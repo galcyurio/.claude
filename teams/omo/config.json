@@ -1,0 +1,81 @@
+{
+  "name": "omo",
+  "description": "Oh-My-Openagent 오케스트레이션 팀.",
+  "createdAt": 1775185470537,
+  "leadAgentId": "sisyphus@omo",
+  "leadSessionId": "",
+  "members": [
+    {
+      "agentId": "sisyphus@omo",
+      "name": "sisyphus",
+      "agentType": "team-lead",
+      "model": "claude-opus-4-6[1m]",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "explore@omo",
+      "name": "explore",
+      "agentType": "Explore",
+      "model": "haiku",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "librarian@omo",
+      "name": "librarian",
+      "agentType": "Librarian",
+      "model": "haiku",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "oracle@omo",
+      "name": "oracle",
+      "agentType": "Oracle",
+      "model": "opus",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "worker@omo",
+      "name": "worker",
+      "agentType": "Junior",
+      "model": "sonnet",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "metis@omo",
+      "name": "metis",
+      "agentType": "Metis",
+      "model": "opus",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "momus@omo",
+      "name": "momus",
+      "agentType": "Momus",
+      "model": "opus",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    },
+    {
+      "agentId": "designer@omo",
+      "name": "designer",
+      "agentType": "Designer",
+      "model": "sonnet",
+      "joinedAt": 1775185470537,
+      "cwd": "/Users/olaf",
+      "subscriptions": []
+    }
+  ]
+}

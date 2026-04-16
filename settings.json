@@ -1,0 +1,44 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max",
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__*",
+      "mcp__plugin_slack_slack__*",
+      "Read(//Users/olaf/.claude/skills/**)",
+      "Edit(/Users/olaf/.claude/**)",
+      "Write(/Users/olaf/.claude/**)",
+      "mcp__ide__getDiagnostics",
+      "mcp__claude_ai_Figma__get_design_context",
+      "mcp__claude_ai_Figma__get_screenshot",
+      "mcp__github__pull_request_read",
+      "mcp__claude_ai_Notion__notion-search",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__claude_ai_Notion__notion-update-page",
+      "mcp__github__get_file_contents",
+      "mcp__claude_ai_Notion__notion-create-pages",
+      "mcp__claude_ai_Figma__get_variable_defs",
+      "mcp__github__search_repositories",
+      "mcp__plugin_slack_slack__slack_read_channel",
+      "mcp__plugin_slack_slack__slack_read_thread"
+    ],
+    "defaultMode": "default"
+  },
+  "hooks": {},
+  "enabledPlugins": {
+    "slack@claude-plugins-official": true
+  },
+  "language": "한국어"
+}

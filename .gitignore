@@ -1,0 +1,43 @@
+# 로컬 전용 설정
+settings.local.json
+
+# 대화 이력 / 세션
+history.jsonl
+sessions/
+session-env/
+transcripts/
+
+# 프로젝트별 데이터 (경로 의존적)
+projects/
+
+# 런타임 데이터
+plans/
+tasks/
+todos/
+file-history/
+shell-snapshots/
+ide/
+backups/
+
+# 캐시
+cache/
+paste-cache/
+plugins/
+mcp-needs-auth-cache.json
+stats-cache.json
+policy-limits.json
+
+# 디버그 / 텔레메트리
+debug/
+telemetry/
+downloads/
+
+# 팀 런타임 (inbox, UUID 세션)
+teams/*/inboxes/
+teams/default/
+teams/3ee68420-*/
+teams/983053d1-*/
+
+# 심링크 (다른 PC에서 동작하지 않음)
+skills/apply-pr-feedback
+skills/pr
