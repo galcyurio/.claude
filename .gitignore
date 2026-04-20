@@ -1,5 +1,7 @@
 # 로컬 전용 설정
+settings.json
 settings.local.json
+.credentials.json
 
 # 대화 이력 / 세션
 history.jsonl
