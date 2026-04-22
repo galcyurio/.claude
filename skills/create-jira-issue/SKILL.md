@@ -1,6 +1,6 @@
 ---
 name: create-jira-issue
-description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명을 일괄 정리한다
+description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명을 일괄 정리하는 스킬. 사용자가 'create-jira-issue', 'Jira 이슈 만들어줘', 'Jira 이슈 생성', '하위 이슈 추가', '서브태스크 만들어줘', 'Jira에 등록', 'HDA 이슈 만들어줘' 등 Jira 이슈/하위 이슈 생성을 요청할 때 이 스킬을 사용해야 한다. 단순 조회(읽기) 요청에는 사용하지 않는다.
 ---
 
 ## 역할

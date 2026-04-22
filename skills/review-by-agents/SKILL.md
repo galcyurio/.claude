@@ -1,6 +1,6 @@
 ---
 name: review-by-agents
-description: "코드 변경사항을 여러 에이전트 관점(Logic, Convention, Security, Architecture)에서 병렬 리뷰한다. 사용자가 'review-by-agents', '코드 리뷰', '에이전트 리뷰', 'code review' 등을 언급할 때 이 스킬을 사용해야 한다."
+description: "코드 변경사항을 여러 에이전트 관점(Logic, Convention, Security, Architecture)에서 병렬 리뷰하는 스킬. 사용자가 'review-by-agents', '코드 리뷰', '에이전트 리뷰', 'code review', '리뷰해줘', 'PR 리뷰해줘', '변경사항 리뷰', '코드 검토', '멀티 에이전트 리뷰', '병렬 리뷰' 등 코드/PR 리뷰를 요청할 때 이 스킬을 사용해야 한다. 단순 PR 조회나 보안 전용 리뷰(security-review 스킬 사용)에는 사용하지 않는다."
 argument-hint: "[PR URL, 파일 경로, 또는 생략(현재 변경사항)]"
 ---
 
