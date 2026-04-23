@@ -6,7 +6,7 @@
 
 | 에이전트 | 모델 | 비용 | 역할 | 사용 시점 |
 |----------|------|------|------|----------|
-| **Explore** | Haiku | 낮음 | 코드베이스 검색 | 넓은 범위 탐색, 병렬 검색 필요 시 |
+| **Explore** *(내장)* | Haiku | 낮음 | 코드베이스 검색 | 넓은 범위 탐색, 병렬 검색 필요 시 |
 | **Librarian** | Haiku | 낮음 | 외부 문서/OSS 검색 | 공식 문서, 원격 코드 조사 시 |
 | **Oracle** | Opus | 높음 | 아키텍처 자문 (읽기 전용) | 설계 판단, 트레이드오프 분석 시 |
 | **Junior** | Sonnet | 중간 | 코드 구현 워커 | 독립 태스크 병렬 실행 시 |
@@ -26,6 +26,7 @@
 | **Mid-sized** | **2개 이상 파일** 수정, 중간 규모 ("로그인 기능 추가해") | **Junior 병렬 스폰** (직접 처리 금지) |
 | **Large** | 5개 이상 파일 또는 Wave 분리 필요, 스코프 넓음 ("결제 모듈 리팩토링해", "모듈 재설계") | Metis 자문 → 계획 작성 → Momus 검증 → 검증된 계획을 사용자에게 전달 → 사용자 승인 → Junior 병렬 스폰 |
 | **Ambiguous** | 스코프 불명확, 여러 해석 가능 | Metis 자문 또는 명확화 질문 1개 → 재분류 |
+| **Meta** | harness/규칙/훅/설정 변경 ("훅 수정해", "룰 추가해", "스킬 바꿔") | `update-config` 스킬 또는 오케스트레이터 직접 편집. 코드 작업 라우팅(Junior/Metis 등)을 사용하지 않는다 |
 
 ## Mid-sized 위임 강제 규칙
 
@@ -64,9 +65,9 @@ Mid-sized로 분류된 요청은 **반드시 Junior에게 위임한다**. 직접
 
 ## 라우팅 예시
 
-- `"이 함수 어디서 호출돼?"` → **Trivial** → 직접 Grep/Glob
 - `"로그인 API 응답 형식 알려줘"` → **Exploratory** → Explore 단독
 - `"Spring Security 최신 설정 방법은?"` → **Exploratory** → Librarian 단독
+- `"이 함수 어디서 호출돼?"` → **Exploratory** → Explore 단독 (여러 파일 Grep)
 - `"이 설계가 맞는지 봐줘"` → **Evaluation** → Oracle → 제안 → 사용자 확인 → 구현 필요 시 재분류
 - `"로그인 실패 시 재시도 로직 추가해"` → **Explicit** → 직접 처리 (단일 파일)
 - `"로그인 기능 추가해"` → **Mid-sized** → Junior 2~3개 병렬 (API, UI, 테스트)
@@ -80,6 +81,8 @@ Mid-sized로 분류된 요청은 **반드시 Junior에게 위임한다**. 직접
 - `"이 Figma 컴포넌트의 토큰 뽑아줘"` → **Design Task** → Designer 스폰
 - `"디자인 시스템에서 Button 컴포넌트 찾아줘"` → **Design Task** → Designer 스폰
 - `"플로우 다이어그램 FigJam으로 만들어줘"` → **Design Task** → Designer 스폰
+- `"UserPromptSubmit 훅 수정해"` → **Meta** → 오케스트레이터 직접 편집
+- `"settings.json에 권한 추가해"` → **Meta** → `update-config` 스킬
 
 ## 계획 작성 시 체크리스트
 
