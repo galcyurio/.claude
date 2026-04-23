@@ -4,6 +4,15 @@
 
 **Intent(의도) 판별과 Routing(실행 경로)은 별개다.** Intent Gate는 **"사용자가 진짜 무엇을 원하는가"**만 판별한다. "어떤 에이전트/도구로 실행하는가"는 `orchestration.md`가 담당한다. 두 레이어를 섞지 않는다.
 
+## 참고: Layer 1 (훅) 자동 응답 모드
+
+`~/.claude/hooks/intent-gate.js` 훅이 사용자 메시지에서 아래 한글 키워드를 감지하면 응답 전략 메시지를 자동 주입한다.
+
+- **search 모드** (`찾아`, `탐색`, `조회`, `검색`, `어디` 등): 병렬 탐색 최대화 (Explore/Librarian 다중 + Grep/rg/ast-grep)
+- **analyze 모드** (`분석`, `조사`, `파악`, `디버깅`, `왜`, `어떻게` 등): 맥락 수집 후 깊이 분석, 필요 시 Oracle 자문
+
+이 두 모드는 아래 Intent 분류와 **직교**한다. 한 메시지에서 Intent와 Mode가 동시 활성 가능 (예: Intent=Investigation + search 모드).
+
 ## Step 1. Intent Classification
 
 사용자 발화의 **진짜 의도**를 아래 중 하나로 분류한다. 표면 단어가 아니라 사용자가 궁극적으로 얻으려는 것을 본다.
