@@ -26,11 +26,3 @@
 
 # PR 제목 규칙
 - PR 제목은 Jira issue 제목과 동일하게 작성한다.
-
-# omo팀
-- "omo팀"은 Claude Code 팀 이름(Oh-My-Openagent)이다. 오타나 감탄사가 아니다.
-- "omo팀"이 언급되면:
-  1. orchestration.md 라우팅 규칙에 따라 요청을 분류한다.
-  2. 필요한 에이전트를 Agent 도구로 스폰한다 (`team_name: "omo"`).
-  3. TaskCreate로 태스크를 생성하고 팀원에게 할당한다.
-  4. SendMessage로 팀원을 조율한다.
