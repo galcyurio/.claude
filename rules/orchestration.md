@@ -26,7 +26,6 @@
 | **Mid-sized** | **2개 이상 파일** 수정, 중간 규모 ("로그인 기능 추가해") | **Junior 병렬 스폰** (직접 처리 금지) |
 | **Large** | 5개 이상 파일 또는 Wave 분리 필요, 스코프 넓음 ("결제 모듈 리팩토링해", "모듈 재설계") | Metis 자문 → 계획 작성 → Momus 검증 → 검증된 계획을 사용자에게 전달 → 사용자 승인 → Junior 병렬 스폰 |
 | **Ambiguous** | 스코프 불명확, 여러 해석 가능 | Metis 자문 또는 명확화 질문 1개 → 재분류 |
-| **Meta** | harness/규칙/훅/설정 변경 ("훅 수정해", "룰 추가해", "스킬 바꿔") | `update-config` 스킬 또는 오케스트레이터 직접 편집. 코드 작업 라우팅(Junior/Metis 등)을 사용하지 않는다 |
 
 ## Mid-sized 위임 강제 규칙
 
@@ -81,8 +80,6 @@ Mid-sized로 분류된 요청은 **반드시 Junior에게 위임한다**. 직접
 - `"이 Figma 컴포넌트의 토큰 뽑아줘"` → **Design Task** → Designer 스폰
 - `"디자인 시스템에서 Button 컴포넌트 찾아줘"` → **Design Task** → Designer 스폰
 - `"플로우 다이어그램 FigJam으로 만들어줘"` → **Design Task** → Designer 스폰
-- `"UserPromptSubmit 훅 수정해"` → **Meta** → 오케스트레이터 직접 편집
-- `"settings.json에 권한 추가해"` → **Meta** → `update-config` 스킬
 
 ## 계획 작성 시 체크리스트
 

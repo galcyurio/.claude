@@ -25,13 +25,11 @@
 | **Implementation (explicit)** | "X 추가해", "Y 수정해", "Z 만들어" — 명시적 구현 동사 + 구체적 대상 | 구현 또는 위임. |
 | **Fix needed** | "X가 안 돼", "에러 났어", "Y가 깨졌어" | 진단 → 최소 수정. |
 | **Open-ended change** | "리팩토링", "개선해", "정리해" — 변경은 원하지만 범위가 암시적 | 범위 평가 → 접근 제안 → **사용자 확인 대기**. |
-| **Meta** | "너 설정 바꿔", "훅 수정해", "규칙 추가해" — harness/규칙 변경 | 설정·규칙 변경. 코드 작업과 구분한다. |
 
 **핵심 구분**:
 - `Implementation (explicit)` vs `Open-ended change`: 명시적 동사 + 구체적 대상이면 explicit, 방향만 있고 범위가 모호하면 open-ended.
 - `Research/understanding` vs `Investigation`: 개념/원리 이해 목적이면 Research, 특정 상태 확인/원인 추적이면 Investigation.
 - `Fix needed` vs `Implementation (explicit)`: 깨진 것을 고치는 것이면 Fix, 멀쩡한 상태에 기능을 더하는 것이면 Implementation.
-- `Meta` vs 나머지: 대상이 **코드베이스가 아니라 harness/규칙/훅**이면 Meta.
 
 ## Step 2. Ambiguity Check
 
@@ -52,6 +50,5 @@ Step 1에서 2개 이상 Intent가 후보로 남으면 **명확화 질문 1개**
 - `[의도: Open-ended change — "리팩토링" 범위 미정]`
 - `[의도: Evaluation — 설계 타당성 판단 요청]`
 - `[의도: Fix needed — 로그인 500 에러 디버깅]`
-- `[의도: Meta — UserPromptSubmit 훅 스크립트 수정]`
 
 사용자가 명시적으로 표시 생략을 요청하지 않는 한 **모든 응답**(단순 답변, 에러 상황, 이어지는 턴 포함)에 붙인다.
