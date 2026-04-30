@@ -2,7 +2,6 @@
 name: create-test-screen
 description: 디바이스에서 즉시 띄워 검증할 수 있는 테스트 전용 Activity를 추가한다 — UI 컴포넌트/View, Dialog, BottomSheet, Compose Screen 등을 단일 또는 묶음 형태로 한 화면에 올리고, 앱 서랍에 별도 아이콘(LAUNCHER intent-filter + exported=true 포함)으로 노출한다. 사용자가 'create-test-screen', '테스트 화면 만들어줘', '컴포넌트 테스트 화면', '마이그레이션 확인 화면', '변경사항 확인 화면', '디바이스에서 띄워보고 싶다', 등 — 디바이스에서 즉시 띄워 검증할 화면 생성을 요청하면 **반드시** 이 스킬로 진입한다. Activity/Manifest를 스킬 우회로 직접 작성하지 않는다. 프로덕션 화면 생성에는 사용하지 않는다.
 argument-hint: "[component_fqcn] [ticket_id]"
-disable-model-invocation: true
 ---
 
 # /create-test-screen
