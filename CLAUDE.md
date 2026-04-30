@@ -12,11 +12,6 @@
 
 # 코드 수정 검증 절차
 
-## Kotlin/Java 파일 수정 규칙
-
-- Kotlin(`.kt`), Java(`.java`) 파일은 `bash` heredoc(`cat > file << 'EOF'`)으로 수정한다. (IDE MCP 도구의 자동 포맷터 회피)
-- 포맷 변경이 섞여 있으면 `git restore --source=HEAD -- <파일>`로 원복 후 재작성한다.
-
 ## 범위 이탈 방지 절차 (필수)
 
 - 수정 시작 전 `git status --short`로 대상 파일을 명시한다.
