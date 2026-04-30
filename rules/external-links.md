@@ -20,7 +20,7 @@
 | Notion | `*.notion.so`, `*.notion.site` | `mcp__claude_ai_Notion__notion-fetch` | 페이지 내용 |
 | Figma | `figma.com` | `mcp__claude_ai_Figma__get_design_context`, `mcp__claude_ai_Figma__get_screenshot` | 디자인 컨텍스트, 스크린샷 |
 | Jira | `*.atlassian.net`, `*.jira.com` | `mcp__claude_ai_Atlassian__getJiraIssue` | 이슈 제목, 설명, AC |
-| Slack | `*.slack.com` | `mcp__plugin_slack_slack__slack_read_thread`, `mcp__plugin_slack_slack__slack_read_channel` | 메시지/스레드 내용 |
+| Slack | `*.slack.com` | `mcp__claude_ai_Slack__slack_read_thread`, `mcp__claude_ai_Slack__slack_read_channel` | 메시지/스레드 내용 |
 
 ## URL 파싱 규칙
 
@@ -66,8 +66,8 @@ https://{workspace}.slack.com/archives/{channelId}
 
 - `channelId`: `/archives/` 다음 세그먼트 (예: `C01234567`)
 - `threadTs`: `p` 접두어를 제거하고 10번째 자리에 `.` 삽입 (예: `p1712345678901234` → `1712345678.901234`)
-- 스레드 링크(`p{timestamp}` 포함) → `mcp__plugin_slack_slack__slack_read_thread`에 `channelId`, `threadTs` 전달
-- 채널 링크(timestamp 없음) → `mcp__plugin_slack_slack__slack_read_channel`에 `channelId` 전달
+- 스레드 링크(`p{timestamp}` 포함) → `mcp__claude_ai_Slack__slack_read_thread`에 `channelId`, `threadTs` 전달
+- 채널 링크(timestamp 없음) → `mcp__claude_ai_Slack__slack_read_channel`에 `channelId` 전달
 
 ## 공통 규칙
 
