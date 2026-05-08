@@ -40,6 +40,59 @@ teams/default/
 teams/3ee68420-*/
 teams/983053d1-*/
 
-# 심링크 (다른 PC에서 동작하지 않음)
+# .android-ai-prompts symlink (별도 repo에서 관리)
 skills/apply-pr-feedback
-skills/pr
+
+# === gstack ===
+# gstack은 git submodule로 관리 (.gitmodules 참조).
+# wrapper는 머신별 setup으로 재생성. .bin/gstack-gitignore-sync.sh로 자동 갱신.
+# 마이그레이션 백업 (검증 후 rm -rf로 정리)
+skills/gstack.bak/
+# >>> gstack-wrappers (auto-generated) >>>
+skills/autoplan/
+skills/benchmark-models/
+skills/benchmark/
+skills/browse/
+skills/canary/
+skills/careful/
+skills/codex/
+skills/connect-chrome/
+skills/context-restore/
+skills/context-save/
+skills/cso/
+skills/design-consultation/
+skills/design-html/
+skills/design-review/
+skills/design-shotgun/
+skills/devex-review/
+skills/document-release/
+skills/freeze/
+skills/gstack-upgrade/
+skills/guard/
+skills/health/
+skills/investigate/
+skills/land-and-deploy/
+skills/landing-report/
+skills/learn/
+skills/make-pdf/
+skills/office-hours/
+skills/open-gstack-browser/
+skills/pair-agent/
+skills/plan-ceo-review/
+skills/plan-design-review/
+skills/plan-devex-review/
+skills/plan-eng-review/
+skills/plan-tune/
+skills/qa-only/
+skills/qa/
+skills/retro/
+skills/review/
+skills/scrape/
+skills/setup-browser-cookies/
+skills/setup-deploy/
+skills/setup-gbrain/
+skills/ship/
+skills/skillify/
+skills/sync-gbrain/
+skills/unfreeze/
+# <<< gstack-wrappers <<<

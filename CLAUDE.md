@@ -21,3 +21,20 @@
 
 # PR 제목 규칙
 - PR 제목은 Jira issue 제목과 동일하게 작성한다.
+
+# gstack
+
+- 모든 웹 브라우징은 gstack의 `/browse` skill을 사용한다.
+- `mcp__claude-in-chrome__*` 도구는 절대 사용하지 않는다.
+- 사용 가능한 gstack skill 목록:
+  - `/office-hours`, `/plan-ceo-review`, `/plan-eng-review`, `/plan-design-review`
+  - `/design-consultation`, `/design-shotgun`, `/design-html`
+  - `/review`, `/ship`, `/land-and-deploy`, `/canary`, `/benchmark`
+  - `/browse`, `/connect-chrome`
+  - `/qa`, `/qa-only`, `/design-review`
+  - `/setup-browser-cookies`, `/setup-deploy`, `/setup-gbrain`
+  - `/retro`, `/investigate`, `/document-release`
+  - `/codex`, `/cso`, `/autoplan`
+  - `/plan-devex-review`, `/devex-review`
+  - `/careful`, `/freeze`, `/guard`, `/unfreeze`
+  - `/gstack-upgrade`, `/learn`
