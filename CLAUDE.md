@@ -38,3 +38,35 @@
   - `/plan-devex-review`, `/devex-review`
   - `/careful`, `/freeze`, `/guard`, `/unfreeze`
   - `/gstack-upgrade`, `/learn`
+
+## gstack — 새 머신 셋업
+
+gstack은 git submodule (`skills/gstack` -> `garrytan/gstack`)로 관리한다. clone 후 prep + setup을 1회 실행한다.
+
+```bash
+git clone --recurse-submodules git@github-galcyurio:galcyurio/.claude.git ~/.claude
+~/.claude/.bin/gstack-submodule-prep.sh   # .git gitfile -> symlink 변환 (멱등)
+~/.claude/skills/gstack/setup              # browse binary + wrapper 등록
+```
+
+> 모든 머신은 동일한 홈 경로(`/Users/olaf/`)를 가정한다. wrapper symlink가 절대경로 기반.
+> prep 스크립트는 `[ -d ".git" ]` detection을 통과시켜 `/gstack-upgrade`가 `vendored` 분기 대신 `global-git` 분기로 진입하도록 한다.
+
+## gstack 업데이트
+
+```bash
+# 방식 1: /gstack-upgrade skill (권장)
+# Claude Code에서 /gstack-upgrade 실행 -> global-git 분기로 git fetch + reset --hard origin/main + setup
+cd ~/.claude
+~/.claude/.bin/gstack-gitignore-sync.sh    # wrapper 변경 반영
+git add skills/gstack .gitignore
+git commit -m "chore: gstack vX.Y.Z 업데이트"
+
+# 방식 2: 수동 submodule update
+cd ~/.claude
+git submodule update --remote skills/gstack
+~/.claude/skills/gstack/setup
+~/.claude/.bin/gstack-gitignore-sync.sh
+git add skills/gstack .gitignore
+git commit -m "chore: gstack vX.Y.Z 업데이트"
+```
