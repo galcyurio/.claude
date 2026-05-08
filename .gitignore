@@ -20,6 +20,7 @@ file-history/
 shell-snapshots/
 ide/
 backups/
+.last-cleanup
 
 # 캐시
 cache/
