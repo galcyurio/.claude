@@ -1,6 +1,6 @@
 ---
 name: start-jira-plan
-description: Jira 이슈 링크나 이슈 키를 받아 이슈 제목/설명을 읽고 작업 계획을 수립한다
+description: Jira 이슈 링크나 이슈 키를 받아 이슈 제목/설명을 읽고 작업 계획을 수립하는 스킬. 사용자가 'start-jira-plan', '계획 시작', '계획해', '계획해 줘', '계획 세워줘', '계획 짜줘', '작업 계획 세워줘', 'Jira 이슈로 계획 세워줘', '이슈로 계획 짜줘', 'HDA-... 계획 세워줘' 등 Jira 이슈 기반 작업 계획 수립을 요청할 때 이 스킬을 사용해야 한다. 단순 이슈 조회나 이슈 생성(create-jira-issue 스킬 사용)에는 사용하지 않는다.
 argument-hint: "[jira_url_or_issue_key]"
 ---
 
