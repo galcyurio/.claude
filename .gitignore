@@ -21,6 +21,11 @@ shell-snapshots/
 ide/
 backups/
 .last-cleanup
+daemon.lock
+daemon.log
+daemon.status.json
+daemon/
+jobs/
 
 # 캐시
 cache/
@@ -29,6 +34,7 @@ plugins/
 mcp-needs-auth-cache.json
 stats-cache.json
 policy-limits.json
+gh-pr-status-cache.json
 
 # 디버그 / 텔레메트리
 debug/
