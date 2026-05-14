@@ -6,9 +6,14 @@
 
 # 세션 이름 규칙
 - Jira 이슈가 확인되면 Jira ID와 Title을 이용해 세션 이름을 작성한다.
-- 규칙: ${JiraId} ${JiraTitle}
-- 예시: HDA-10000 [고객] 로그인 기능 추가
-- 세션 이름을 지을 때는 설명 없이 `/rename ${JiraId} ${JiraTitle}` 한 줄만 단독 출력한다.
+- 세션 이름을 지을 때는 설명 없이 아래 2줄을 단독 출력한다.
+  1. `/rename ${JiraId} ${JiraFullTitle}` — Jira 원본 제목 그대로 (대괄호 prefix 포함)
+  2. `/rename ${JiraId} ${JiraShortTitle}` — 대괄호 prefix(`[고객]`, `[마켓 추천 매물 강화]` 등)를 모두 제거한 핵심 제목만
+- 예시 (Jira 제목이 `[고객][마켓 추천 매물 강화] 모델 퀵링크 - MarketCarList`인 경우):
+  ```
+  /rename HDA-21304 [고객][마켓 추천 매물 강화] 모델 퀵링크 - MarketCarList
+  /rename HDA-21304 모델 퀵링크 - MarketCarList
+  ```
 
 # 코드 수정 검증 절차
 
