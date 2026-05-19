@@ -24,8 +24,8 @@
 | **Design Task** | Figma URL, 디자인 조회/탐색, 디자인 시스템 검색, 시각 비교, FigJam 다이어그램, Code Connect 매핑 등 디자인 관련 요청 | Designer 스폰 |
 | **Explicit** | **단일 파일**, 명확한 지시 ("X에 Y 추가해", "Z 에러 수정해") | 직접 처리 |
 | **Mid-sized** | **2개 이상 파일** 수정, 중간 규모 ("로그인 기능 추가해") | **Junior 병렬 스폰** (직접 처리 금지) |
-| **Large** | 5개 이상 파일 또는 Wave 분리 필요, 스코프 넓음 ("결제 모듈 리팩토링해", "모듈 재설계") | Metis 자문 → **의도 재진술 + 사용자 승인** (`plan.md` 절차, `AskUserQuestion`) → 계획 본문 작성 → Momus 검증 → 검증된 계획을 사용자에게 전달 → 사용자 승인 → Junior 병렬 스폰 |
-| **Ambiguous** | 스코프 불명확, 여러 해석 가능 | Metis 자문 또는 명확화 질문 1개 → 재분류 |
+| **Large** | 5개 이상 파일 또는 Wave 분리 필요, 스코프 넓음 ("결제 모듈 리팩토링해", "모듈 재설계") | 의도 재진술 + 사용자 승인 (`AskUserQuestion`) → Metis 자문 → 계획 본문 작성 → Momus 검증 → 검증된 계획을 사용자에게 전달 → 사용자 승인 → Junior 병렬 스폰 |
+| **Ambiguous** | 스코프 불명확, 여러 해석 가능 | 의도 재진술 또는 명확화 질문 → 재분류 |
 
 ## Mid-sized 위임 강제 규칙
 
@@ -70,10 +70,10 @@ Mid-sized로 분류된 요청은 **반드시 Junior에게 위임한다**. 직접
 - `"이 설계가 맞는지 봐줘"` → **Evaluation** → Oracle → 제안 → 사용자 확인 → 구현 필요 시 재분류
 - `"로그인 실패 시 재시도 로직 추가해"` → **Explicit** → 직접 처리 (단일 파일)
 - `"로그인 기능 추가해"` → **Mid-sized** → Junior 2~3개 병렬 (API, UI, 테스트)
-- `"결제 모듈 리팩토링해"` → **Large** → Metis → 재진술 승인 → 계획 → Momus → 사용자 승인 → Junior 병렬
+- `"결제 모듈 리팩토링해"` → **Large** → 재진술 승인 → Metis → 계획 → Momus → 사용자 승인 → Junior 병렬
 - `"이 API 엔드포인트 정리해"` → **Mid-sized** → Junior 1~2개
-- `"전체 아키텍처 재설계해"` → **Large** → Metis → 재진술 승인 → 계획 → Momus → 사용자 승인 → Junior 병렬
-- `"이거 구현해줘" (요구사항 모호)` → **Ambiguous** → Metis 자문 → 재분류
+- `"전체 아키텍처 재설계해"` → **Large** → 재진술 승인 → Metis → 계획 → Momus → 사용자 승인 → Junior 병렬
+- `"이거 구현해줘" (요구사항 모호)` → **Ambiguous** → 의도 재진술 또는 명확화 질문 → 재분류
 - `"이 Figma 디자인이랑 구현이 맞는지 확인해줘"` → **Design Task** → Designer 스폰
 - `"figma.com/design/abc123 이거랑 비교해줘"` → **Design Task** → Designer 스폰
 - `"UI migration 전후 비교해줘"` → **Design Task** → Designer 스폰 (기존 코드 ↔ 신규 코드)
