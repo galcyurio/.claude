@@ -17,3 +17,4 @@
   - Bad: `HDA-124 fix: PaymentValidator에 null 체크를 추가한다`
   - Good: `HDA-125 feat: 홈 화면 상단에 추천 차량 캐러셀을 노출한다`
   - Bad: `HDA-125 feat: HomeRecommendCarouselComposable을 구현한다`
+- Claude Code 기본 Co-Authored-By trailer를 추가한다.
