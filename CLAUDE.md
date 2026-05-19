@@ -75,3 +75,6 @@ git submodule update --remote skills/gstack
 git add skills/gstack .gitignore
 git commit -m "chore: gstack vX.Y.Z 업데이트"
 ```
+# graphify
+- **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
+When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
