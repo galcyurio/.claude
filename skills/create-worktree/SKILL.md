@@ -1,12 +1,12 @@
 ---
 name: create-worktree
-description: git worktree를 추가하고 서브모듈/.claude 초기화까지 한 번에 처리하는 스킬. 사용자가 'create-worktree', 'worktree 만들어', 'worktree 추가', '워크트리 만들어', '워크트리 생성', '병렬 작업 환경 만들어줘', '새 worktree' 등 worktree 생성을 요청할 때 이 스킬을 사용해야 한다. worktree 삭제/조회 요청에는 사용하지 않는다.
+description: git worktree를 추가하고 서브모듈/.claude/.agent 초기화까지 한 번에 처리하는 스킬. 사용자가 'create-worktree', 'worktree 만들어', 'worktree 추가', '워크트리 만들어', '워크트리 생성', '병렬 작업 환경 만들어줘', '새 worktree' 등 worktree 생성을 요청할 때 이 스킬을 사용해야 한다. worktree 삭제/조회 요청에는 사용하지 않는다.
 argument-hint: "[branch-name] [base-branch]"
 ---
 
 ## 역할
 
-현재 git 저장소에서 새 worktree를 생성하고, 서브모듈과 `.claude/` 환경까지 새 worktree에서 즉시 작업 가능한 상태로 초기화한다.
+현재 git 저장소에서 새 worktree를 생성하고, 서브모듈·`.claude/`·`.agent/` 환경까지 새 worktree에서 즉시 작업 가능한 상태로 초기화한다.
 
 사용자 입력: $ARGUMENTS
 
@@ -119,7 +119,7 @@ git worktree add <worktree-path> <branch-name>
 
 `git worktree add` 실패 시 에러 메시지를 그대로 노출하고 종료한다.
 
-### 2. 서브모듈/.claude 초기화
+### 2. 서브모듈/.claude/.agent 초기화
 
 worktree가 생성되면 다음 스크립트를 호출한다:
 
@@ -138,12 +138,16 @@ worktree가 생성되면 다음 스크립트를 호출한다:
    - **broken link 검출**: 링크 생성 후 target이 실재하지 않으면 `broken link: <name> -> <target>` 경고를 별도로 출력.
 4. **`.claude/plans/` 빈 디렉토리** — 메인의 plan 파일은 가져오지 않는다(plan은 worktree별 작업 단위).
 5. **`settings.local.json`** — 메인에 있고 worktree에 없을 때만 복사. worktree에 이미 있으면 덮어쓰지 않고 skip하며 "메인의 settings.local.json과 다를 수 있음" 경고를 출력.
+6. **`.agent/` 심볼릭 링크** — `<worktree>/.agent`를 메인의 `.agent/`로 향하는 symlink로 만든다. superpowers의 spec/plan(`/.agent/specs/`, `/.agent/plans/`)을 모든 worktree에서 같은 메인 디렉토리로 공유하기 위함이다.
+   - 메인에 `.agent/`가 없으면 `.agent/specs/`, `.agent/plans/`까지 함께 신규 생성한 뒤 link한다.
+   - worktree에 이미 `.agent`가 존재하면 skip (이미 symlink면 target만 출력, 일반 디렉토리면 그대로 둔다).
+   - broken symlink면 경고만 출력하고 진행한다.
 
 메인 `.claude/` 직속의 그 외 항목(사용자 메모, 로컬 스크립트 등)은 자동 복사하지 않는다. 사용자에게 발견 사실만 보고하고 결정은 위임한다.
 
 ### 3. 결과 보고
 
-스크립트가 출력한 요약(서브모듈, `.claude/`·`rules/`·`plans/`·`settings.local.json` 초기화 결과, skip된 항목, broken link 경고)을 그대로 사용자에게 전달한다. 추가로 다음을 함께 안내한다.
+스크립트가 출력한 요약(서브모듈, `.claude/`·`rules/`·`plans/`·`settings.local.json`·`.agent/` 초기화 결과, skip된 항목, broken link 경고)을 그대로 사용자에게 전달한다. 추가로 다음을 함께 안내한다.
 
 - 생성된 worktree 경로와 브랜치
 - 충돌 검증 결과 — 사전 감지하여 차단한 충돌이 있었으면 무엇이었는지
@@ -163,4 +167,5 @@ worktree가 생성되면 다음 스크립트를 호출한다:
 - **이미 사용 중인 브랜치**: git은 같은 브랜치를 두 worktree에서 동시에 체크아웃할 수 없다. "충돌 검증" 단계에서 사전 감지하여 어떤 worktree가 점유 중인지 안내한 뒤 종료한다.
 - **`.claude/`는 .gitignore 대상**: worktree 생성만으로는 자동 복제되지 않는다. 본 스킬이 명시적으로 초기화한다.
 - **plans는 복사하지 않는다**: worktree는 새 작업 단위이므로 메인의 진행 중인 plan을 함께 가져가면 혼동을 유발한다.
+- **`.agent/`는 메인과 공유한다**: spec/plan(`.agent/specs/`, `.agent/plans/`)은 worktree마다 따로 두지 않고 symlink로 메인 디렉토리를 가리키게 한다. worktree에서 작성한 spec/plan을 메인 및 다른 worktree에서도 그대로 읽고 갱신할 수 있다.
 - **사용자가 명시한 경로/이름이 있으면 자동 결정 로직보다 우선**한다.

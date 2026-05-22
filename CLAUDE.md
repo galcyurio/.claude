@@ -30,3 +30,7 @@
 # graphify
 - **graphify** (`~/.claude/skills/graphify/SKILL.md`) - any input to knowledge graph. Trigger: `/graphify`
 When the user types `/graphify`, invoke the Skill tool with `skill: "graphify"` before doing anything else.
+
+# Superpowers 문서 위치
+- spec: `.agent/specs/`에 저장
+- plan: `.agent/plans/`에 저장
