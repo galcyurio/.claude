@@ -119,70 +119,34 @@ git worktree add <worktree-path> <branch-name>
 
 `git worktree add` 실패 시 에러 메시지를 그대로 노출하고 종료한다.
 
-### 2. 서브모듈 초기화
+### 2. 서브모듈/.claude 초기화
 
-메인 worktree의 `.gitmodules` 존재 여부를 먼저 확인한다.
-
-- `.gitmodules`가 없으면 이 단계를 건너뛴다.
-- 있으면 새 worktree로 이동(`cd <worktree-path>`) 후 다음을 순서대로 실행한다:
+worktree가 생성되면 다음 스크립트를 호출한다:
 
 ```bash
-git submodule update --init --recursive
+~/.claude/skills/create-worktree/init.sh <worktree-path>
 ```
 
-서브모듈이 여러 개거나 깊은 트리인 경우에도 `--recursive`로 전부 처리한다.
+스크립트는 다음을 idempotent하게 처리한다(같은 worktree에 재실행해도 기존 항목 덮어쓰기 금지):
 
-명령 실패 시 에러를 그대로 노출하고, 후속 단계인 `.claude/` 초기화는 계속 진행한다. 사용자가 즉시 수동 재시도할 수 있도록 다음 안내를 함께 출력한다:
+1. **서브모듈 초기화** — 메인 worktree에 `.gitmodules`가 있을 때만 `git submodule update --init --recursive`를 실행. 실패해도 다음 단계는 계속 진행하며, 수동 재시도 명령을 함께 출력한다.
+2. **`.claude/` 디렉토리** — `<worktree>/.claude/`가 없으면 생성, 있으면 skip.
+3. **`.claude/rules/` 복제** — 메인 `.claude/rules/` 항목을 새 worktree로 복제한다.
+   - **심볼릭 링크**: `readlink`로 원본 타깃을 읽어 같은 타깃 링크를 만든다. 메인이 `~/.android-ai-prompts/rules/...` 같은 절대 경로 링크를 쓰면 그대로 보존된다.
+   - **일반 파일/디렉토리**: `cp -R`로 복사.
+   - **충돌 시 skip**: 같은 이름이 이미 있으면 덮어쓰지 않고 skip.
+   - **broken link 검출**: 링크 생성 후 target이 실재하지 않으면 `broken link: <name> -> <target>` 경고를 별도로 출력.
+4. **`.claude/plans/` 빈 디렉토리** — 메인의 plan 파일은 가져오지 않는다(plan은 worktree별 작업 단위).
+5. **`settings.local.json`** — 메인에 있고 worktree에 없을 때만 복사. worktree에 이미 있으면 덮어쓰지 않고 skip하며 "메인의 settings.local.json과 다를 수 있음" 경고를 출력.
 
-> 서브모듈 초기화에 실패했습니다. `.claude/` 초기화는 계속 진행합니다.
-> 수동 재시도:
->   cd <worktree-path>
->   git submodule update --init --recursive
+메인 `.claude/` 직속의 그 외 항목(사용자 메모, 로컬 스크립트 등)은 자동 복사하지 않는다. 사용자에게 발견 사실만 보고하고 결정은 위임한다.
 
-### 3. `.claude/` 초기화
+### 3. 결과 보고
 
-메인 worktree의 `<main>/.claude/`를 참조하여 새 worktree의 `<worktree-path>/.claude/`를 구성한다.
-
-모든 sub-step은 **idempotent**하게 동작한다. 같은 worktree 경로에 재실행해도 기존 항목을 덮어쓰지 않고, 누락된 항목만 채운 뒤 결과 보고에 "skipped"로 기록한다.
-
-#### 3-1. `.claude/` 자체
-
-- 새 worktree에 `.claude/` 디렉토리가 없으면 생성한다. 이미 있으면 skip.
-
-#### 3-2. `.claude/rules/`
-
-메인의 `.claude/rules/` 안에 있는 항목을 그대로 새 worktree에 복제한다. **새 worktree에 같은 이름의 항목이 이미 있으면 skip하고 결과 보고에 "skipped"로 기록한다(기존 항목 덮어쓰기 금지).**
-
-- **심볼릭 링크**: `readlink`로 원본 타깃을 읽어 새 worktree의 같은 위치에 동일 타깃을 가리키는 심볼릭 링크를 만든다. 메인이 `~/.android-ai-prompts/rules/...` 형태의 절대 경로 링크를 쓰므로 그대로 사용한다.
-  - **target 실재 검증**: 링크 생성 직전에 `[ -e <target> ]`로 target 존재를 확인한다. target이 실재하지 않으면 링크는 만들되 결과 보고에 `broken link: <link path> -> <target> (target 부재)` 경고를 추가한다(silent failure 방지).
-- **일반 파일/디렉토리**: 발견되면 `cp -R`로 복사한다.
-- 메인에 `.claude/rules/`가 없으면 이 단계를 건너뛴다.
-
-#### 3-3. `.claude/plans/`
-
-새 worktree에 `.claude/plans/` 빈 디렉토리를 만든다. 이미 있으면 skip하고 내부 plan 파일은 그대로 둔다. 메인의 plan 파일은 복사하지 않는다(plan은 worktree별 작업 단위).
-
-#### 3-4. `.claude/settings.local.json`
-
-메인에 `settings.local.json`이 있으면 그대로 새 worktree로 복사한다. 없으면 생성하지 않는다. **새 worktree에 이미 `settings.local.json`이 있으면 덮어쓰지 않고 skip하며, 결과 보고에 "메인의 settings.local.json과 다를 수 있음" 경고를 추가한다.**
-
-#### 3-5. 그 외 메인 `.claude/` 항목
-
-메인 `.claude/` 직속의 다른 파일/디렉토리(예: 사용자가 별도로 둔 메모, 로컬 스크립트)는 자동 복사하지 않는다. 사용자에게 발견 사실만 보고하고 결정은 위임한다.
-
-### 4. 결과 보고
-
-다음 정보를 사용자에게 출력한다.
+스크립트가 출력한 요약(서브모듈, `.claude/`·`rules/`·`plans/`·`settings.local.json` 초기화 결과, skip된 항목, broken link 경고)을 그대로 사용자에게 전달한다. 추가로 다음을 함께 안내한다.
 
 - 생성된 worktree 경로와 브랜치
 - 충돌 검증 결과 — 사전 감지하여 차단한 충돌이 있었으면 무엇이었는지
-- 서브모듈 초기화 결과 (수행/생략/실패 — 실패 시 수동 재시도 명령 함께)
-- `.claude/` 초기화 결과
-  - 복제된 rules 항목 목록 (`common`, `heydealer` 등)
-  - **이미 존재해서 skip된 항목 목록** (재실행 시)
-  - **broken symlink 경고 목록** (target 부재인 링크가 있었던 경우)
-  - `plans/` 생성/skip 여부
-  - `settings.local.json` 복사/skip 여부 (skip 시 메인과 다를 수 있음 경고)
 - 다음 행동 제안: `cd <worktree-path>`로 이동하여 작업 시작
 
 ## 예시
