@@ -1,6 +1,6 @@
 ---
 name: feature-memory
-description: 피처(Jira Epic 단위) 진행 현황을 Jira·Slack·Notion·GitHub에서 자동 수집해 Notion 페이지에 markdown 보고서로 갱신하는 스킬. 사용자가 'feature-memory', '피처 현황', '피처 진행 상황', '피처 상태', '진행 현황 갱신', '진행 상황 업데이트', '피처 보고서', '피처 트래킹', '피처 추적' 등 피처 진행 현황 보고서 생성/갱신/조회를 요청할 때 이 스킬을 사용해야 한다. 매일 새벽 Claude Code의 /schedule routine으로 자동 호출되며, 수동 호출도 동일하게 동작한다. 단순 Jira 이슈 조회(start-jira-plan/create-jira-issue)나 일일 업무 기록(snippet)에는 사용하지 않는다.
+description: 피처(Jira Epic 단위) 진행 현황을 Jira·Slack·Notion·GitHub에서 자동 수집해 Notion 페이지에 markdown 보고서로 갱신하는 스킬. 사용자가 'feature-memory', '피처 현황', '피처 진행 상황', '피처 상태', '진행 현황 갱신', '진행 상황 업데이트', '피처 보고서', '피처 트래킹', '피처 추적' 등 피처 진행 현황 보고서 생성/갱신/조회를 요청할 때 이 스킬을 사용해야 한다. 매일 새벽 Claude Code의 /schedule routine으로 자동 호출되며, 수동 호출도 동일하게 동작한다. 단순 Jira 이슈 작업(create-jira-issue)이나 일일 업무 기록(snippet)에는 사용하지 않는다.
 argument-hint: "[bootstrap | register <epic-key> [...옵션] | <epic-key> | batch | list [--all] | unregister <epic-key> | reactivate <epic-key>]"
 model: sonnet
 ---

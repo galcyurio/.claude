@@ -6,7 +6,7 @@ argument-hint: "[worktree-path-or-name]"
 
 ## 역할
 
-dev/* 프로젝트의 worktree를 안전하게 제거한다. 미커밋 변경/미push 커밋/메인에 없는 plan 파일을 사전 검증해 손실을 막은 뒤, worktree 제거 → 옵션에 따른 브랜치 삭제 → `git worktree prune`까지 일관 수행한다.
+dev/* 프로젝트의 worktree를 안전하게 제거한다. 미커밋 변경과 미push 커밋을 사전 검증해 손실을 막은 뒤, worktree 제거 → 옵션에 따른 브랜치 삭제 → `git worktree prune`까지 일관 수행한다.
 
 사용자 입력: $ARGUMENTS
 
@@ -98,20 +98,6 @@ git -C <worktree-path> log --oneline <branch> --not --remotes
 - 옵션 1: `중단 (Recommended)` — push하고 다시 실행
 - 옵션 2: `강제 제거` — 커밋 손실 감수
 
-### 3. 메인에 없는 `.claude/plans/` 파일
-
-worktree의 `.claude/plans/` 안에 있는 파일 중 메인의 `.claude/plans/`에 같은 이름이 없는 것을 추출:
-
-```bash
-diff <(ls "<worktree-path>/.claude/plans/" 2>/dev/null) <(ls "<main>/.claude/plans/" 2>/dev/null) | awk '/^</{print $2}'
-```
-
-비어 있지 않으면 파일 목록 표시 후 `AskUserQuestion`:
-
-- 옵션 1: `메인의 .claude/plans/로 백업 후 제거 (Recommended)` — `cp <worktree>/.claude/plans/<f> <main>/.claude/plans/<f>`. 같은 이름이 메인에 (이번 단계에서는 정의상 없으니) 충돌 없음.
-- 옵션 2: `백업하지 않고 폐기`
-- 옵션 3: `중단`
-
 ## 실행
 
 ### 1. worktree 제거
@@ -167,7 +153,6 @@ stale worktree 메타데이터를 정리한다.
 ### 5. 결과 보고
 
 - 제거된 worktree 경로
-- 백업된 plan 파일 (있으면 메인의 어느 경로로 복사되었는지)
 - 삭제된 로컬 브랜치 (있으면)
 - 삭제된 원격 브랜치 (있으면)
 - 강제 진행한 안전 검증 항목 (있으면 — "미커밋 변경사항 폐기", "미 push 커밋 손실" 등)
@@ -185,7 +170,7 @@ stale worktree 메타데이터를 정리한다.
 
 - **자기 자신 제거 금지**: 현재 위치가 worktree면 거부. git이 본질적으로 막는 동작.
 - **메인 worktree 제거 금지**: 본 스킬은 보조 worktree 제거만 책임.
-- **손실 가능성 있는 동작은 모두 명시적 승인**: 미커밋·미 push·unique plan은 자동 진행하지 않는다.
+- **손실 가능성 있는 동작은 모두 명시적 승인**: 미커밋·미 push는 자동 진행하지 않는다.
 - **원격 브랜치 삭제는 보수적 기본값(유지)**: 협업 영향이 있어 사용자 명시 승인 필요.
 - **base 추정은 `develop` → `main` → `master` 순**: `create-worktree`와 동일 규칙.
 - **`.claude/`의 rules 심볼릭 링크와 settings.local.json은 별도 백업하지 않는다**: rules는 외부 절대 경로 링크라 worktree 제거와 함께 사라져도 정보 손실 없음. settings.local.json은 메인이 정본.
