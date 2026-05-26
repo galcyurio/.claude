@@ -1,0 +1,21 @@
+package ${PACKAGE_NAME}
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import kr.co.prnd.design.theme.HeyDealerTheme
+
+@Composable
+fun ${NAME}(
+    modifier: Modifier = Modifier,
+) {
+
+}
+
+@Preview
+@Composable
+private fun Preview() {
+    HeyDealerTheme {
+        ${NAME}()
+    }
+}
