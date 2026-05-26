@@ -1,0 +1,46 @@
+package ${PACKAGE_NAME}
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kr.co.prnd.revolt.design.theme.RevoltTheme
+
+@Composable
+fun ${NAME}Screen(
+    viewModel: ${NAME}ViewModel,
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val onAction: (${NAME}UiAction) -> Unit = remember(viewModel) {
+        { action: ${NAME}UiAction ->
+            when (action) {
+                else -> {} // TODO
+            }
+        }
+    }
+    ${NAME}Screen(
+        uiState = uiState,
+        onAction = onAction,
+    )
+}
+
+@Composable
+private fun ${NAME}Screen(
+    uiState: ${NAME}UiState,
+    onAction: (${NAME}UiAction) -> Unit,
+) {
+    // TODO
+}
+
+@Preview
+@Composable
+private fun Preview() {
+    val uiState = ${NAME}UiState()
+    RevoltTheme {
+        ${NAME}Screen(
+            uiState = uiState,
+            onAction = {},
+        )
+    }
+}

@@ -1,0 +1,17 @@
+package ${PACKAGE_NAME}
+
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import ${PACKAGE_NAME}.${NAME}ViewModel.Event
+import kr.co.prnd.ui.LibraryViewModel
+import kr.co.prnd.ui.ViewEvent
+import javax.inject.Inject
+
+@HiltViewModel
+class ${NAME}ViewModel @Inject constructor() : LibraryViewModel<Event>() {
+    private val _uiState = MutableStateFlow(${NAME}UiState())
+    val uiState = _uiState.asStateFlow()
+
+    sealed interface Event : ViewEvent
+}
