@@ -1,0 +1,33 @@
+package ${PACKAGE_NAME}
+
+import android.os.Bundle
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import dagger.hilt.android.AndroidEntryPoint
+import kr.co.prnd.design.theme.HeyDealerTheme
+import ${PACKAGE_NAME}.${NAME}ViewModel.Event
+import kr.co.prnd.ui.ActivityTemplate
+import kr.co.prnd.ui.LibraryComposeActivity
+
+// TODO: AndroidManifest.xml 파일에 activity 선언
+@AndroidEntryPoint
+class ${NAME}Activity : LibraryComposeActivity<${NAME}ViewModel, Event>(
+    TODO("screenName 추가")
+) {
+    override val viewModel: ${NAME}ViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            HeyDealerTheme {
+                ${NAME}Screen(viewModel)
+            }
+        }
+    }
+
+    override fun handleEvent(event: Event) {
+        // no-op
+    }
+
+    companion object : ActivityTemplate<${NAME}Activity>()
+}
