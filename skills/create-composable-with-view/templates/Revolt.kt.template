@@ -1,0 +1,38 @@
+package ${PACKAGE_NAME}
+
+import android.content.Context
+import android.util.AttributeSet
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.tooling.preview.Preview
+import kr.co.prnd.revolt.design.theme.RevoltTheme
+
+class ${NAME}View @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0,
+) : AbstractComposeView(context, attrs, defStyleAttr) {
+
+    @Composable
+    override fun Content() {
+        RevoltTheme {
+            ${NAME}()
+        }
+    }
+}
+
+@Composable
+fun ${NAME}(
+    modifier: Modifier = Modifier,
+) {
+
+}
+
+@Preview
+@Composable
+private fun Preview() {
+    RevoltTheme {
+        ${NAME}()
+    }
+}
