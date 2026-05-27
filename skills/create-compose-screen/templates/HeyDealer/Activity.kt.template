@@ -5,14 +5,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import dagger.hilt.android.AndroidEntryPoint
 import kr.co.prnd.design.theme.HeyDealerTheme
+import kr.co.prnd.heydealer.analytics.Screen
 import ${PACKAGE_NAME}.${NAME}ViewModel.Event
 import kr.co.prnd.ui.ActivityTemplate
 import kr.co.prnd.ui.LibraryComposeActivity
 
-// TODO: AndroidManifest.xml 파일에 activity 선언
 @AndroidEntryPoint
 class ${NAME}Activity : LibraryComposeActivity<${NAME}ViewModel, Event>(
-    TODO("screenName 추가")
+    Screen.${SCREEN_CONST},
 ) {
     override val viewModel: ${NAME}ViewModel by viewModels()
 
