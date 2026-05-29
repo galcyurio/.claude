@@ -35,13 +35,35 @@ TODO 주석은 `TODO([issue id, optional]): xxx` 포맷으로 작성한다.
 
 새 Compose 화면을 추가할 때는 아래 순서로 커밋을 쪼갠다. 각 단계가 독립 커밋이다.
 
-1. **골격(skeleton) 추가**: Activity + Screen + UiState + UiAction + ViewModel + Manifest 등록 → 한 커밋
-2. **텍스트 리소스 추가** (strings.xml 등)
-3. **UiState 필드 추가**
-4. **UiAction 항목 추가**
-5. **UI 본문 구현** (Composable 채우기)
-6. **개별 기능 단위로 분리** (edge-to-edge 적용, LazyColumn 전환, 로딩 인디케이터, 페이징 등 각각 별도 커밋)
-7. **fix**: 리뷰/디자인 반영, 누락 수정, 엣지 케이스 처리
+1. **API/DTO 추가** (필요 시 선행) — 아래 "API/DTO 작업 분리" 참고
+2. **골격(skeleton) 추가**: Activity + Screen + UiState + UiAction + ViewModel + Manifest 등록 → 한 커밋
+3. **텍스트 리소스 추가** (strings.xml 등)
+4. **UiState 필드 추가**
+5. **UiAction 항목 추가**
+6. **UI 본문 구현** (Composable 채우기)
+7. **개별 기능 단위로 분리** (edge-to-edge 적용, LazyColumn 전환, 로딩 인디케이터, 페이징 등 각각 별도 커밋)
+8. **fix**: 리뷰/디자인 반영, 누락 수정, 엣지 케이스 처리
+
+### API/DTO 작업 분리
+
+서버 API의 요청·응답을 모델링하는 DTO(`Response`/`Request`/`Entity`/`Local`/도메인 모델/`Model`)는 **화면 작업과 분리해 별도 커밋**한다. 한 PR에서 여러 DTO를 다루면 DTO 단위로도 쪼갠다.
+
+분리 단위 — 작업 성격에 맞춰 선택:
+
+- **각 layer 한 번에 추가** (보통): `feat: 각 layer에 X DTO를 추가한다` — Response/Request + Entity + Domain + Model을 묶음
+- **layer별 분리** (큰 모델): `feat(API): X Response DTO를 추가한다`, `feat: X 도메인 모델을 추가한다` 식으로 layer별 커밋
+- **Mapper만 추가**: `feat(DTO): toDomain(), toData(), toLocal() 함수를 추가한다`
+- **필드만 추가/변경**: `feat(DTO): recall 필드를 추가한다`, `feat(API): 예약 상세 DTO에 car, nickname을 추가한다`
+- **DTO 선언과 필드 채우기 분리**: `feat: CarDetail DTO 선언하고 최상위 필드들을 추가한다` → 이후 `feat: 하위 DTO들에 Mapper를 추가한다` 식으로 단계적 채움
+- **여러 DTO**: 각 DTO마다 별도 커밋
+
+권장 scope:
+
+- `feat(API):` — API 엔드포인트 관점 (Response/Request 추가, 필드 추가)
+- `feat(DTO):` — DTO 자체 관점 (Mapper, 공통 필드)
+- `feat(post):` / `feat(get):` — HTTP 메서드별 구분이 필요한 경우
+
+> 정의 자체와 layer 간 매핑 규칙은 `~/.android-ai-prompts/rules/common/model-mapping.md`를 따른다. 이 섹션은 **커밋 분리 단위**만 다룬다.
 
 ### 사용할 태그
 
