@@ -200,7 +200,9 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 ### 2.3 5 소스 병렬 dispatch — **반드시 한 번의 응답 메시지에 모든 tool_use 호출을 함께 보낸다**
 
 - **Jira 활동 (이미 fetch된 응답 재사용)**: `comment.comments`에서 `created >= since` 필터. subtask 상태는 응답에 포함됨
-- **Slack**: 분류된 Slack URL 각각을 `~/.claude/rules/external-links.md` 규칙으로 `channelId`+`threadTs` 추출 → `slack_read_thread` (스레드 ts 있을 때) 또는 `slack_read_channel` (채널 전체) 병렬 호출. **`response_format="detailed"` 필수** — 각 메시지의 `ts` 필드를 보존해야 본문에 영구 링크(`https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` — `ts`에서 `.` 제거)를 부착할 수 있다. `ts >= since`만 채택
+- **Slack**: 분류된 Slack URL 각각을 `~/.claude/rules/external-links.md` 규칙으로 `channelId`+`threadTs` 추출 → `slack_read_thread` (스레드 ts 있을 때) 또는 `slack_read_channel` (채널 전체) 병렬 호출. **`response_format="detailed"` 필수** — 각 메시지의 `ts` 필드를 보존해야 본문에 영구 링크(`https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` — `ts`에서 `.` 제거)를 부착할 수 있다. `ts >= since`만 채택.
+
+  > **⛔ `oldest` 파라미터에 Unix timestamp를 수동 계산하여 넘기지 않는다.** LLM이 ISO 날짜를 Unix timestamp로 변환할 때 약 23시간 오차가 발생해 모든 신규 메시지를 누락하는 버그가 재현된 바 있다. 반드시 **`oldest` 없이 `slack_read_channel`을 호출**하고, 응답의 `ts` 값(소수점 포함 Unix timestamp 문자열)을 `last_run_at`(ISO 8601)과 비교해서 `ts >= since` 필터링을 응답 처리 단계에서 수행한다. `last_run_at`을 Unix timestamp로 변환해야 할 경우: `since_ts = (last_run_at ISO 문자열을 Bash의 `date -d` 또는 Python `datetime.fromisoformat`으로 파싱) — 직접 계산 금지.
 - **Notion 기획/API 문서**: 분류된 Notion URL 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
 - **GitHub PR**: `gh search prs "{epic_key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30` + Jira에서 추출된 GitHub URL과 합치기. `updatedAt >= since`만 채택
 - **Figma**: 분류된 Figma URL 각각을 fileKey+nodeId로 파싱. 페이지 단위 nodeId는 `get_design_context`가 항상 실패(`선택된 레이어 없음`)하므로 **frame 단위로 우회**한다.
