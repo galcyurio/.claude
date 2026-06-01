@@ -21,6 +21,7 @@ shell-snapshots/
 ide/
 backups/
 .last-cleanup
+.last-update-result.json
 daemon.lock
 daemon.log
 daemon.status.json
