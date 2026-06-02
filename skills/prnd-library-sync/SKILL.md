@@ -1,6 +1,6 @@
 ---
 name: prnd-library-sync
-description: 여러 프로젝트의 prnd-library를 지정한 브랜치로 체크아웃하고 명령어를 실행한다
+description: 여러 프로젝트의 prnd-library를 특정 브랜치로 일괄 전환하고 명령어를 실행하고 싶을 때 이 스킬을 사용한다. 사용자가 'prnd-library-sync', 'prnd-library 브랜치 맞춰줘', '여러 프로젝트 라이브러리 체크아웃', 'prnd-library 일괄 실행' 등을 요청할 때 사용한다.
 argument-hint: "[projects] [branch] [command]"
 disable-model-invocation: true
 allowed-tools: Bash

@@ -1,6 +1,6 @@
 ---
 name: graphify
-description: "any input (code, docs, papers, images, videos) to knowledge graph. Use when user asks any question about a codebase, documents, or project content - especially if graphify-out/ exists, treat the question as a /graphify query."
+description: "사용자가 '/graphify'를 실행하거나, 코드·문서·논문·이미지·영상을 지식 그래프로 만들고 싶을 때, 또는 현재 디렉토리에 'graphify-out/'(이미 생성된 그래프)가 있고 그 내용에 대해 질문할 때 이 스킬을 사용한다. 그래프가 없는 일반 코드베이스 탐색·이해 질문에는 사용하지 않는다."
 trigger: /graphify
 ---
 
