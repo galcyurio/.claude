@@ -219,6 +219,8 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 
   **frame 목록 표는 매 갱신 시 get_metadata 결과로 전량 재생성한다** (직전 표에 누적 prepend하지 않는다). 1단계는 페이지당 `get_metadata` 1회라 비용이 낮으므로 `__skip__` 여부와 무관하게 **항상 수행**한다. 직전 목록·`figma_frame_hashes`에는 있으나 이번 결과에 없는 nodeId는 **유령 frame**(Figma에서 삭제·이동됨)이므로 표와 hash dict에서 즉시 제거한다. 표가 stale해져 존재하지 않는 frame이 잔존하면 이를 참조하는 review-by-agents 등 하위 소비자가 헛도므로, 신선도 유지가 중요하다.
 
+  **frame 이름은 Figma name 원문 그대로 쓴다.** 동명 frame이 여럿이어도 `한화면`·`(2)`·`신규` 같은 임의 suffix를 붙이지 않는다 — 구별은 표의 별도 nodeId 칼럼으로 한다 (Figma에서 "홈_최초" 같은 이름이 여러 frame에 중복되는 경우가 흔하다). 이름 기반으로 frame을 참조하는 소비자가 임의 suffix 때문에 매칭에 실패하는 것을 막는다.
+
   **2단계 — frame별 디자인 컨텍스트 incremental fetch (hash diff)**: Figma API는 `last_modified`를 제공하지 않으므로 **응답 코드 hash 비교 방식**으로 변경 감지를 구현한다.
 
   1. 1단계에서 얻은 모든 frame nodeId에 대해 `mcp__claude_ai_Figma__get_design_context(fileKey, frame_nodeId, excludeScreenshot=true)`를 **병렬 호출**한다 (응답 크기를 줄이기 위해 스크린샷 제외).
@@ -530,10 +532,10 @@ STEP 2.5의 B 리스트를 **체크박스**로 출력. 시간 역순. 도메인 
 
 페이지 단위 nodeId를 받았을 때 STEP 2.3의 `get_metadata` + 임시 파일 추출로 만들어진 표.
 
-| Frame 이름 | 크기 | 링크 |
-|---|---|---|
-| 관심 차 가격 변동 | 393×812 | [Figma](https://www.figma.com/design/{fileKey}/?node-id=488-2586) |
-| (... nodeId|name|WxH 형태로 정렬된 frame들) | ... | ... |
+| Frame 이름 | nodeId | 크기 | 링크 |
+|---|---|---|---|
+| 관심 차 가격 변동 | 488:2586 | 393×812 | [Figma](https://www.figma.com/design/{fileKey}/?node-id=488-2586) |
+| (... Figma name 원문 그대로. 동명이면 nodeId 칼럼으로 구별, 임의 suffix 금지) | ... | ... | ... |
 
 각 frame은 `https://www.figma.com/design/{fileKey}/?node-id={nodeId_with_dash}` (nodeId의 `:`를 `-`로 변환) 형식.
 </details>
