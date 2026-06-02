@@ -221,6 +221,12 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 
   **frame 이름은 Figma name 원문 그대로 쓴다.** 동명 frame이 여럿이어도 `한화면`·`(2)`·`신규` 같은 임의 suffix를 붙이지 않는다 — 구별은 표의 별도 nodeId 칼럼으로 한다 (Figma에서 "홈_최초" 같은 이름이 여러 frame에 중복되는 경우가 흔하다). 이름 기반으로 frame을 참조하는 소비자가 임의 suffix 때문에 매칭에 실패하는 것을 막는다.
 
+  **frame 목록을 `화면`과 `부품·에셋` 두 그룹으로 분리한다.** 페이지 직계 자식에는 화면 시안과 부분 컴포넌트(카드·버튼·배너 이미지 등)가 섞여 있다. 분류 가이드:
+  - **화면**: 너비가 표준 디바이스 폭(폰 ≈360~440, 태블릿 ≈600 이상)이고 세로로 긴(높이 ≥ 너비) frame.
+  - **부품·에셋**: 너비 < 320, 가로형(높이 < 너비), 정사각에 가깝거나, 이름이 카드/이미지/버튼 등 부분 요소인 frame.
+
+  너비만으로 카드(예: 352)와 폰 화면(예: 360·393)을 완벽히 가를 수는 없으므로 크기 가이드 + 이름 휴리스틱으로 판단하되, 애매하면 `부품·에셋`에 둔다. 두 그룹 모두 표에 남기되(정보 보존) Reference에서 별도 표로 분리해 화면을 우선 노출한다. review-by-agents 등 화면 매칭 소비자는 `화면` 표만 대상으로 삼을 수 있다.
+
   **2단계 — frame별 디자인 컨텍스트 incremental fetch (hash diff)**: Figma API는 `last_modified`를 제공하지 않으므로 **응답 코드 hash 비교 방식**으로 변경 감지를 구현한다.
 
   1. 1단계에서 얻은 모든 frame nodeId에 대해 `mcp__claude_ai_Figma__get_design_context(fileKey, frame_nodeId, excludeScreenshot=true)`를 **병렬 호출**한다 (응답 크기를 줄이기 위해 스크린샷 제외).
@@ -530,12 +536,21 @@ STEP 2.5의 B 리스트를 **체크박스**로 출력. 시간 역순. 도메인 
 <details>
 <summary>Figma frame 목록 (페이지 단위 직계 자식)</summary>
 
-페이지 단위 nodeId를 받았을 때 STEP 2.3의 `get_metadata` + 임시 파일 추출로 만들어진 표.
+페이지 단위 nodeId를 받았을 때 STEP 2.3의 `get_metadata` + 임시 파일 추출로 만들어진 표. 화면과 부품·에셋을 분리해 화면을 우선 노출한다.
+
+**화면**
 
 | Frame 이름 | nodeId | 크기 | 링크 |
 |---|---|---|---|
 | 관심 차 가격 변동 | 488:2586 | 393×812 | [Figma](https://www.figma.com/design/{fileKey}/?node-id=488-2586) |
-| (... Figma name 원문 그대로. 동명이면 nodeId 칼럼으로 구별, 임의 suffix 금지) | ... | ... | ... |
+| (... 표준 디바이스 폭 + 세로로 긴 화면 시안만. Figma name 원문, 동명이면 nodeId로 구별) | ... | ... | ... |
+
+**부품·에셋**
+
+| Frame 이름 | nodeId | 크기 | 링크 |
+|---|---|---|---|
+| 리스트 끝에 전체보기 | 716:4589 | 132×180 | [Figma](https://www.figma.com/design/{fileKey}/?node-id=716-4589) |
+| (... 카드·버튼·이미지 등 부분 요소. 너비<320·가로형·정사각 frame) | ... | ... | ... |
 
 각 frame은 `https://www.figma.com/design/{fileKey}/?node-id={nodeId_with_dash}` (nodeId의 `:`를 `-`로 변환) 형식.
 </details>
