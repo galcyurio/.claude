@@ -1,8 +1,8 @@
 ---
 name: create-jira-impl-pr
-description: Jira 이슈 생성 → 구현 → PR 생성을 한 번에 처리
+description: Jira 이슈 등록부터 코드 구현, PR 생성까지 한 번에 끝내야 할 때 이 스킬을 사용한다. 사용자가 'create-jira-impl-pr', '이슈 만들고 구현해서 PR까지', '이슈부터 PR까지 한 번에', '작업 통째로 처리해줘' 등 이슈 생성·구현·PR을 묶어 요청할 때 사용한다. 단순 이슈 생성만(create-jira-issue) 또는 PR 생성만(create-pr) 필요한 경우에는 사용하지 않는다.
 argument-hint: [작업 설명]
-allowed-tools: mcp__atlassian__*, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Agent
+allowed-tools: mcp__claude_ai_Atlassian__*, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Agent
 ---
 
 # Jira → 구현 → PR
@@ -26,7 +26,7 @@ Cloud ID: `4e8e1a3d-2b6f-40df-820b-43c476f41656` (prndcompany)
 
 ### 1-1. 에픽/프로젝트 결정
 
-현재 브랜치명에서 `HDA-XXXXX` 패턴 추출 → `mcp__atlassian__getJiraIssue`로 에픽 찾기.
+현재 브랜치명에서 `HDA-XXXXX` 패턴 추출 → `mcp__claude_ai_Atlassian__getJiraIssue`로 에픽 찾기.
 
 에픽 확인 (우선순위):
 1. 브랜치 이슈 자체가 에픽 → 해당 이슈
@@ -121,7 +121,7 @@ git push -u origin <브랜치>
 
 ### 5-1. JIRA summary 재조회
 
-`mcp__atlassian__getJiraIssue`로 이슈 조회하여 Automation이 적용된 최신 summary를 가져온다.
+`mcp__claude_ai_Atlassian__getJiraIssue`로 이슈 조회하여 Automation이 적용된 최신 summary를 가져온다.
 
 ### 5-2. PR 내용 작성
 

@@ -92,7 +92,7 @@ print(f\"{data.get('totalSessions', 0)}|{data.get('totalMessages', 0)}\")
 3단계 결과를 아래 기준으로 3개 그룹으로 분류한다.
 
 **활성 에이전트** — `~/.claude/agents/`에 정의 파일(`.md`)이 존재:
-- explore, librarian, oracle, metis, momus, atlas, junior
+- explore, designer, librarian, oracle, metis, momus, junior
 
 **빌트인 에이전트** — Claude Code 내장 에이전트 (대소문자 무관):
 - claude-code-guide, general-purpose, Worker, Plan, Explore (대문자), Librarian (대문자), Oracle (대문자), Momus (대문자), Junior (대문자)
@@ -139,5 +139,5 @@ print(f\"{data.get('totalSessions', 0)}|{data.get('totalMessages', 0)}\")
 
 **모델 매핑** (활성 에이전트 표에서 사용, orchestration.md 기준):
 - explore, librarian → Haiku
-- junior, atlas → Sonnet
+- junior, designer → Sonnet
 - oracle, metis, momus → Opus
