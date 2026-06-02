@@ -1,4 +1,5 @@
 ---
+name: create-jira-impl-pr
 description: Jira 이슈 생성 → 구현 → PR 생성을 한 번에 처리
 argument-hint: [작업 설명]
 allowed-tools: mcp__atlassian__*, Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion, Agent
