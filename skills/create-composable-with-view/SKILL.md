@@ -69,7 +69,7 @@ HeyDealer 또는 Revolt 테마의 `AbstractComposeView` 클래스 + 내부 `Comp
 4. **commit**: 메시지 형식
    - Issue ID 있음: `HDA-XXX feat: 골격 구현을 추가한다`
    - Issue ID 없음: `feat: 골격 구현을 추가한다`
-   - `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` trailer 추가
+   - Claude Code 기본 Co-Authored-By trailer를 추가한다
 5. 커밋 실패 시 에러 보고, staged 상태 유지
 
 ### 8. 결과 보고

@@ -96,6 +96,7 @@ HeyDealer 또는 Revolt 테마의 Compose Screen 묶음 5개 파일(`{Name}Activ
 | `${NAME}` | `name` (PascalCase) |
 | `${PACKAGE_NAME}` | 추론 패키지 |
 | `${SCREEN_CONST}` | SCREAMING_SNAKE_CASE 이름 |
+| `${SCREEN_LABEL}` | 화면 식별 라벨 문자열 — 9단계 `Screen.kt` const 값으로 사용 |
 
 치환 후 `Write` 도구로 저장.
 
@@ -141,7 +142,7 @@ const val ${SCREEN_CONST} = "${SCREEN_LABEL}"
 4. **commit**: 메시지 형식
    - Issue ID 있음: `HDA-XXX feat: 골격 구현을 추가한다`
    - Issue ID 없음: `feat: 골격 구현을 추가한다`
-   - 본문에 `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` trailer 추가
+   - 본문에 Claude Code 기본 Co-Authored-By trailer를 추가한다
 5. 커밋 실패 시 에러 보고, staged 상태 유지
 
 ### 12. 결과 보고
