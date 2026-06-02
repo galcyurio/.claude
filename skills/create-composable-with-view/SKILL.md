@@ -1,6 +1,6 @@
 ---
 name: create-composable-with-view
-description: HeyDealer 또는 Revolt 테마의 AbstractComposeView 와 내부 Composable 함수를 함께 생성하는 스킬. 사용자가 'create-composable-with-view', 'ComposeView 만들어', 'XML에서 쓸 수 있는 composable', 'AbstractComposeView 추가', 'View로 감싼 composable', '골격 구현 추가' 등을 요청할 때 이 스킬을 사용해야 한다.
+description: HeyDealer 또는 Revolt 테마의 AbstractComposeView 와 내부 Composable 함수를 함께 생성하는 스킬. 사용자가 'create-composable-with-view', 'ComposeView 만들어', 'XML에서 쓸 수 있는 composable', 'AbstractComposeView 추가', 'View로 감싼 composable', 'ComposeView 골격 추가' 등을 요청할 때 이 스킬을 사용해야 한다.
 argument-hint: "[name] [target_dir_or_fqcn]"
 ---
 

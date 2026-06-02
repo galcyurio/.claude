@@ -1,6 +1,6 @@
 ---
 name: create-compose-screen
-description: HeyDealer 또는 Revolt 테마의 Compose Screen 묶음(Activity, ViewModel, Screen, UiState, UiAction 5개 파일)을 한 번에 생성하는 스킬. 사용자가 'create-compose-screen', 'compose screen 만들어', '화면 추가', 'Activity + ViewModel 묶음 만들어', 'MVI 화면 생성', '골격 구현 추가' 등을 요청할 때 이 스킬을 사용해야 한다. 단일 Composable만 필요할 때는 create-composable, View로 감싸야 할 때는 create-composable-with-view 를 사용한다.
+description: HeyDealer 또는 Revolt 테마의 Compose Screen 묶음(Activity, ViewModel, Screen, UiState, UiAction 5개 파일)을 한 번에 생성하는 스킬. 사용자가 'create-compose-screen', 'compose screen 만들어', '프로덕션 화면 추가', 'Activity + ViewModel 묶음 만들어', 'MVI 화면 생성', '화면 골격 추가(Activity+ViewModel)' 등을 요청할 때 이 스킬을 사용해야 한다. 단일 Composable만 필요할 때는 create-composable, View로 감싸야 할 때는 create-composable-with-view 를 사용한다.
 argument-hint: "[name] [target_dir_or_fqcn] [screen_label]"
 ---
 

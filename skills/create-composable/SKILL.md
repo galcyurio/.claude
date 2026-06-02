@@ -1,6 +1,6 @@
 ---
 name: create-composable
-description: HeyDealer 또는 Revolt 테마의 Composable 함수와 @Preview 를 생성하는 스킬. 사용자가 'create-composable', 'Composable 만들어', 'composable 추가', 'compose 컴포넌트 만들어', '컴포저블 생성', '골격 구현 추가' 등을 요청할 때 이 스킬을 사용해야 한다. Activity나 ViewModel이 필요한 화면 생성에는 사용하지 않는다 (create-compose-screen 사용).
+description: HeyDealer 또는 Revolt 테마의 Composable 함수와 @Preview 를 생성하는 스킬. 사용자가 'create-composable', 'Composable 만들어', 'composable 추가', 'compose 컴포넌트 만들어', '컴포저블 생성', 'Composable 골격 추가' 등을 요청할 때 이 스킬을 사용해야 한다. Activity나 ViewModel이 필요한 화면 생성에는 사용하지 않는다 (create-compose-screen 사용).
 argument-hint: "[name] [target_dir_or_fqcn]"
 ---
 
