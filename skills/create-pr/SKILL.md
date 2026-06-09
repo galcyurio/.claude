@@ -1,6 +1,6 @@
 ---
 name: create-pr
-allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, mcp__github__create_pull_request, Read, AskUserQuestion
+allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, AskUserQuestion
 description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그램). 사용자가 'create-pr', 'PR 생성', 'PR 만들어', 'PR 만들어줘', 'PR 작성', 'PR 올려줘', 'PR 올려', 'pull request 생성', 'pull request 만들어', '풀리퀘 생성', '풀리퀘 만들어' 등 PR 생성을 요청할 때 이 스킬을 사용해야 한다. PR 리뷰/조회 요청에는 사용하지 않는다.
 ---
 
@@ -22,9 +22,8 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
   - "아니오" → 종료
 
 ### 1. 기본 정보 추출
-- git remote URL에서 owner/repo 추출
-(예: `https://github.com/PRNDcompany/heydealer-android.git` → owner: PRNDcompany, repo: heydealer-android)
 - 브랜치 이름에서 JIRA 티켓 ID 추출 (예: `feature/HDA-20017-*` → HDA-20017). 없으면 사용자에게 알리고 종료
+- owner/repo는 `gh`가 현재 디렉토리의 origin remote로 자동 감지하므로 별도 추출하지 않는다
 
 ### 2. JIRA 티켓 조회
 - `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources`로 cloudId 가져오기
@@ -143,9 +142,14 @@ flowchart LR
    - "### 관련 채널 내용": 관련 링크 있을 때만
    - "## 작업사항": 4번 전략으로 작성 (필수)
    - 비어있는 섹션은 제거
-4. `mcp__github__create_pull_request` 호출:
-   - title: `{티켓ID} {JIRA summary}` — **반드시 JIRA summary 필드 값을 그대로 사용** (요약/가공/의역 금지).
-   - head: 현재 브랜치, base: 3번 결정 브랜치
+4. PR 본문을 임시 markdown 파일로 저장한다 (예: `/tmp/pr-body-{티켓ID}.md`).
+   - 본문에 mermaid·백틱·대괄호가 포함되므로 `--body`에 인라인하지 않고 **반드시 `--body-file`로 전달**한다. (`--body "..."`에 백틱을 넣으면 셸 명령 치환으로 깨진다)
+5. `gh pr create`로 PR을 생성한다:
+   - `--title "{티켓ID} {JIRA summary}"` — **반드시 JIRA summary 필드 값을 그대로 사용** (요약/가공/의역 금지)
+   - `--base {3번에서 결정한 브랜치}`
+   - `--head {현재 브랜치}`
+   - `--body-file {4번 임시 파일}`
+   - `--assignee @me` — assignee를 본인으로 설정 (`gh`는 `@me`를 현재 인증 사용자로 해석)
 
 ## 예시
 
