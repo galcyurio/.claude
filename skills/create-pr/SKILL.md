@@ -17,9 +17,7 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 - **커밋되지 않은 변경사항이 있는 경우**: 사용자에게 알리고 종료
   - "커밋되지 않은 변경사항이 있습니다. 먼저 커밋한 후 다시 PR 생성을 실행해주세요."
 - **remote에 push되지 않은 커밋이 있는 경우** (`git ls-remote --heads origin <branch>`로 remote 브랜치 존재 확인 후, 있으면 `git log origin/<branch>..HEAD`, 없으면 신규 브랜치로 간주):
-  - AskUserQuestion으로 "push되지 않은 커밋이 있습니다. push하고 PR을 작성할까요?" 확인
-  - "예" → `git push` 실행 후 계속 진행
-  - "아니오" → 종료
+  - 확인 없이 `git push`를 실행한 후 계속 진행한다. (이 스킬에 진입한 것 자체가 push 동의를 의미하므로 별도로 묻지 않는다)
 
 ### 1. 기본 정보 추출
 - 브랜치 이름에서 JIRA 티켓 ID 추출 (예: `feature/HDA-20017-*` → HDA-20017). 없으면 사용자에게 알리고 종료
