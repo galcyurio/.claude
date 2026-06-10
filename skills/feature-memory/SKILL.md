@@ -295,7 +295,9 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 > `[근거]`, `[원본]`, `[Slack 근거]` 같은 일반 라벨은 사용하지 않는다. 한 항목에 여러 출처가 있으면 `[Slack](url) · [Notion](url)`처럼 가운뎃점으로 나열.
 >
 > **URL 형식**
-> - Slack → `https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` (스레드 답글이면 `?thread_ts=...&cid=...` 추가)
+> - Slack → `https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` (`ts`에서 `.` 제거)
+>   - **⛔ thread reply에 `?thread_ts=...&cid=...`를 붙이지 않는다.** Notion이 Slack URL을 `slackMessage://` 앱 딥링크로 자동 변환하면서 쿼리스트링을 버린다 → reply가 채널 최상위에서 안 찾아져 **이동 실패**. thread 안 발화는 **그 스레드 부모 메시지의 top-level 링크**(`p{parent_ts}`)를 쓰고 라벨을 `[Slack 스레드]`로 표기한다. reply 정확 위치 점프는 Notion 한계로 불가.
+>   - **⛔ `ts`는 반드시 수집한 메시지의 실제 값(`slack_read_*` 응답의 `Message TS`)만 쓴다. 추측·생성 금지** — 잘못된 ts는 죽은 링크가 된다.
 > - Notion → `https://www.notion.so/{page_id}` (블록 anchor 가능하면 부착)
 > - Jira 코멘트 → `{jira_url}?focusedCommentId={comment_id}`
 > - GitHub PR/이슈 → PR URL 그대로
