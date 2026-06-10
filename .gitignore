@@ -36,6 +36,7 @@ mcp-needs-auth-cache.json
 stats-cache.json
 policy-limits.json
 gh-pr-status-cache.json
+remote-settings.json
 
 # 디버그 / 텔레메트리
 debug/
