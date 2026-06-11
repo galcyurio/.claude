@@ -4,17 +4,30 @@
 
 분류된 Figma URL 각각을 fileKey+nodeId로 파싱. 페이지 단위 nodeId는 `get_design_context`가 항상 실패(`선택된 레이어 없음`)하므로 **frame 단위로 우회**한다.
 
-## 1단계 — frame 목록 추출
+## 1단계 — frame 목록 추출 + diff
 
-`mcp__claude_ai_Figma__get_metadata(fileKey, page_nodeId)` 호출. 응답은 수십만 자로 token limit 초과하지만 도구가 자동으로 임시 파일에 저장한다 (응답 메시지에 파일 경로 포함). 그 임시 파일에서 직계 자식 frame만 추출:
+`mcp__claude_ai_Figma__get_metadata(fileKey, page_nodeId)` 호출. 응답은 수십만 자로 token limit 초과하지만 도구가 자동으로 임시 파일에 저장한다 (응답 메시지에 파일 경로 포함). 그 임시 파일과 기존 `figma_frame_hashes`를 **`figma-diff.py` 스크립트에 전달**해 frame 추출 + diff를 한 번에 수행한다:
 
 ```bash
-jq -r '.[].text' <임시파일경로> \
-  | grep -E '^  <(frame|section) id="[0-9]+:[0-9]+"' \
-  | sed -E 's/^  <[a-z]+ id="([^"]+)" name="([^"]+)" x="[^"]+" y="[^"]+" width="([^"]+)" height="([^"]+)".*$/\1|\2|\3x\4/'
+python3 ~/.claude/skills/feature-memory/figma-diff.py \
+  --metadata <임시파일경로> \
+  --hashes '<figma_frame_hashes_json>'
 ```
 
-각 줄은 `nodeId|name|WxH` 형태. frame 목록 표로 정리해 본문 `## 📚 Reference`의 `Figma frame 목록` toggle에 부착. 각 frame은 `https://www.figma.com/design/{fileKey}/?node-id={nodeId_with_dash}` (콜론을 대시로 변환) 형식의 클릭 링크.
+출력 JSON 구조:
+```json
+{
+  "current_frames": [{"nodeId", "name", "size", "is_screen"}],
+  "new":     [{"nodeId", "name", "size"}],
+  "deleted": [{"nodeId"}],
+  "new_hashes": {"nodeId": "기존hash_or_new"},
+  "summary": {"total", "new_count", "deleted_count", "unchanged_count"}
+}
+```
+
+`is_screen=true`인 것이 화면, `false`인 것이 부품·에셋. LLM은 이 결과만 받아서 표 구성과 변경 이력 작성에 집중한다.
+
+각 줄은 `nodeId|name|WxH` 형태 (표 구성 시 참고). frame 목록 표로 정리해 본문 `## 📚 Reference`의 `Figma frame 목록` toggle에 부착. 각 frame은 `https://www.figma.com/design/{fileKey}/?node-id={nodeId_with_dash}` (콜론을 대시로 변환) 형식의 클릭 링크.
 
 **frame 목록 표는 매 갱신 시 get_metadata 결과로 전량 재생성한다** (직전 표에 누적 prepend 금지). 1단계는 페이지당 `get_metadata` 1회라 비용이 낮으므로 `__skip__` 여부와 무관하게 **항상 수행**한다. 직전 목록·`figma_frame_hashes`에는 있으나 이번 결과에 없는 nodeId는 **유령 frame**(Figma에서 삭제·이동됨)이므로 표와 hash dict에서 즉시 제거한다. 표가 stale해져 존재하지 않는 frame이 잔존하면 이를 참조하는 review-by-agents 등 하위 소비자가 헛도므로 신선도 유지가 중요하다.
 
