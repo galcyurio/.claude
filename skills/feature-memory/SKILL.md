@@ -195,7 +195,18 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 - **Jira 활동 (이미 fetch된 응답 재사용)**: `comment.comments`에서 `created >= since` 필터. subtask 상태는 응답에 포함됨
 - **Slack**: 분류된 Slack URL 각각을 `~/.claude/rules/external-links.md` 규칙으로 `channelId`+`threadTs` 추출 → `slack_read_thread` (스레드 ts 있을 때) 또는 `slack_read_channel` (채널 전체) 병렬 호출. **`response_format="detailed"` 필수** — 각 메시지의 `ts` 필드를 보존해야 본문에 영구 링크(`https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` — `ts`에서 `.` 제거)를 부착할 수 있다. `ts >= since`만 채택.
 
-  > **⛔ `oldest` 파라미터에 Unix timestamp를 수동 계산하여 넘기지 않는다.** LLM이 ISO 날짜를 Unix timestamp로 변환할 때 약 23시간 오차가 발생해 모든 신규 메시지를 누락하는 버그가 재현된 바 있다. 반드시 **`oldest` 없이 `slack_read_channel`을 호출**하고, 응답의 `ts` 값(소수점 포함 Unix timestamp 문자열)을 `last_run_at`(ISO 8601)과 비교해서 `ts >= since` 필터링을 응답 처리 단계에서 수행한다. `last_run_at`을 Unix timestamp로 변환해야 할 경우: `since_ts = (last_run_at ISO 문자열을 Bash의 `date -d` 또는 Python `datetime.fromisoformat`으로 파싱) — 직접 계산 금지.
+  > **`oldest` 파라미터는 반드시 Python으로 계산한 Unix timestamp를 넣는다.** LLM이 직접 ISO → Unix 변환 시 약 23시간 오차가 재현된 바 있어 LLM 직접 계산 금지. `slack_read_channel` 호출 직전에 아래 명령으로 계산하고, 그 값을 `oldest`에 그대로 넘긴다:
+  >
+  > ```bash
+  > python3 -c "
+  > from datetime import datetime, timezone
+  > import sys
+  > dt = datetime.fromisoformat(sys.argv[1].replace('Z','+00:00'))
+  > print(dt.timestamp())
+  > " "<last_run_at_ISO>"
+  > ```
+  >
+  > 응답 `ts` 값은 여전히 `>= since_ts` 조건으로 한 번 더 검증한다 (API 경계 반올림 여유).
   >
   > **⛔ top-level만 보지 말고 thread 내부까지 전개한다.** `slack_read_channel`은 top-level 메시지만 반환한다 — thread reply 안의 본인 발화는 보이지 않는다. reply ≥1인 스레드 중 **(a) parent author가 본인, (b) parent에 본인 멘션, (c) 최신 reply ts ≥ since** 중 하나라도 해당하면 `slack_read_thread`로 전개해 내부 reply까지 검사한다. 특히 **본인 발화(author=self)가 스레드 마지막이고 멘션을 포함하는데 이후 reply 0 + reaction에 타인 없음 → 미응답 TODO 후보**(STEP 2.5). top-level만 보면 이 케이스를 통째로 놓친다 (실제 누락 사례 있었음).
 - **Notion 기획/API 문서**: 분류된 Notion URL 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
