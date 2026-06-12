@@ -210,7 +210,10 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
   >
   > **⛔ top-level만 보지 말고 thread 내부까지 전개한다.** `slack_read_channel`은 top-level 메시지만 반환한다 — thread reply 안의 본인 발화는 보이지 않는다. reply ≥1인 스레드 중 **(a) parent author가 본인, (b) parent에 본인 멘션, (c) 최신 reply ts ≥ since** 중 하나라도 해당하면 `slack_read_thread`로 전개해 내부 reply까지 검사한다. 특히 **본인 발화(author=self)가 스레드 마지막이고 멘션을 포함하는데 이후 reply 0 + reaction에 타인 없음 → 미응답 TODO 후보**(STEP 2.5). top-level만 보면 이 케이스를 통째로 놓친다 (실제 누락 사례 있었음).
 - **Notion 기획/API 문서**: 분류된 Notion URL 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
-- **GitHub PR**: `gh search prs "{epic_key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30` + Jira에서 추출된 GitHub URL과 합치기. `updatedAt >= since`만 채택
+- **GitHub PR**: 에픽 키 + 하위 이슈 키를 **2-pass로 검색**하고 dedup.
+  1. **에픽 키 검색**: `gh search prs "{epic_key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30`
+  2. **하위 이슈 키 검색**: Jira Epic 응답의 `subtasks[].key` 목록을 추출 → 0건이면 skip. 1~20건이면 `gh search prs "{k1} OR {k2} OR ... in:title" --owner PRNDcompany --json ... --limit 50` 단일 호출. 21건 이상이면 10개씩 분할해 병렬 호출 후 합치기.
+  3. 두 pass 결과를 PR `number`로 dedup. Jira에서 추출된 GitHub URL과도 합치기. `updatedAt >= since`만 채택.
 - **Figma**: 페이지 단위 nodeId는 `get_design_context`가 항상 실패(`선택된 레이어 없음`)하므로 **frame 단위로 우회**한다.
   - **① frame 목록 추출** — `get_metadata`(페이지) → 임시 파일에서 `jq`+`grep`+`sed`로 직계 자식 frame 추출. `__skip__` 여부 무관 **항상 수행**, 매 갱신 전량 재생성, 유령 frame 제거. `화면`/`부품·에셋` 2그룹 분리, name 원문 유지.
   - **② frame별 hash diff** — frame마다 `get_design_context(excludeScreenshot=true)` 병렬 호출 → `data-node-id`·asset URL 제거 후 SHA-256 → `figma_frame_hashes` property와 비교해 신규/변경 감지. `__skip__`이면 ②만 생략.
@@ -596,7 +599,14 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
 0. **1회성 backfill (멱등)**:
    - DB 스키마에 `status` property 자체가 없으면 1회 안내 후 batch 중단: "Notion DB에 `status` select property (`active` · `archived`)를 추가하세요. DB 상단의 `+ Add a property` → `Select` → 옵션 `active`, `archived` 등록. 이후 batch 재실행." (Notion API `notion-update-data-source`로 자동 추가는 시도하지 않는다 — 사용자가 직접 옵션 색상까지 결정할 수 있게 둠.)
    - 스키마는 있지만 페이지의 `status` 값이 비어 있으면 `mcp__claude_ai_Notion__notion-update-page` `update_properties`로 `status = active`로 채운다. 이미 채워진 페이지는 건드리지 않는다.
-1. Notion DB에서 `status = active`인 페이지만 조회: `mcp__claude_ai_Notion__notion-search` 또는 DB query (data_source_id 기준 + `status = active` 필터). `status = archived`인 페이지는 batch 대상에서 제외한다.
+1. **활성 피처 조회 (결정적 전수 조회 — semantic search 한계 보정).**
+
+   > ⛔ **`notion-search`는 semantic search다. `status = active`로 직접 필터할 수 없고(지원 필터는 `created_date_range`·`created_by_user_ids`뿐), 임의 단어 쿼리는 전체 행을 보장하지 않는다.** 실제로 `query="active"`는 ranking 때문에 archived 페이지만 상위로 올리고 active 피처를 통째로 누락시킨 사례가 있다 (`query="HDA"`로는 전수 반환). "search가 active만 걸러준다"고 가정하지 말 것 — `notion-fetch`로 collection/database/view를 떠도 행 데이터는 안 나오므로(스키마만 반환), **반드시 후보 페이지를 개별 fetch해 `properties.status`로 직접 거른다.**
+
+   절차:
+   1. `mcp__claude_ai_Notion__notion-search(data_source_url="collection://314333d2-57ac-4f15-8fa2-12cee61130e1", query="<project key>", page_size=25, max_highlight_length=0)`로 후보를 모은다. `query`는 **모든 피처에 공통인 토큰**(Jira project key, 예 `HDA`)을 쓴다 — epic_key·제목에 공통이라 전 페이지가 후보로 올라온다. 단일 의미 단어(`active`/`피처` 등) 금지.
+   2. 반환된 **모든 후보 페이지**를 `notion-fetch(page_id)`로 열어 `properties.status`를 확인한다 (search 결과에는 status가 없다). **`status == "active"`만 채택**하고 `status == "archived"`는 batch 대상에서 제외한다. — 이 fetch 결과(본문 포함)는 STEP 2.1의 본문 fetch로 그대로 재사용해 중복 호출을 피한다.
+   3. **sanity check (누락 감지)**: 후보 수가 `page_size`(25)에 도달하면 더 있을 수 있다 → 다른 공통 토큰이나 cursor로 재조회해 합집합을 dedup. `log`로 `후보 N건 · active M건`을 출력한다. active 0건이면 정말 없는지 다른 공통 토큰으로 한 번 더 확인한 뒤에만 종료한다.
 2. 각 페이지의 `epic_key` property 추출 → list로 정렬 (등록일 순).
 3. list 길이가 0이면 알림 채널에 "활성 피처가 없어 batch 종료" 1줄 송신 후 종료.
 4. list를 **순차 순회** (병렬 X, Notion API rate limit 보호)하면서 각 epic_key에 대해 STEP 2~5 실행.
@@ -613,8 +623,8 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
 
 ## STEP 7: list
 
-1. `$ARGUMENTS`의 두 번째 토큰이 `--all`이면 모든 페이지, 아니면 `status = active`인 페이지만 조회. archived 페이지는 기본 숨김.
-2. Notion DB에서 해당 페이지들 조회 → page properties 추출.
+1. **STEP 6 step 1의 결정적 전수 조회**로 후보 페이지 집합을 얻고 각 페이지 `properties.status`를 확인한다 (`notion-search` 단독 결과를 신뢰하지 말 것 — 같은 semantic 누락 버그). 두 번째 토큰이 `--all`이면 active+archived 전체, 아니면 `status == "active"`만 채택(archived 기본 숨김).
+2. 채택된 페이지들의 page properties를 추출한다.
 3. 표 형식으로 출력 (`status` 컬럼 포함, `--all`일 때만 의미 있음):
 
 ```markdown
