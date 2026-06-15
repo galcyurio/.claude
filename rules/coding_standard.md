@@ -300,6 +300,24 @@ private fun Preview2() { ... }
 
 내부 부품은 파일 밖에서 쓰일 가능성이 없으면 `private fun`으로 같은 파일에 둔다. 다른 화면에서 재사용될 가능성이 보이면 `feature/.../section/` 또는 `feature/.../component/`로 빼낸다.
 
+#### 파일 레벨 상수는 구현 아래·Preview 위에 선언
+
+파일 레벨 `private val`/`private const val` 상수(치수, 키, 기본값 등)는 import 아래 상단이 아니라 **실제 구현(Composable/함수)들 중 가장 아래**, 그리고 **Preview 위**에 선언한다. 파일을 열었을 때 핵심 구현이 먼저 보이고, Preview는 맨 끝에 모이도록 하기 위함이다.
+
+```kotlin
+@Composable
+fun XxxComponent(...)        // public API
+@Composable
+private fun XxxPart(...)     // 내부 부품
+
+private val XxxHeight = 200.dp      // 구현 아래, Preview 위
+private const val MAX_COUNT = 10
+
+@Preview
+@Composable
+private fun Preview() { ... }
+```
+
 ### 패키지 배치
 
 Clean Architecture 레이어 안에서 다음 구조를 사용한다.
