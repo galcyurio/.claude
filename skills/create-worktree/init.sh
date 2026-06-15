@@ -3,14 +3,11 @@
 #
 # 동작:
 #   1. 서브모듈 초기화 (메인 worktree에 .gitmodules 있을 때만)
-#   2. <worktree>/.claude/ 디렉토리 생성
-#   3. 메인의 .claude/rules/ 항목 복제
-#      - symlink: readlink로 타깃을 읽어 동일 타깃 symlink 생성
-#      - 일반 파일/디렉토리: cp -R
-#      - 같은 이름이 이미 있으면 skip (덮어쓰기 금지)
-#      - 생성 후 target 부재면 broken link 경고
-#   4. 메인의 .claude/settings.local.json 복사 (worktree에 없을 때만)
-#   5. <worktree>/.agent → 메인의 .agent/ symlink 생성
+#   2. <worktree>/.claude → 메인의 .claude/ symlink 생성
+#      - 메인에 .claude/가 없으면 먼저 생성
+#      - worktree에 이미 .claude가 있으면 skip (symlink면 target 출력, 일반 디렉토리면 그대로 둔다)
+#      - rules·settings.local.json 등 .claude/ 전체를 메인과 공유하기 위함
+#   3. <worktree>/.agent → 메인의 .agent/ symlink 생성
 #      - 메인에 .agent/가 없으면 .agent/specs/, .agent/plans/까지 함께 생성
 #      - worktree에 이미 .agent가 있으면 skip
 #      - spec/plan을 모든 worktree에서 공유하기 위함
@@ -66,7 +63,7 @@ echo ""
 # ─── 1. 서브모듈 초기화 ────────────────────────────────────
 SUBMODULE_RESULT="skip (.gitmodules 없음)"
 if [ -f "$MAIN_WORKTREE/.gitmodules" ]; then
-  echo "[1/5] 서브모듈 초기화..."
+  echo "[1/3] 서브모듈 초기화..."
   if git -C "$WORKTREE_PATH" submodule update --init --recursive; then
     SUBMODULE_RESULT="완료"
   else
@@ -75,76 +72,37 @@ if [ -f "$MAIN_WORKTREE/.gitmodules" ]; then
     echo "  수동 재시도: cd $WORKTREE_PATH && git submodule update --init --recursive" >&2
   fi
 else
-  echo "[1/5] 서브모듈: .gitmodules 없음, skip"
+  echo "[1/3] 서브모듈: .gitmodules 없음, skip"
 fi
 echo ""
 
-# ─── 2. .claude/ 디렉토리 ──────────────────────────────────
-CLAUDE_DIR="$WORKTREE_PATH/.claude"
-if [ -d "$CLAUDE_DIR" ]; then
-  CLAUDE_DIR_RESULT="이미 존재 (skip)"
-else
-  mkdir -p "$CLAUDE_DIR"
-  CLAUDE_DIR_RESULT="생성"
-fi
-echo "[2/5] .claude/: $CLAUDE_DIR_RESULT"
+# ─── 2. .claude/ symlink ───────────────────────────────────
+MAIN_CLAUDE="$MAIN_WORKTREE/.claude"
+WORKTREE_CLAUDE="$WORKTREE_PATH/.claude"
 
-# ─── 3. .claude/rules/ ─────────────────────────────────────
-MAIN_RULES="$MAIN_WORKTREE/.claude/rules"
-WORKTREE_RULES="$CLAUDE_DIR/rules"
-RULES_COPIED=()
-RULES_SKIPPED=()
-RULES_BROKEN=()
-
-if [ -d "$MAIN_RULES" ]; then
-  echo "[3/5] .claude/rules/ 복제..."
-  mkdir -p "$WORKTREE_RULES"
-  for entry in "$MAIN_RULES"/* "$MAIN_RULES"/.[!.]*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    name="$(basename "$entry")"
-    dest="$WORKTREE_RULES/$name"
-
-    if [ -e "$dest" ] || [ -L "$dest" ]; then
-      RULES_SKIPPED+=("$name")
-      continue
-    fi
-
-    if [ -L "$entry" ]; then
-      target="$(readlink "$entry")"
-      ln -s "$target" "$dest"
-      if [ ! -e "$dest" ]; then
-        RULES_BROKEN+=("$name -> $target")
-      fi
-      RULES_COPIED+=("$name (symlink → $target)")
-    else
-      cp -R "$entry" "$dest"
-      RULES_COPIED+=("$name")
-    fi
-  done
-  echo "  복제 ${#RULES_COPIED[@]}개 / skip ${#RULES_SKIPPED[@]}개 / broken ${#RULES_BROKEN[@]}개"
-else
-  echo "[3/5] .claude/rules/: 메인에 없음, skip"
-fi
-
-# ─── 4. .claude/settings.local.json ────────────────────────
-MAIN_SETTINGS="$MAIN_WORKTREE/.claude/settings.local.json"
-WORKTREE_SETTINGS="$CLAUDE_DIR/settings.local.json"
-SETTINGS_WARN=""
-
-if [ -f "$MAIN_SETTINGS" ]; then
-  if [ -e "$WORKTREE_SETTINGS" ]; then
-    SETTINGS_RESULT="이미 존재 (skip)"
-    SETTINGS_WARN=" — 메인의 settings.local.json과 다를 수 있음"
+if [ -L "$WORKTREE_CLAUDE" ]; then
+  CLAUDE_TARGET="$(readlink "$WORKTREE_CLAUDE")"
+  if [ ! -e "$WORKTREE_CLAUDE" ]; then
+    CLAUDE_RESULT="이미 존재 (broken symlink → $CLAUDE_TARGET)"
   else
-    cp "$MAIN_SETTINGS" "$WORKTREE_SETTINGS"
-    SETTINGS_RESULT="복사"
+    CLAUDE_RESULT="이미 존재 (symlink → $CLAUDE_TARGET)"
   fi
+elif [ -e "$WORKTREE_CLAUDE" ]; then
+  CLAUDE_RESULT="이미 존재 (skip, symlink 아님)"
 else
-  SETTINGS_RESULT="메인에 없음, skip"
+  if [ ! -d "$MAIN_CLAUDE" ]; then
+    mkdir -p "$MAIN_CLAUDE"
+    ln -s "$MAIN_CLAUDE" "$WORKTREE_CLAUDE"
+    CLAUDE_RESULT="symlink 생성 (메인 .claude/ 신규 생성 포함) → $MAIN_CLAUDE"
+  else
+    ln -s "$MAIN_CLAUDE" "$WORKTREE_CLAUDE"
+    CLAUDE_RESULT="symlink 생성 → $MAIN_CLAUDE"
+  fi
 fi
-echo "[4/5] settings.local.json: $SETTINGS_RESULT"
+echo "[2/3] .claude/: $CLAUDE_RESULT"
+echo ""
 
-# ─── 5. .agent/ symlink ────────────────────────────────────
+# ─── 3. .agent/ symlink ────────────────────────────────────
 MAIN_AGENT="$MAIN_WORKTREE/.agent"
 WORKTREE_AGENT="$WORKTREE_PATH/.agent"
 
@@ -167,39 +125,14 @@ else
     AGENT_RESULT="symlink 생성 → $MAIN_AGENT"
   fi
 fi
-echo "[5/5] .agent/: $AGENT_RESULT"
+echo "[3/3] .agent/: $AGENT_RESULT"
 echo ""
 
 # ─── 결과 요약 ─────────────────────────────────────────────
 echo "=== 결과 요약 ==="
 echo "서브모듈:            $SUBMODULE_RESULT"
-echo ".claude/:            $CLAUDE_DIR_RESULT"
-echo ".claude/settings:    $SETTINGS_RESULT${SETTINGS_WARN}"
+echo ".claude/:            $CLAUDE_RESULT"
 echo ".agent/:             $AGENT_RESULT"
-
-if [ ${#RULES_COPIED[@]} -gt 0 ]; then
-  echo ""
-  echo "복제된 rules (${#RULES_COPIED[@]}):"
-  for item in "${RULES_COPIED[@]}"; do
-    echo "  + $item"
-  done
-fi
-
-if [ ${#RULES_SKIPPED[@]} -gt 0 ]; then
-  echo ""
-  echo "skip된 rules — 이미 존재 (${#RULES_SKIPPED[@]}):"
-  for item in "${RULES_SKIPPED[@]}"; do
-    echo "  · $item"
-  done
-fi
-
-if [ ${#RULES_BROKEN[@]} -gt 0 ]; then
-  echo ""
-  echo "⚠ broken symlink — target 부재 (${#RULES_BROKEN[@]}):"
-  for item in "${RULES_BROKEN[@]}"; do
-    echo "  ! $item"
-  done
-fi
 
 echo ""
 echo "다음: cd $WORKTREE_PATH"
