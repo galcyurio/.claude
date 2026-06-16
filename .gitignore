@@ -43,11 +43,5 @@ debug/
 telemetry/
 downloads/
 
-# 팀 런타임 (inbox, UUID 세션)
-teams/*/inboxes/
-teams/default/
-teams/3ee68420-*/
-teams/983053d1-*/
-
 # .android-ai-prompts symlink (별도 repo에서 관리)
 skills/apply-pr-feedback
