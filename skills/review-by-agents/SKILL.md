@@ -172,33 +172,26 @@ Designer는 **개수 제한 없음**. Figma 디자인과 구현의 모든 시각
 
 각 finder는 `mergeBlocking`(머지 순간 빌드/보안/데이터 영향 여부)을 포함해 보고하며, 개수 하드캡 없이 중요한 이슈만 severity를 정확히 태깅한다. 선별은 4단계(합성)에서 수행한다.
 
-### 4단계: 결과 통합
+### 4단계: 결과 병합
 
-에이전트 결과(JSON 배열)를 **두 그룹으로 분리**하여 처리한다:
+두 출처의 결과를 병합한다.
 
-- **코드 이슈 그룹**: Code Reviewer + Oracle (Logic, Convention, Security, Architecture)
-- **디자인 이슈 그룹**: Designer (Design) — 별도 섹션으로 출력한다
-
-각 그룹 공통 처리:
-
-1. **중복 제거**: 같은 `file:line` 이슈는 심각도가 높은 쪽을 유지한다
-2. **선별**:
-   - 코드 이슈: **정말 중요한 것 최대 3개**만 남긴다 (Top 3). 억지로 채우지 않고, 중요한 게 1개면 1개만 남긴다
-   - 디자인 이슈: **개수 제한 없음**. Designer가 보고한 이슈 전체를 그대로 출력한다. 코드 이슈의 Top 3 제한과 완전히 별개다
-3. **정렬**: 심각도 내림차순 → `file` → `line` 오름차순
+- **코드 이슈**: Workflow가 반환한 `codeIssues`. 이미 중복 제거·선별·정렬이 끝난 상태다. 추가 가공하지 않는다.
+  - Workflow 내부 처리(참고): ① 같은 `file:line`은 높은 severity 유지 ② **Critical 전량 보존(cap 없음)** + warning/info만 최대 5건 ③ severity 내림차순 → `file` → `line` 오름차순 정렬. Critical·머지차단 finding은 교차검증으로 `verifyNote`가 부착되며, 강등된 finding은 삭제하지 않고 낮춰진 severity로 남는다.
+- **디자인 이슈**: 메인 스레드 Designer가 반환한 JSON 배열. **개수 제한 없음**. 같은 `file:line` 중복만 높은 severity로 정리하고 severity → `file` → `line` 순 정렬한다. 별도 섹션으로 출력한다.
 
 ### 5단계: 오케스트레이터 판정
 
-에이전트들의 리뷰가 모두 끝난 뒤, 오케스트레이터(스킬 호출자)가 통합된 결과를 종합해 **OKAY** 또는 **REJECT**를 결정한다. 이 단계는 에이전트가 아닌 오케스트레이터가 직접 수행한다.
+병합된 결과를 종합해 오케스트레이터(스킬 호출자)가 **OKAY** 또는 **REJECT**를 결정한다. 판정 입력은 Workflow가 **교차검증을 거친** findings다 — 강등되어 게이트에서 빠진 finding은 판정 사유가 되지 않는다.
 
 **판정 규칙**:
 
 - **❌ REJECT** — 다음 중 하나라도 해당:
-  - Critical 이슈가 1건 이상 존재 (관점 무관: Logic/Convention/Security/Architecture/Design)
-  - 머지/배포 시 즉시 사용자에게 영향이 가는 Warning 이슈가 존재 (예: 노출된 시크릿, 깨진 빌드, 데이터 유실 가능성)
-- **✅ OKAY** — 위에 해당하지 않음. Warning/Info만 존재하거나 이슈가 없을 때.
+  - 검증된 Critical 이슈가 1건 이상 존재 (관점 무관: Logic/Convention/Security/Architecture/Design)
+  - 검증된 머지차단(`mergeBlocking`) Warning 이슈가 존재 (노출된 시크릿, 깨진 빌드, 데이터 유실 등)
+- **✅ OKAY** — 위에 해당하지 않음.
 
-판정 근거를 **한~두 문장**으로 정리해 출력에 포함한다. 근거에는 어떤 이슈가 판정을 좌우했는지(또는 차단 이슈가 없었다는 점)를 구체적으로 적는다. Critical이 없어도 머지 차단 수준의 Warning이 있다고 판단해 REJECT를 내릴 때는 그 이유를 명시한다.
+판정 근거를 한~두 문장으로 정리해 출력에 포함한다. 어떤 이슈가 판정을 좌우했는지(또는 차단 이슈가 없었다는 점)를 구체적으로 적고, **검증 통계**(예: `검증: Critical 3건 중 2건 확인·1건 강등`)를 한 줄 덧붙인다. `verifyStats`의 `criticalConfirmed`·`verified`·`downgraded`를 활용한다.
 
 ### 6단계: 최종 출력
 
