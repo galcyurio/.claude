@@ -8,7 +8,14 @@ export const meta = {
 }
 
 // args: { diff, changedFiles, contextSummary, followupContext, targetDesc }
-const { diff = '', changedFiles = [], contextSummary = '', followupContext = '', targetDesc = '' } = args || {}
+// 런타임이 args를 JSON 문자열로 넘기는 경우가 있어 파싱 후 사용한다(객체로 오면 그대로).
+const _args = typeof args === 'string' ? JSON.parse(args) : (args || {})
+const { diff = '', changedFiles = [], contextSummary = '', followupContext = '', targetDesc = '' } = _args
+
+// fail-fast: args 미전달/파싱 후에도 빈 diff면 finder가 엉뚱한 결과를 내는 silent failure 방지
+if (!String(diff).trim()) {
+  throw new Error('review-by-agents: args.diff가 비어 있음 — Workflow args 미전달 의심. 메인 스레드는 수동 Agent 병렬 스폰 폴백으로 전환할 것.')
+}
 
 const FINDINGS_SCHEMA = {
   type: 'object',
