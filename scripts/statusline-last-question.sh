@@ -17,14 +17,32 @@ tp=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 
 q=""
 if [ -n "$tp" ] && [ -f "$tp" ]; then
+  # user 메시지에서 표시 후보를 뽑는다.
+  #  - content가 string → 일반 프롬프트(슬래시/로컬커맨드 래퍼 제외)
+  #  - content가 array  → AskUserQuestion 답변(tool_result)의 안내 문구
+  # 문서 순서를 유지하므로 last가 "가장 최근 user 입력"이 된다.
   q=$(tail -n 400 "$tp" | jq -R 'fromjson? // empty' | jq -rs '
     [ .[]
       | select(.type=="user")
-      | .message.content
-      | select(type=="string")
-      | select(test("<command-(name|message|args)>|<local-command")|not)
+      | .message.content as $c
+      | if ($c|type)=="string" then
+          ($c | select(test("<command-(name|message|args)>|<local-command")|not))
+        elif ($c|type)=="array" then
+          ( $c[]
+            | select(.type=="tool_result")
+            | (.content // empty)
+            | (if type=="array" then (map(.text? // "")|join(" ")) else . end)
+            | select(type=="string")
+            | select(test("questions have been answered"))
+          )
+        else empty end
     ] | last // ""')
 fi
+
+# AskUserQuestion 답변이면 보기 좋게 정리: 안내 문구 제거 + "질문"="답변" → 질문 → 답변
+q=$(printf '%s' "$q" \
+  | sed -E 's/^Your questions have been answered: //; s/\. You can now continue with these answers in mind\.$//' \
+  | sed -E 's/"([^"]*)"="([^"]*)"/\1 → \2/g')
 
 # 개행 제거 + 공백 정리
 q=$(printf '%s' "$q" | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
