@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# statusline: 화면 하단에 "지금 답하는 마지막 질문"을 고정 표시.
+# statusline: 화면 하단에 "지금 답하는 마지막 프롬프트"를 고정 표시.
 # Claude Code가 stdin으로 세션 JSON(transcript_path 포함)을 넘겨준다.
 # transcript(JSONL)에서 마지막 실제 user 프롬프트를 뽑아 출력한다.
 # 슬래시커맨드/로컬커맨드 래퍼와 tool_result(array content)는 제외한다.
@@ -39,7 +39,7 @@ if [ -n "$tp" ] && [ -f "$tp" ]; then
     ] | last // ""')
 fi
 
-# AskUserQuestion 답변이면 보기 좋게 정리: 안내 문구 제거 + "질문"="답변" → 질문 → 답변
+# AskUserQuestion 답변이면 보기 좋게 정리: 안내 문구 제거 + "프롬프트"="답변" → 프롬프트 → 답변
 q=$(printf '%s' "$q" \
   | sed -E 's/^Your questions have been answered: //; s/\. You can now continue with these answers in mind\.$//' \
   | sed -E 's/"([^"]*)"="([^"]*)"/\1 → \2/g')
@@ -48,7 +48,7 @@ q=$(printf '%s' "$q" \
 q=$(printf '%s' "$q" | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
 
 if [ -z "$q" ]; then
-  printf '❓ (질문 없음)'
+  printf '❓ (프롬프트 없음)'
 elif [ "${#q}" -gt "$MAX_CHARS" ]; then
   # 문자 단위 슬라이스 → 멀티바이트 중간을 끊지 않음(깨짐 방지)
   printf '❓ %s…' "${q:0:$MAX_CHARS}"
