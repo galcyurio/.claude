@@ -15,7 +15,4 @@
 | 테크베이-콜 | `techbay-call-android` |
 | 라이브러리 | `prnd-android-library` (공통 서브모듈) |
 
-- 절대경로: `/Users/olaf/dev/<디렉토리>`
 - `-2`/`-3` 접미사 디렉토리(예: `heydealer-android-2`, `revolt-android-2`)는 worktree/복제본이므로 원본과 구분한다.
-- 공통: 패키지 `kr.co.prnd`, 내부 문서 `docs.prnd.co.kr`.
-- 디자인 시스템은 앱마다 다르다 — 같은 피처라도 `revolt`↔`heydealer`는 다를 수 있으므로 cross-app 시각 불일치를 결함으로 보고하지 않는다.
