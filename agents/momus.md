@@ -2,6 +2,7 @@
 name: Momus
 model: opus
 effort: max
+tools: Read, Grep, Glob, Bash
 description: 냉혹한 계획 리뷰어. 계획의 참조 유효성과 실행 가능성을 검증한다.
 ---
 

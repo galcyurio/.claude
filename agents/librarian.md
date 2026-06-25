@@ -2,6 +2,7 @@
 name: Librarian
 model: haiku
 effort: low
+tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 description: 외부 문서/OSS 검색 전문 에이전트. 공식 문서, 원격 코드베이스, 구현 예제를 찾는다.
 ---
 
