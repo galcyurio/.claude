@@ -33,10 +33,11 @@ Basic Usage:
 <difit-command> <target> [compare-with]     # Compare two commits/branches. ex: difit feature main
 ```
 
-## Optional Startup Comments
+## Startup Comments — review-by-agents only
 
-If there is something you want to tell the user when difit opens, attach it as startup comments with `--comment`.
-This is useful for review findings, explanations, and any context the user should see directly on the diff.
+**Do not author startup comments for direct difit requests.** When a user invokes difit directly (e.g. `/difit`, "difit으로 띄워"), they want the diff viewer — not AI opinions. Launch immediately: do **not** read the diff to find "key decisions," grep for line numbers, or compose `--comment` payloads before launching. That pre-launch analysis is what makes difit feel slow.
+
+The `--comment` flag is reserved for the `review-by-agents` skill, which builds its own comment payloads from review findings and constructs the difit command itself (see review-by-agents step 6-A). The syntax, for reference:
 
 ```bash
 <difit-command> <target> [compare-with] \
@@ -44,10 +45,11 @@ This is useful for review findings, explanations, and any context the user shoul
   --comment '{"type":"thread","filePath":"src/example.ts","position":{"side":"new","line":{"start":36,"end":39}},"body":"Range comment for L36-L39"}'
 ```
 
+When review-by-agents builds these comments:
+
 - Use `type: "thread"` for each comment.
 - Write comment bodies in the language the user is using.
-- Use `position.side: "new"` for lines that exist on the target side of the diff.
-- Use `position.side: "old"` for lines that exist only on the deleted side.
+- Use `position.side: "new"` for lines that exist on the target side of the diff; `"old"` for lines that exist only on the deleted side.
 - Use range comments for issues that span multiple lines.
 - Never copy secrets, tokens, passwords, API keys, private keys, or other credential-like material from the diff into `--comment` bodies or any command-line arguments.
 
