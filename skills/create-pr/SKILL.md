@@ -26,9 +26,9 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 ### 2. JIRA 티켓 조회
 - `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources`로 cloudId 가져오기
 - `mcp__claude_ai_Atlassian__getJiraIssue`로 티켓 조회 (반드시 `fields: ["summary", "description", "parent"]` 명시)
-- **인증 실패 시**: AskUserQuestion으로 반드시 사용자에게 확인
-  - "예" → JIRA/에픽 조회 없이 develop을 base로 확정하고 3번 단계 건너뛰기
-  - "아니오" → "'/mcp'로 JIRA를 재인증한 후 다시 '/pr'을 실행해주세요" 출력 후 종료
+- **인증 실패 시**: develop으로 임의 진행하지 말고, AskUserQuestion으로 **base 브랜치를 사용자에게 확인**한다.
+  - 후보 제시: `develop` + `git branch -r | grep "origin/feature-base/"` 목록. 사용자가 고른 브랜치를 base로 3번 단계를 건너뛰고 진행한다. (PR 제목은 세션에서 확보한 summary나 사용자 입력을 사용)
+  - 사용자가 재인증을 택하면 "'/mcp'로 JIRA를 재인증한 후 다시 '/pr'을 실행해주세요" 출력 후 종료한다.
 
 ### 3. base 브랜치 결정
 
