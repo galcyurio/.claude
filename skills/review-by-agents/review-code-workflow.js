@@ -69,7 +69,7 @@ const PERSPECTIVES = [
   {
     label: 'logic-convention',
     checklist: `- Logic: 버그, null safety, 경계 조건, 에러 핸들링 누락, 레이스 컨디션
-- Convention: 네이밍 일관성, 프로젝트 패턴, 코드 중복, 매직 넘버
+- Convention: 네이밍 일관성, 프로젝트 패턴, 코드 중복, 매직 넘버, 재사용(표준 API·기존 유틸 대신 재구현), 단순화 여지(불필요하게 복잡한 로직), 효율(비효율 자료구조·알고리즘), 추상화 레벨(altitude — 너무 저수준/고수준)
 (perspective 필드는 Logic 또는 Convention 중 해당하는 값으로 태깅)`,
     opts: {},
   },
@@ -108,7 +108,7 @@ ${EXCLUSION_RULES}
 각 finding의 line은 변경 후(post-change) 파일의 절대 라인 번호다. diff 헤더 @@ -a,b +c,d @@ 의 +c 를 시작으로 추가(+)·문맥(공백) 라인을 세어 산출하며, diff 텍스트 안에서의 위치나 삭제(-) 라인 번호가 아니다. 삭제된 코드를 지적할 때만 변경 전 라인을 쓰고 issue에 "(삭제 라인)"을 명시한다.
 
 ## OUTPUT
-정말 중요한 이슈만 보고하라. 사소한 스타일·네이밍 지적은 제외하고 실제 버그·취약점·구조 결함·사용자 영향 위주로 선별하라. 개수 하드캡은 없다. severity를 정확히 태깅하고, mergeBlocking은 "머지 순간 빌드/보안/데이터에 실제 영향"일 때만 true로 둔다. 이슈가 없으면 빈 배열을 반환하라.`
+정말 중요한 이슈만 보고하라. 순수 포매팅·개인 취향 수준의 사소한 지적은 제외한다. 단, 재사용/단순화/효율/추상화 레벨(Convention) 개선은 명확한 개선 효과가 있으면 info 또는 warning으로 보고하라. 실제 버그·취약점·구조 결함·사용자 영향은 severity를 정확히 태깅한다. 개수 하드캡은 없다. mergeBlocking은 "머지 순간 빌드/보안/데이터에 실제 영향"일 때만 true로 둔다. 이슈가 없으면 빈 배열을 반환하라.`
 }
 
 const SEV_RANK = { critical: 3, warning: 2, info: 1 }
