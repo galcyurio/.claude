@@ -14,6 +14,14 @@
 - difit 자체 `--background` 플래그는 **쓰지 않는다** — 하니스 백그라운드 잡으로 띄워야 서버가 턴을 넘어 유지된다.
 - **`--keep-alive`는 붙이지 않는다.** 이게 없어야 사용자가 브라우저를 닫을 때 difit가 스스로 종료된다(client disconnect → shutdown). 이 **잡 완료가 "리뷰 끝" 신호**이자 회수 트리거다 — 사용자의 완료 메시지를 기다리지 않는다.
 
+## 코멘트 영속과 세션 격리 — `--clean`
+
+difit는 리뷰 코멘트를 **브라우저 localStorage에 영속**하며, 이 저장소는 **origin(`localhost:<port>`) 단위**다. 클라이언트는 로드 시 그 origin에 쌓인 이전 코멘트를 모두 복원하므로, 같은 포트로 difit를 다시 띄우면 **이전 세션·다른 PR의 코멘트가 이번 diff에 섞여** 나타난다(종료 시 stdout 덤프에도 그대로 포함된다).
+
+- 매 리뷰를 깨끗한 상태로 시작하려면 **`--clean`을 붙인다.** 서버가 `/api/diff` 응답에 `clearComments:true`를 실어 보내고, 클라이언트가 로드 시 `clearAllComments()`로 localStorage를 비운다.
+- `--clean` 없이 세션을 열면 leak이 발생한다. **프리로드·회수를 쓰는 스킬은 `--clean`을 기본으로 한다.**
+- `--clean`은 해당 origin의 **모든** 저장 코멘트를 지운다(현재 diff/PR 한정 아님). 의도적으로 이전 코멘트를 이어서 볼 때만 생략한다.
+
 ## 절대 kill하지 않는다
 
 difit에 `kill`·`pkill`·`lsof … | xargs kill`을 **절대 실행하지 않는다.** difit는 브라우저를 자식 프로세스로 띄우므로, difit(또는 그 프로세스 그룹)를 kill하면 사용자 브라우저가 함께 종료될 수 있다. difit는 브라우저가 닫히면 스스로 깨끗이 종료된다 — 항상 자가 종료하게 둔다.
