@@ -229,7 +229,9 @@ Designer는 **개수 제한 없음**. Figma 디자인과 구현의 모든 시각
 | 모드 | difit target |
 |------|--------------|
 | PR 모드 | `<difit-command> --pr <PR-URL>` — difit가 GitHub PR diff를 직접 가져온다 (difit 5.x는 `--pr` 플래그 필수; positional URL은 commit-ish로 오인돼 `Invalid target commit-ish format`으로 실패) |
-| 현재 변경사항 모드 | `<difit-command> HEAD <base>` — base 대비 HEAD diff. `<base>`는 1단계에서 감지한 base 브랜치 |
+| 현재 변경사항 모드 | `<difit-command> HEAD <base> --merge-base` — merge-base(`<base>`, HEAD)부터의 diff(three-dot). `<base>`는 1단계에서 감지한 base 브랜치 |
+
+> **`--merge-base` 필수(현재 변경사항 모드)**: 없이 `difit HEAD <base>`는 **two-dot 직접 비교**(`git diff <base> HEAD`)라, base 브랜치가 fork 이후 앞으로 이동하면 그 사이 base에 병합된 커밋들이 diff에 전부 섞여 나온다. 1단계 에이전트 입력은 `git diff <base>...HEAD`(three-dot)이므로 `--merge-base`를 붙여 difit도 fork point 기준으로 맞춰야 **에이전트가 검토한 diff와 difit 렌더가 일치**한다. base가 빠르게 움직이는 레포(예: PRND develop)에서 특히 중요하다. `--merge-base`는 Git revision 모드 전용이므로 PR 모드(`--pr`)에는 붙이지 않는다.
 
 PR 모드의 GitHub fetch나 `npx difit`는 네트워크가 필요하므로 샌드박스에서는 계약의 네트워크 권한 규칙을 따른다.
 
