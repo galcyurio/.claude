@@ -13,7 +13,7 @@ disable-model-invocation: true
 |------|----------|
 | 이슈 생성 | `create-jira-issue` 스킬 |
 | 구현 라우팅 | `~/.claude/rules/orchestration.md` |
-| 커밋 | `~/.claude/rules/git-commit-message.md` + `~/.claude/rules/coding_standard.md` |
+| 커밋 | `~/.claude/rules/git.md` + `~/.claude/rules/coding_standard.md` |
 | PR 생성 | `create-pr` 스킬 |
 
 ## 입력 형식
@@ -75,7 +75,7 @@ disable-model-invocation: true
 ### Phase 4. 커밋
 
 1. `coding_standard.md`의 **커밋 단위 분리** 원칙대로 논리 단위마다 커밋한다. 여러 변경을 한 커밋에 몰지 않는다.
-2. 커밋 메시지는 `git-commit-message.md` 포맷 (`HDA-YYYYY 태그: 내용`)을 따른다. 이슈키는 Phase 1에서 만든 키를 사용한다.
+2. 커밋 메시지는 `git.md` 포맷 (`HDA-YYYYY 태그: 내용`)을 따른다. 이슈키는 Phase 1에서 만든 키를 사용한다.
 3. 구현과 커밋은 보통 단위별로 인터리브된다(구현 한 단위 → 커밋 → 다음 단위).
 
 ### Phase 5. PR 생성

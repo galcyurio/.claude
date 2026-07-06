@@ -98,4 +98,4 @@ HeyDealer 또는 Revolt 테마의 `AbstractComposeView` 클래스 + 내부 `Comp
 
 - **`git add`는 정확히 생성된 파일 절대경로만 지정**한다. working tree의 다른 변경을 보호한다.
 - 파일명은 `{name}.kt`, 클래스명은 `{name}View`다. 사용자가 혼동할 수 있으므로 결과 보고에 명시한다.
-- 커밋 메시지는 `~/.claude/rules/git-commit-message.md` 규칙을 따른다.
+- 커밋 메시지는 `~/.claude/rules/git.md` 규칙을 따른다.

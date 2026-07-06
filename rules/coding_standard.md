@@ -21,7 +21,7 @@ TODO 주석은 `TODO([issue id, optional]): xxx` 포맷으로 작성한다.
 
 ## 커밋 단위
 
-> 커밋 메시지 형식 자체는 `~/.claude/rules/git-commit-message.md`를 따른다. 이 섹션은 **단위 분리**와 **메시지 표현 패턴**을 보완한다.
+> 커밋 메시지 형식 자체는 `~/.claude/rules/git.md`를 따른다. 이 섹션은 **단위 분리**와 **메시지 표현 패턴**을 보완한다.
 
 ### 한 커밋 = 하나의 논리적 변경
 
@@ -153,7 +153,7 @@ HDA-10842 refactor: build_app_by_pr.yml -> build.yml
 
 ### 기획자/유저 관점
 
-기능 단위 커밋은 **사용자가 보게 될 변화** 중심으로 작성한다 (`~/.claude/rules/git-commit-message.md` 규칙과 동일).
+기능 단위 커밋은 **사용자가 보게 될 변화** 중심으로 작성한다 (`~/.claude/rules/git.md` 규칙과 동일).
 
 - Good: `feat: 알림 모두보기 클릭 시 가격 알림 화면으로 진입한다`
 - Bad: `feat: HomeViewModel에 onNotificationSeeAllClick 핸들러를 추가한다`

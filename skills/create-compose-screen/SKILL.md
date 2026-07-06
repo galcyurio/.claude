@@ -175,4 +175,4 @@ const val ${SCREEN_CONST} = "${SCREEN_LABEL}"
 - 5개 파일 모두 같은 패키지에 생성된다. 패키지가 모두 동일하므로 `${PACKAGE_NAME}.${NAME}ViewModel.Event` import는 사실 같은 패키지 내 inner 클래스 참조다. 원본 file template과 동일하게 명시적 import를 유지한다 (불필요해도 컴파일은 정상 동작).
 - 5개 파일이 부분적으로만 생성되는 상태를 피한다. 도중에 실패하면 이미 생성된 파일을 안내하고 자동 커밋 단계를 건너뛴다.
 - Screen.kt / AndroidManifest.xml 수정 실패 시: 이미 생성된 신규 5개 파일은 유지하되, 어떤 단계에서 실패했는지 명시하고 사용자가 수동으로 마무리할 수 있도록 안내한다 (커밋은 진행하지 않는다).
-- 커밋 메시지는 `~/.claude/rules/git-commit-message.md` 규칙을 따른다.
+- 커밋 메시지는 `~/.claude/rules/git.md` 규칙을 따른다.
