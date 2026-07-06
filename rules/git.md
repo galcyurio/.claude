@@ -18,3 +18,12 @@
   - Good: `HDA-125 feat: 홈 화면 상단에 추천 차량 캐러셀을 노출한다`
   - Bad: `HDA-125 feat: HomeRecommendCarouselComposable을 구현한다`
 - Claude Code 기본 Co-Authored-By trailer를 추가한다.
+
+# 브랜치 생성 규칙
+
+- 브랜치는 base 브랜치(develop 등)로 **먼저 이동한 뒤** `git checkout -b feature/X`만 사용한다.
+- start-point로 `origin/develop` 같은 원격 ref를 **붙이지 않는다.** (`git checkout -b feature/X origin/develop` 금지)
+  - 이유: git 기본값 `branch.autoSetupMerge=true`가 원격 ref를 upstream으로 자동 설정해 develop이 upstream으로 걸린다. 이 상태는 원치 않는다.
+- 다른 브랜치에 체크아웃돼 있어서 develop 기준이 필요하면, "한 방에" 하려고 원격 ref를 붙이지 말고 먼저 `git switch develop`(또는 `git checkout develop`)으로 이동한 뒤 `git checkout -b feature/X` 한다.
+- git config(`branch.autoSetupMerge` 등)는 변경하지 않는다.
+- 이미 upstream이 걸렸으면 `git branch --unset-upstream`으로 해제한다.
