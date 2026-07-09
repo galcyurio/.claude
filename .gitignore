@@ -45,3 +45,4 @@ downloads/
 
 # .android-ai-prompts symlink (별도 repo에서 관리)
 skills/apply-pr-feedback
+skills/merge-develop
