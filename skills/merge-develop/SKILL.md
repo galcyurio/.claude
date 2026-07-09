@@ -90,13 +90,13 @@ ${CLAUDE_SKILL_DIR}/merge-develop.sh <feature-base 브랜치> [auto] --continue
 - base 직접 push / force-push 하지 않는다
 - 스크립트 밖에서 수동 `gh pr create` / `gh pr merge --merge` 하지 않는다
 
-## 자주 하는 실수
+## 하지 말 것
 
-- **rebase/squash로 develop 반영**: 공유 base 히스토리를 rewrite/평탄화한다. 반드시 merge commit으로 남긴다 (스크립트는 `git merge --no-edit`).
-- **stale 로컬 base 기준으로 브랜치 생성**: 로컬 `feature-base`가 origin보다 뒤처져 있으면 낡은 base에서 판다. 스크립트는 `origin/feature-base` tip을 쓴다.
-- **충돌 자동 해결**: 타 팀 코드와의 충돌은 도메인 지식이 필요하다. exit 3에서 멈추고 사람이 푼다.
-- **수동 PR 생성/즉시 머지**: `gh pr create`나 `gh pr merge --merge`를 직접 하면 auto-merge 유실·중복이 생긴다. PR 생성=workflow, 머지=approve→auto-merge에 맡긴다.
-- **base 직접 push**: 보호되어 거부된다(개발 계정 admin→maintain). merge 브랜치로만 반영한다.
+- **rebase/squash로 develop을 반영하지 않는다**: 공유 base 히스토리를 rewrite/평탄화한다. 반드시 merge commit으로 남긴다 (스크립트는 `git merge --no-edit`).
+- **stale 로컬 base 기준으로 브랜치를 만들지 않는다**: 로컬 `feature-base`가 origin보다 뒤처져 있으면 낡은 base에서 판다. 스크립트는 `origin/feature-base` tip을 쓴다.
+- **충돌은 자동으로 해결하지 않는다**: 타 팀 코드와의 충돌은 도메인 지식이 필요하다. exit 3에서 멈추고 사람이 푼다.
+- **수동으로 PR을 만들거나 즉시 머지하지 않는다**: `gh pr create`나 `gh pr merge --merge`를 직접 하면 auto-merge 유실·중복이 생긴다. PR 생성=workflow, 머지=approve→auto-merge에 맡긴다.
+- **base에 직접 push하지 않는다**: 보호되어 거부된다(개발 계정 admin→maintain). merge 브랜치로만 반영한다.
 
 ## 핵심 명령 요약
 
