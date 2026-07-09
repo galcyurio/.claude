@@ -47,13 +47,13 @@ TODO 주석은 `TODO([issue id, optional]): xxx` 포맷으로 작성한다.
 
 ### Compose/MVI 화면 작업 분리 순서
 
-새 Compose 화면을 추가할 때는 아래 순서로 커밋을 쪼갠다. 각 단계가 독립 커밋이다.
+새 Compose 화면을 추가할 때는 아래 순서로 커밋을 쪼갠다. 각 단계가 독립 커밋이며, **각 커밋은 단독으로 컴파일 가능해야 한다**(중간 커밋도 빌드가 깨지지 않게).
 
 1. **API/DTO 추가** (필요 시 선행) — 아래 "API/DTO 작업 분리" 참고
 2. **골격(skeleton) 추가**: Activity + Screen + UiState + UiAction + ViewModel + Manifest 등록 → 한 커밋
 3. **텍스트 리소스 추가** (strings.xml 등)
 4. **UiState 필드 추가**
-5. **UiAction 항목 추가**
+5. **UiAction 항목 추가** — `sealed`에 subtype을 새로 추가하는 커밋은 그것을 소비하는 `when`(보통 `Screen` onAction) 갱신과 **같은 커밋으로 묶는다**. subtype만 추가하고 소비 `when`을 다음 커밋으로 미루면 Kotlin exhaustive `when` 때문에 그 중간 커밋이 컴파일되지 않는다(위 "단독 컴파일 가능" 원칙 위반).
 6. **UI 본문 구현** (Composable 채우기)
 7. **개별 기능 단위로 분리** (edge-to-edge 적용, LazyColumn 전환, 로딩 인디케이터, 페이징 등 각각 별도 커밋)
 8. **fix**: 리뷰/디자인 반영, 누락 수정, 엣지 케이스 처리
