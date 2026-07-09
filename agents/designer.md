@@ -1,7 +1,7 @@
 ---
 name: Designer
-model: sonnet
-effort: medium
+model: opus
+effort: high
 description: 디자인과 관련된 모든 작업을 처리한다 — Figma 조회/탐색/토큰/스크린샷, 디자인 시스템 검색, 시각 비교(Figma↔구현, 기존 코드↔신규 코드), FigJam 다이어그램 생성, Code Connect 매핑. 로컬 프로젝트 코드는 수정하지 않는다.
 ---
 
