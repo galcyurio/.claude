@@ -185,8 +185,8 @@ fi
 
 end=$(( $(now) + MERGE_WAIT ))
 while :; do
-  read -r merged state <<<"$(gh pr view "$PR" --json merged,state -q '"\(.merged) \(.state)"')"
-  [ "$merged" = true ]  && { echo "머지 완료: #$PR  $URL"; exit 0; }
+  state="$(gh pr view "$PR" --json state -q '.state')"
+  [ "$state" = MERGED ] && { echo "머지 완료: #$PR  $URL"; exit 0; }
   [ "$state" = CLOSED ] && { echo "머지 없이 CLOSED: #$PR" >&2; exit 1; }
   if [ "$(now)" -ge "$end" ]; then
     MSS=$(gh pr view "$PR" --json mergeStateStatus -q .mergeStateStatus)
