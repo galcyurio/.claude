@@ -2,7 +2,7 @@ export const meta = {
   name: 'review-by-agents-code',
   description: '코드 변경을 다관점 병렬 리뷰하고 Critical·머지차단 finding을 교차검증한다',
   phases: [
-    { title: 'Find', detail: 'Logic+Convention / Security / Architecture 관점 병렬 리뷰' },
+    { title: 'Find', detail: 'Logic+Convention+Security / Architecture 관점 병렬 리뷰' },
     { title: 'Verify', detail: 'Critical·머지차단 finding을 refute 검증자 2명으로 교차검증' },
   ],
 }
@@ -67,16 +67,11 @@ const EXCLUSION_RULES = `다음에 해당하면 명백한 문제처럼 보여도
 
 const PERSPECTIVES = [
   {
-    label: 'logic-convention',
+    label: 'logic-convention-security',
     checklist: `- Logic: 버그, null safety, 경계 조건, 에러 핸들링 누락, 레이스 컨디션
 - Convention: 네이밍 일관성, 프로젝트 패턴, 코드 중복, 매직 넘버, 재사용(표준 API·기존 유틸 대신 재구현), 단순화 여지(불필요하게 복잡한 로직), 효율(비효율 자료구조·알고리즘), 추상화 레벨(altitude — 너무 저수준/고수준)
-(perspective 필드는 Logic 또는 Convention 중 해당하는 값으로 태깅)`,
-    opts: {},
-  },
-  {
-    label: 'security',
-    checklist: `- Security: 인젝션(SQL/XSS/SSRF), 인증/인가 우회, 민감정보 노출, 안전하지 않은 API 사용
-(perspective 필드는 항상 Security)`,
+- Security: 인젝션(SQL/XSS/SSRF), 인증/인가 우회, 민감정보 노출, 안전하지 않은 API 사용
+(perspective 필드는 Logic·Convention·Security 중 해당하는 값으로 태깅)`,
     opts: {},
   },
   {
