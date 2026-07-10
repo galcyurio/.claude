@@ -211,7 +211,7 @@ internal fun XxxScreen(viewModel: XxxViewModel) {
     val onAction: (XxxUiAction) -> Unit = remember(viewModel) {
         { action ->
             when (action) {
-                is XxxUiAction.OnItemClick -> viewModel.onItemClick(action.item)
+                is XxxUiAction.OnItemClick -> viewModel.selectItem(action.item)
                 XxxUiAction.OnRefresh -> viewModel.fetch()
             }
         }
@@ -231,6 +231,7 @@ private fun XxxScreen(
 - 외부 함수: `internal fun` — uiState collect, onAction 정의
 - 내부 함수: `private fun` — 실제 UI 구현
 - `onAction`은 `remember(viewModel) { ... }`로 감싸 재구성 최소화
+- ViewModel 메서드는 UiAction 이름을 미러링한 `onXxx()`가 **아니라** 행위 동사로 짓는다 (`onItemClick` ❌ → `selectItem` ✅). 상세: `~/.android-ai-prompts/rules/common/viewmodel.md` 메서드 네이밍
 
 ### UiAction 네이밍
 
