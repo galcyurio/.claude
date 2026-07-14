@@ -23,7 +23,9 @@ if [ -n "$tp" ] && [ -f "$tp" ]; then
   # user 메시지에서 표시 후보를 뽑는다.
   #  - content가 string → 일반 프롬프트(슬래시/로컬커맨드 래퍼 제외)
   #  - content가 array  → AskUserQuestion 답변(tool_result)의 안내 문구
-  # 문서 순서를 유지하므로 last가 "가장 최근 user 입력"이 된다.
+  # 진짜 프롬프트(❓, 비-SOH)를 시스템 라벨(⚙️, SOH 마커)보다 우선한다:
+  # 마지막 비-SOH 후보를 쓰고, 그런 게 없을 때만 마지막 시스템 라벨로 폴백한다.
+  # (bash 출력·리마인더 같은 주입이 프롬프트 뒤에 와도 프롬프트가 이긴다)
   q=$(tail -n 400 "$tp" | jq -R 'fromjson? // empty' | jq -rs '
     # 표시할 실제 텍스트에서 주입 블록·stray 태그·양끝 공백을 제거한다.
     def clean_text:
@@ -59,7 +61,10 @@ if [ -n "$tp" ] && [ -f "$tp" ]; then
             | select(test("^Your questions have been answered"))
           )
         else empty end
-    ] | last // ""')
+    ] as $all
+    | ( [ $all[] | select(startswith("")|not) ] | last )
+      // ( $all | last )
+      // ""')
 fi
 
 # AskUserQuestion 답변이면 보기 좋게 정리: 안내 문구 제거 + "프롬프트"="답변" → 프롬프트 → 답변
