@@ -191,10 +191,11 @@ function sortFindings(arr) {
   )
 }
 
-// select: critical 전량 보존 + non-critical 최대 5
-const criticals = deduped.filter((f) => f.severity === 'critical')
-const nonCriticals = sortFindings(deduped.filter((f) => f.severity !== 'critical')).slice(0, 5)
-const codeIssues = sortFindings([...criticals, ...nonCriticals])
+// select: critical + 머지차단 warning 전량 보존 + 나머지 non-critical 최대 5
+// 머지차단 warning(needsVerify 대상 = 판정 게이트)이 5-cap에 탈락하면 5단계 REJECT를 우회하므로 critical과 함께 보존한다
+const gated = deduped.filter(needsVerify)
+const capped = sortFindings(deduped.filter((f) => !needsVerify(f))).slice(0, 5)
+const codeIssues = sortFindings([...gated, ...capped])
 
 const verifyStats = {
   criticalConfirmed: codeIssues.filter((f) => f.severity === 'critical').length,
