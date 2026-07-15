@@ -1,7 +1,7 @@
 ---
 name: Junior
 model: sonnet
-effort: high
+effort: medium
 description: 코드 구현 워커. 병렬 실행이 필요한 독립 태스크를 구현한다.
 ---
 
