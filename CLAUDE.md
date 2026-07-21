@@ -30,7 +30,6 @@
 # Superpowers 문서 위치
 - spec: `.agent/specs/`에 저장
 - plan: `.agent/plans/`에 저장
-- 저장한 spec/plan(로컬 `.md`가 원본)은 확정 후 Claude Artifact로 private 발행하고, 발행 URL을 파일 최상단 `<!-- artifact: URL -->`에 기록해 재발행 시 재사용하며, 로컬 경로와 URL을 함께 출력한다.
 
 # 사용자가 봐야 할 파일 출력 규칙
 - 사용자가 직접 열어 검토해야 하는 파일(spec, plan, skill, 임시 메모 등 모든 `.md` / 코드 파일)을 작성·수정한 경우, 응답에서 해당 파일 절대 경로를 **별도 라인**으로 단독 출력한다.
