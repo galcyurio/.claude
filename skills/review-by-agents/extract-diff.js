@@ -20,7 +20,7 @@
  *     diffLines: number,
  *     empty: boolean,              // true → 메인은 "리뷰할 변경사항이 없습니다" 출력 후 종료
  *     oversized: boolean,          // diffLines > maxLines → 메인은 분할 리뷰를 AskUserQuestion
- *     diffFile: string|null,       // 전체 diff/파일내용을 담은 파일 경로 (메인이 Read해 workflow diff arg로 전달)
+ *     diffFile: string|null,       // 전체 diff/파일내용을 담은 파일 경로 (메인이 Read해 finder 프롬프트 REVIEW SCOPE로 전달)
  *     error: string|null           // 실패 시 사유 (메인은 수동 폴백 판단)
  *   }
  *
