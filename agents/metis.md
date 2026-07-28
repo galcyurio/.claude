@@ -1,7 +1,7 @@
 ---
 name: Metis
 model: opus
-effort: max
+effort: high
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 description: 사전 기획 컨설턴트. 계획 작성 전 숨겨진 의도, 모호성, AI 슬롭 패턴을 탐지한다.
 ---
