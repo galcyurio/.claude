@@ -1,5 +1,6 @@
 ---
 name: remove-worktree
+effort: low
 description: git worktree를 안전하게 제거하는 스킬. 사용자가 'remove-worktree', 'worktree 삭제', 'worktree 정리', 'worktree 제거', '워크트리 삭제', '워크트리 정리', '워크트리 지워', 'worktree prune', 'worktree cleanup' 등 worktree 제거를 요청할 때 이 스킬을 사용해야 한다. worktree 생성 요청에는 `create-worktree`를 사용한다.
 argument-hint: "[worktree-path-or-name]"
 ---

@@ -1,5 +1,6 @@
 ---
 name: create-worktree
+effort: low
 description: git worktree를 추가하고 서브모듈/.claude/.agent 초기화까지 한 번에 처리하는 스킬. 사용자가 'create-worktree', 'worktree 만들어', 'worktree 추가', '워크트리 만들어', '워크트리 생성', '병렬 작업 환경 만들어줘', '새 worktree' 등 worktree 생성을 요청할 때 이 스킬을 사용해야 한다. worktree 삭제/조회 요청에는 사용하지 않는다.
 argument-hint: "[branch-name] [base-branch]"
 ---
