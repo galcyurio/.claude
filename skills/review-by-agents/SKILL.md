@@ -210,66 +210,31 @@ Designer는 **개수 제한 없음**. Figma 디자인과 구현의 모든 시각
 
 각 finder는 `mergeBlocking`(머지 순간 빌드/보안/데이터 영향 여부)을 포함해 보고하며, 개수 하드캡 없이 중요한 이슈만 severity를 정확히 태깅한다. 선별은 4단계(병합)에서 수행한다.
 
-### 4단계: 교차검증 + 결과 병합
+### 4단계: 결과 병합
 
-finder 결과를 오케스트레이터가 직접 정리한다(3-0 fast-path로 fan-out을 생략한 경우 fast-path 직접 검증 이슈가 finder 결과를 대신해 이 단계에 들어온다). 순서: 중복 제거 → 교차검증 → 선별·정렬.
+finder 결과를 오케스트레이터가 직접 정리한다(3-0 fast-path로 fan-out을 생략한 경우 fast-path 직접 검증 이슈가 finder 결과를 대신해 이 단계에 들어온다). 순서: 중복 제거 → 선별·정렬.
 
 **4-1. 중복 제거 (코드 이슈)**
 
 Code Reviewer + Oracle 결과를 합치고, 같은 `file:line`은 높은 severity만 남긴다.
 
-**4-2. 교차검증 (Critical·머지차단 Warning만)**
+**4-2. 선별·정렬**
 
-검증 대상: dedup 후 `severity == critical` 또는 `warning && mergeBlocking == true`인 코드 이슈. 디자인 이슈는 검증하지 않는다. 대상이 0건이면 이 단계를 건너뛴다.
-
-각 대상 finding마다 **refute 검증자 2명**을 병렬 스폰한다(`general-purpose` + `model: "sonnet"`, 대상이 여러 건이면 전 finding의 검증자를 한 블록에서 동시에). 두 검증자는 서로 다른 lens를 가진다:
-
-- **정확성 lens**: "다음 리뷰 finding이 실제 코드에서 참인지 검증하라. diff와 해당 파일을 Read해 직접 확인하라. **참임을 확신할 수 없으면 refuted=true**로 답하라."
-- **머지영향 lens**: "다음 리뷰 finding이 머지되는 순간 실제로 빌드/보안/데이터에 영향을 주는지 검증하라. **영향을 확신할 수 없으면 refuted=true**로 답하라."
-
-검증자 프롬프트에는 lens 지시문 + FINDING(JSON: severity·perspective·file·line·issue·problem_code) + DIFF(또는 diffFile 경로) + 레포 루트를 담고, 출력 계약을 명시한다:
-
-```
-{ "refuted": true|false, "reason": "한 문장" }
-```
-
-**검증 결과 반영** (finding별 refute 수 기준):
-
-| refute 수 | 처리 | verifyNote |
-|-----------|------|------------|
-| 0 | severity 유지 | `검증: 정확성·머지영향 2/2 확인` |
-| 1 | 한 단계 강등 (critical→warning, warning→info) | `검증: 1/2 refute → <새 severity> 강등` |
-| 2 | `info`로 강등 + `mergeBlocking=false` | `검증: 2/2 refute → 낮은 신뢰도(info 강등)` |
-
-강등된 finding은 **삭제하지 않고** 낮아진 severity로 남긴다(5단계 판정 게이트에서만 빠진다). 강등 시 refute한 검증자의 `reason` 요지를 verifyNote 뒤 괄호로 덧붙인다(예: `검증: 1/2 refute → warning 강등 (경계 조건이 upstream에서 이미 가드됨)`).
-
-**4-3. 선별·정렬**
-
-- **코드 이슈**: ① 검증 후에도 `critical` 또는 머지차단 `warning`인 finding **전량 보존(cap 없음)** ② 나머지 warning/info는 합쳐서 **최대 5건**만 남긴다 ③ severity 내림차순 → `file` → `line` 오름차순 정렬. (머지차단 warning이 5-cap에 밀리면 5단계 REJECT 게이트를 우회하게 되므로 critical과 함께 전량 보존한다.)
+- **코드 이슈**: ① `critical` 또는 머지차단 `warning`인 finding **전량 보존(cap 없음)** ② 나머지 warning/info는 합쳐서 **최대 5건**만 남긴다 ③ severity 내림차순 → `file` → `line` 오름차순 정렬. (머지차단 warning이 5-cap에 밀리면 5단계 REJECT 게이트를 우회하게 되므로 critical과 함께 전량 보존한다.)
 - **디자인 이슈**: Designer가 반환한 JSON 배열. **개수 제한 없음**. 같은 `file:line` 중복만 높은 severity로 정리하고 severity → `file` → `line` 순 정렬한다. 별도 섹션으로 출력한다.
-
-**4-4. 검증 통계 집계**
-
-5단계 판정 근거에 쓸 `verifyStats`를 오케스트레이터가 집계한다:
-
-- `criticalConfirmed`: 선별 후 코드 이슈 중 critical 수
-- `verified`: `verifyNote`가 부착된 finding 수
-- `downgraded`: 검증으로 강등된 finding 수
-
-디자인 이슈는 교차검증 대상이 아니므로 이 통계에 포함하지 않는다.
 
 ### 5단계: 오케스트레이터 판정
 
-병합된 결과를 종합해 오케스트레이터(스킬 호출자)가 **OKAY** 또는 **REJECT**를 결정한다. 판정 입력: **코드 이슈**는 4단계 **교차검증을 거친** findings(강등되어 게이트에서 빠진 finding은 판정 사유가 되지 않는다), **디자인 이슈**는 교차검증 없이 Designer 보고 그대로다.
+병합된 결과를 종합해 오케스트레이터(스킬 호출자)가 **OKAY** 또는 **REJECT**를 결정한다. 판정 입력은 4단계에서 병합·선별된 **코드 이슈**와 Designer가 보고한 **디자인 이슈**다.
 
 **판정 규칙**:
 
 - **❌ REJECT** — 다음 중 하나라도 해당:
-  - 검증된 Critical 이슈가 1건 이상 존재 (관점 무관: Logic/Convention/Security/Architecture/Design)
-  - 검증된 머지차단(`mergeBlocking`) Warning 이슈가 존재 (노출된 시크릿, 깨진 빌드, 데이터 유실 등)
+  - Critical 이슈가 1건 이상 존재 (관점 무관: Logic/Convention/Security/Architecture/Design)
+  - 머지차단(`mergeBlocking`) Warning 이슈가 존재 (노출된 시크릿, 깨진 빌드, 데이터 유실 등)
 - **✅ OKAY** — 위에 해당하지 않음.
 
-판정 근거를 한~두 문장으로 정리해 출력에 포함한다. 어떤 이슈가 판정을 좌우했는지(또는 차단 이슈가 없었다는 점)를 구체적으로 적고, **검증 통계**(예: `검증: Critical 3건 중 2건 확인·1건 강등`)를 한 줄 덧붙인다. `verifyStats`의 `criticalConfirmed`·`verified`·`downgraded`를 활용한다.
+판정 근거를 한~두 문장으로 정리해 출력에 포함한다. 어떤 이슈가 판정을 좌우했는지(또는 차단 이슈가 없었다는 점)를 구체적으로 적는다.
 
 ### 6단계: difit 프리로드 + 최종 출력
 
@@ -314,7 +279,7 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
 병합된 코드·디자인 이슈를 하나의 findings 배열로 스크래치패드에 쓰고, `build-difit-comments.js`로 difit 주입용 JSON을 생성한다. **손으로 `--comment` JSON을 조립하지 않는다**(JSON 이스케이프·개행 오류 방지).
 
 1. 병합된 이슈 배열을 `<스크래치패드>/review-findings.json`에 Write한다. 각 항목:
-   - `severity`·`perspective`·`file`·`line`·`issue`, 선택 `suggestion`·`suggestion_code`·`language`·`verifyNote`.
+   - `severity`·`perspective`·`file`·`line`·`issue`, 선택 `suggestion`·`suggestion_code`·`language`.
    - `line`은 **변경 후 파일의 절대 라인**이어야 한다. 에이전트가 diff 상대 위치를 반환했으면 보정한 뒤 넣는다.
    - **삭제된 코드**를 지적하는 이슈만 `"side":"old"`를 넣는다(기본 `"new"`).
    - **`problem_code`·시크릿은 넣지 않는다** — `problem_code`는 body에서 제외되고(코멘트가 해당 라인에 부착돼 diff에서 바로 보임), 자격증명류는 계약의 "시크릿 금지"를 따른다.
@@ -323,7 +288,7 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
    - `commentsFile`: difit `--comment` 주입용 thread 배열(아래 런치에서 `"$(cat <commentsFile>)"`로 사용).
    - `baselineFile`: 6-D 대조용 `[{file,line,body}]` 프리로드 baseline.
 
-스크립트의 body 조립 규칙(참고): `[<심각도 이모지> <심각도> · <관점 이모지> <관점>] <issue>` → (suggestion 있으면) 빈 줄 + `제안: …` → (suggestion_code 있으면) 빈 줄 + 코드펜스(언어 `language`) → (verifyNote 있으면) 빈 줄 + `> …`. `problem_code`는 넣지 않는다.
+스크립트의 body 조립 규칙(참고): `[<심각도 이모지> <심각도> · <관점 이모지> <관점>] <issue>` → (suggestion 있으면) 빈 줄 + `제안: …` → (suggestion_code 있으면) 빈 줄 + 코드펜스(언어 `language`). `problem_code`는 넣지 않는다.
 
 **런치**:
 
@@ -360,7 +325,6 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
 ## 🧑‍⚖️ 판정: ❌ REJECT
 
 Critical Logic(`src/foo.ts:42` 세션 null 미체크)이 머지 시 로그인 흐름을 깨뜨려 차단한다.
-검증: Critical 2건 중 2건 확인.
 
 difit: http://localhost:4966
 
@@ -368,7 +332,7 @@ difit: http://localhost:4966
 ````
 
 - **요약 라인**: `리뷰 대상: {설명} · 변경 파일 N개 · difit 프리로드 (코멘트 M건)`. (6-C의 `에이전트: …` 목록은 difit 런치 시 생략한다.)
-- **핵심 이슈**: 선별된 코드 이슈(검증된 Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건)와 디자인 이슈(개수 제한 없음)를 **한 목록**에 컴팩트 한 줄씩 출력한다. 형식: `- [<심각도 이모지> <심각도> · <관점 이모지> <관점>] \`file:line\` — <issue 한 문장>`. 정렬은 severity 내림차순 → file → line. 이슈가 0건이면 이 섹션을 생략한다.
+- **핵심 이슈**: 선별된 코드 이슈(Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건)와 디자인 이슈(개수 제한 없음)를 **한 목록**에 컴팩트 한 줄씩 출력한다. 형식: `- [<심각도 이모지> <심각도> · <관점 이모지> <관점>] \`file:line\` — <issue 한 문장>`. 정렬은 severity 내림차순 → file → line. 이슈가 0건이면 이 섹션을 생략한다.
 - **이상 없음 · 판정**: 6-C와 동일 규칙을 따른다. 판정은 이슈가 0건이어도 항상 출력한다.
 - **디자인 미검토 경고**: 디자인 변경이 감지됐으나 Figma 링크가 없어 Designer를 스폰하지 못한 경우, 판정 섹션 바로 위에 `⚠️ 디자인 변경이 감지됐으나 Figma 링크가 없어 디자인 정합성은 검토하지 못했습니다` 한 줄을 둔다.
 - 마지막 줄에 `difit: {URL}`을 둔다. (6-B는 이슈 ≥1일 때만 도달하므로 프리로드 코멘트는 항상 1건 이상이다.)
@@ -453,7 +417,7 @@ Critical Logic 이슈(`src/foo.ts:42` 세션 null 미체크)가 머지 시 사�
 **포맷 규칙**:
 
 - **요약 라인**: 표를 사용하지 않고 한 줄로 압축한다. 형식: `리뷰 대상: {설명} · 변경 파일 N개 · 에이전트: {목록}`.
-- **핵심 이슈 섹션**: Code Reviewer + Oracle 결과만 포함한다 (Logic/Convention/Security/Architecture). 검증된 Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건. 이슈가 0개면 섹션 전체를 생략한다.
+- **핵심 이슈 섹션**: Code Reviewer + Oracle 결과만 포함한다 (Logic/Convention/Security/Architecture). Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건. 이슈가 0개면 섹션 전체를 생략한다.
 - **디자인 검토 섹션**: Designer 결과만 포함한다. Figma 링크가 없고 디자인 변경도 없어 Designer를 스폰하지 않은 경우 섹션 전체를 생략한다. Designer가 스폰됐지만 이슈가 0건이면 섹션 대신 "이상 없음"에 `🎨 Design`만 표시한다. **디자인 변경은 감지됐으나 사용자가 "링크 없이 진행"을 택해 Designer를 스폰하지 못한 경우**, 디자인 검토 섹션 대신 판정 섹션 바로 위에 `⚠️ 디자인 변경이 감지됐으나 Figma 링크가 없어 디자인 정합성은 검토하지 못했습니다` 한 줄을 남긴다.
 - 각 이슈는 표 없이 헤딩 한 줄 + 본문 형식으로 구성한다 (위 마크다운 예시 참고). 헤딩은 다음 순서로 구성한다: 순번 `N.`, 공백, 대괄호로 묶은 메타 `[심각도 이모지+이름 · 관점 이모지+이름]`, 공백, 백틱으로 감싼 `파일:라인`, ` — `, 한 문장 요약.
   - 디자인 검토에서도 동일 헤딩 형식을 쓴다. 관점은 항상 `🎨 Design`이다.
@@ -461,14 +425,13 @@ Critical Logic 이슈(`src/foo.ts:42` 세션 null 미체크)가 머지 시 사�
 - 그 다음 줄에 빈 줄 1개, 그 아래에 `**문제 코드**:` 한 줄, 빈 줄 1개, 언어 지정 코드블록(1~5줄)을 배치한다. JSON의 `problem_code`를 그대로 코드블록에 넣고 언어는 `language` 필드를 사용한다. 코드는 이슈 핵심 라인을 컴팩트하게 잘라낸다.
 - 그 다음 줄에 빈 줄 1개, 그 아래에 `**제안**: {수정 제안 한 문장}.` 형태로 작성한다.
 - 제안 코드 예시가 필요한 경우 (JSON의 `suggestion_code`가 비어 있지 않을 때) 제안 줄 다음에 빈 줄 1개를 두고 언어 지정 코드블록을 배치한다. `suggestion_code`가 없거나 빈 문자열이면 코드블록을 두지 않는다.
-- **검증 노트**: 코드 이슈가 4단계 교차검증을 거친 경우(`verifyNote` 존재), 제안/제안 코드 다음에 빈 줄 1개를 두고 인용문 한 줄로 노트를 표시한다. 예: `> 검증: 정확성·머지영향 2/2 확인`, `> 검증: 1/2 refute → warning 강등 (경계 조건이 upstream에서 이미 가드됨)`. 디자인 이슈에는 검증 노트가 없다.
 - 이슈 사이에는 빈 줄 1개만 둔다. 각 섹션 헤딩 바로 위에는 Unicode 구분선 `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━` 한 줄을 둔다 (첫 섹션 포함, 단 `# 코드 리뷰 결과` 상단에는 두지 않는다).
 - **섹션 헤딩 prefix 이모지**: `## 📌 핵심 이슈`, `## 🎨 디자인 검토`, `## ✅ 이상 없음`, `## 🧑‍⚖️ 판정`.
 - **이모지 매핑**: 6단계 상단 공통 표를 따른다.
 - **"이상 없음" 섹션**: 이슈가 없었던 관점만 `{이모지} {이름}` 형태로 한 줄에 ` · `로 구분해 나열한다 (예: `🛡️ Security · 🎨 Design`). 모든 관점에 이슈가 있으면 이 섹션은 생략한다.
 - **"판정" 섹션** (항상 출력, 가장 마지막):
   - 헤딩은 `## 🧑‍⚖️ 판정: ✅ OKAY` 또는 `## 🧑‍⚖️ 판정: ❌ REJECT` 형태로 결과를 한 줄에 표시한다.
-  - 헤딩 다음 줄에 빈 줄 1개, 그 아래에 판정 근거를 한~두 문장으로 적는다. 판정에 결정적이었던 이슈가 있다면 `파일:라인`을 백틱으로 인용한다. 판정 근거 마지막에 검증 통계 한 줄(`검증: Critical N건 중 M건 확인·K건 강등`)을 포함한다.
+  - 헤딩 다음 줄에 빈 줄 1개, 그 아래에 판정 근거를 한~두 문장으로 적는다. 판정에 결정적이었던 이슈가 있다면 `파일:라인`을 백틱으로 인용한다.
   - 이슈가 0건이어도 이 섹션은 생략하지 않고 `✅ OKAY`로 출력한다.
 
 #### 6-D. difit 답변 readback (difit 런치 성공 시 항상)
@@ -511,9 +474,9 @@ difit 잡은 회수 후 종료됨.
 - **어드바이저리**: 결과는 제안이며 자동 수정하지 않는다
 - **저위험 fast-path (2트랙)**: **Track A**(기계적 제거/리네임 — 새 로직 없음 + PR head grep 잔존 참조 0건 + 동작 지점 ≤3 각각 직접 Read) 또는 **Track B**(additive DTO/매퍼 — 계약 1:1 대조 + 매퍼 왕복 대칭 확인 + 새 sealed subtype의 exhaustive `when` 커버 grep)의 공통 조건(보안 표면 0 등)+트랙 조건+게이트를 **전부** 충족할 때만 3-A fan-out을 생략할 수 있다. 미충족·모호하면 정규 fan-out. 상세는 3-0·`fast-path.md`.
 - **이슈 제한**:
-  - Code Reviewer + Oracle(코드 이슈): **검증된 Critical·머지차단 Warning은 전량 보존**하고, 나머지 warning/info는 합쳐서 최대 5개만 남긴다. 순수 포매팅·취향 수준의 사소한 지적은 제외하되, 재사용/단순화/효율/추상화 레벨(altitude) 개선은 info/warning으로 보고한다
+  - Code Reviewer + Oracle(코드 이슈): **Critical·머지차단 Warning은 전량 보존**하고, 나머지 warning/info는 합쳐서 최대 5개만 남긴다. 순수 포매팅·취향 수준의 사소한 지적은 제외하되, 재사용/단순화/효율/추상화 레벨(altitude) 개선은 info/warning으로 보고한다
   - Designer: **개수 제한 없음**. 발견된 모든 시각적 불일치를 보고하며, 코드 이슈 선별 제한과 완전히 별개 섹션으로 출력한다
-- **교차검증은 생략하지 않는다**: **코드** Critical·머지차단 Warning finding이 1건이라도 있으면 4-2 검증자 스폰을 건너뛰지 않는다. 검증 없는 코드 Critical은 판정 게이트에 올리지 않는다(검증 대상 0건이면 자연히 생략). 디자인 이슈는 교차검증 대상이 아니며 Designer 보고 그대로 판정에 오른다.
-- **판정은 오케스트레이터의 책임**: OKAY/REJECT 결정은 에이전트가 아닌 오케스트레이터가 직접 내린다. 에이전트 프롬프트에는 판정을 요청하지 않으며, 에이전트(finder·검증자)는 이슈 보고·검증 의견까지만 담당한다. 판정 규칙은 5단계를 따른다.
+- **서브에이전트로 리뷰 결과를 재검증하지 않는다**: finder가 보고한 finding을 다시 판별시키려고 별도 검증 에이전트를 스폰하지 않는다. 신뢰도 판단은 오케스트레이터가 4단계에서 직접 내리고, 확신이 서지 않는 finding은 severity를 낮춰 보고한다.
+- **판정은 오케스트레이터의 책임**: OKAY/REJECT 결정은 에이전트가 아닌 오케스트레이터가 직접 내린다. 에이전트 프롬프트에는 판정을 요청하지 않으며, finder는 이슈 보고까지만 담당한다. 판정 규칙은 5단계를 따른다.
 - **difit 출력**: diff 모드(PR · 현재 변경사항)에서 **이슈가 1건 이상일 때만** finding을 difit 인라인 코멘트로 프리로드한다(6단계). **이슈 0건(깨끗한 리뷰)이면 difit를 띄우지 않고 터미널 출력(6-C)만 한다.** difit는 로컬 뷰어이며 **PR 모드라도 원격 GitHub에 코멘트를 달지 않는다**. 시크릿·토큰·키·PII는 difit 코멘트 본문·명령줄 인자에 복사하지 않는다.
 - **difit 수명·회수·종료**: `~/.claude/skills/review-by-self/difit-contract.md` 계약을 따른다(`--no-open`·`--keep-alive` → 브라우저 닫혀도 서버 유지, **사용자 종료 신호** = 6-D 트리거, `comment get`으로 회수 후 우리가 띄운 잡만 종료).

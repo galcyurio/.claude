@@ -13,7 +13,7 @@
  *
  * 입력 findings.json: 병합·선별·정렬이 끝난 finding 배열. 각 항목:
  *   { severity, perspective, file, line, issue, suggestion?,
- *     suggestion_code?, language?, verifyNote?, side? }
+ *     suggestion_code?, language?, side? }
  *
  * 출력:
  *   <out>/difit-comments.json  — difit `--comment` 주입용 thread 배열
@@ -25,7 +25,6 @@
  *   2) suggestion 있으면  빈 줄 + "제안: <suggestion>"
  *   3) suggestion_code 있으면  빈 줄 + ```suggestion 코드펜스
  *      (difit 코멘트 렌더러가 일반 코드펜스를 한 줄로 붕괴시켜서 — buildBody 주석 참고)
- *   4) verifyNote 있으면  빈 줄 + "> <verifyNote>"
  * problem_code는 body에 넣지 않는다(코멘트가 해당 라인에 부착돼 diff에서 바로 보임 + 시크릿 유출 위험).
  */
 
@@ -78,9 +77,6 @@ function buildBody(f) {
     } else {
       parts.push('```suggestion\n' + code + '\n```')
     }
-  }
-  if (f.verifyNote && String(f.verifyNote).trim()) {
-    parts.push(`> ${f.verifyNote}`)
   }
   return parts.join('\n\n')
 }
