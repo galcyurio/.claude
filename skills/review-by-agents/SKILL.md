@@ -111,10 +111,10 @@ diff와 PR 본문에서 아래 신호들을 추출해 에이전트 프롬프트�
 
 | finder | 관점 | 스폰 방식 |
 |--------|------|----------|
-| Code Reviewer | Logic + Convention + Security | `general-purpose` + `model: "sonnet"` |
-| Architecture | Architecture | `general-purpose` + `model: "sonnet"` |
+| Code Reviewer | Logic + Convention + Security | `subagent_type: "Reviewer"` |
+| Architecture | Architecture | `subagent_type: "Reviewer"` |
 
-**두 finder는 스폰 방식이 같고 PERSPECTIVE 체크리스트만 다르다.** Architecture finder에 `Oracle`을 쓰지 않는다 — Oracle은 설계 자문용 에이전트이고, 리뷰 관점은 아래 프롬프트의 PERSPECTIVE가 결정한다.
+**두 finder는 같은 에이전트를 쓰고 PERSPECTIVE 체크리스트만 다르다.** `Reviewer`는 리뷰 전용 에이전트다(opus·effort medium). `Oracle`을 finder로 쓰지 않는다 — Oracle은 설계 자문용이고, 리뷰 관점은 아래 프롬프트의 PERSPECTIVE가 결정한다.
 
 각 finder 프롬프트는 아래 골격을 따른다. PERSPECTIVE의 체크리스트만 finder별로 갈아끼우고 나머지 섹션은 공통이다.
 

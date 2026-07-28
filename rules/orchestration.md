@@ -13,6 +13,7 @@
 | **Metis** | Opus | 높음 | 사전 기획 컨설턴트 | 계획 작성 전 사전 자문 |
 | **Momus** | Opus | 높음 | 계획 리뷰어 | 계획 검증 |
 | **Designer** | Opus | 높음 | 디자인 작업 전담: Figma 조회/탐색/비교/생성, Code Connect 매핑, 디자인 자문. 로컬 코드 수정 금지 | Figma/디자인 관련 요청 전반 |
+| **Reviewer** | Opus | 중간 | 코드 리뷰 finder (읽기 전용) | `review-by-agents` 스킬이 관점별로 스폰. 직접 라우팅 대상이 아니다 — 리뷰 요청은 스킬로 진입한다 |
 
 ## 라우팅
 
