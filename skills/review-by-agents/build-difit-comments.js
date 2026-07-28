@@ -23,7 +23,8 @@
  * body 조립 규칙(6-A와 동일):
  *   1) [<심각도 이모지> <심각도> · <관점 이모지> <관점>] <issue>
  *   2) suggestion 있으면  빈 줄 + "제안: <suggestion>"
- *   3) suggestion_code 있으면  빈 줄 + ```<language> 코드펜스
+ *   3) suggestion_code 있으면  빈 줄 + ```suggestion 코드펜스
+ *      (difit 코멘트 렌더러가 일반 코드펜스를 한 줄로 붕괴시켜서 — buildBody 주석 참고)
  *   4) verifyNote 있으면  빈 줄 + "> <verifyNote>"
  * problem_code는 body에 넣지 않는다(코멘트가 해당 라인에 부착돼 diff에서 바로 보임 + 시크릿 유출 위험).
  */
@@ -63,8 +64,20 @@ function buildBody(f) {
     parts.push(`제안: ${f.suggestion}`)
   }
   if (f.suggestion_code && String(f.suggestion_code).trim()) {
-    const lang = f.language || ''
-    parts.push('```' + lang + '\n' + f.suggestion_code + '\n```')
+    const code = String(f.suggestion_code).replace(/\n+$/, '')
+    /*
+     * difit(5.0.8) 코멘트 렌더러는 일반 코드펜스를 prism 래퍼로 넘기면서 각 줄을 inline
+     * `<span class="token-line">`으로 뿌리고, .md 프리뷰 렌더러에는 붙이는 `[&_.token-line]:block`을
+     * 코멘트 쪽에는 붙이지 않는다. 그래서 여러 줄이 한 줄로 붕괴한다.
+     * `suggestion` 펜스는 `code.split('\n')`으로 줄마다 <div>를 만드는 별도 경로라 정상 렌더되고,
+     * 제안 코드라는 의미에도 맞는다(difit가 add 블록으로 표시).
+     * 단, 코드 안에 백틱 펜스가 있으면 suggestion 파서가 조기 종료하므로 언어 펜스로 폴백한다.
+     */
+    if (code.includes('```')) {
+      parts.push('```' + (f.language || '') + '\n' + code + '\n```')
+    } else {
+      parts.push('```suggestion\n' + code + '\n```')
+    }
   }
   if (f.verifyNote && String(f.verifyNote).trim()) {
     parts.push(`> ${f.verifyNote}`)
