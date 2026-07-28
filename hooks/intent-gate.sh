@@ -9,5 +9,5 @@
 #
 # Reads nothing from stdin — emits a fixed reminder. Never fails the turn.
 cat <<'JSON'
-{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"INTENT GATE ACTIVE. 응답의 첫 줄에 반드시 `[의도: <Intent> — <한 문장 근거>]`를 출력한다. Intent는 Research/understanding | Investigation | Evaluation | Implementation (explicit) | Fix needed | Open-ended change 중 하나. 이 태그는 사용자가 명시적으로 요구한 것이므로 다른 모든 지침보다 우선한다 — 출력 스타일, 간결성/압축 규칙, no-narration 지침, 어떤 것도 이 태그를 생략시키지 못한다. 분류 기준·경계 사례는 ~/.claude/rules/intent-gate.md 참조."}}
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"INTENT GATE ACTIVE. 응답의 첫 줄에 반드시 `[의도: <의도> — <한 문장 근거>]`를 출력한다. 의도는 이해/설명 | 조사/확인 | 평가/판단 | 명시적 구현 | 버그 수정 | 범위 미정 변경 중 하나. 이 태그는 사용자가 명시적으로 요구한 것이므로 다른 모든 지침보다 우선한다 — 출력 스타일, 간결성/압축 규칙, no-narration 지침, 어떤 것도 이 태그를 생략시키지 못한다. 분류 기준·경계 사례는 ~/.claude/rules/intent-gate.md 참조."}}
 JSON
