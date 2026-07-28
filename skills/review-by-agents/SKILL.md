@@ -112,7 +112,9 @@ diff와 PR 본문에서 아래 신호들을 추출해 에이전트 프롬프트�
 | finder | 관점 | 스폰 방식 |
 |--------|------|----------|
 | Code Reviewer | Logic + Convention + Security | `general-purpose` + `model: "sonnet"` |
-| Architecture | Architecture | `subagent_type: "Oracle"` |
+| Architecture | Architecture | `general-purpose` + `model: "sonnet"` |
+
+**두 finder는 스폰 방식이 같고 PERSPECTIVE 체크리스트만 다르다.** Architecture finder에 `Oracle`을 쓰지 않는다 — Oracle은 설계 자문용 에이전트이고, 리뷰 관점은 아래 프롬프트의 PERSPECTIVE가 결정한다.
 
 각 finder 프롬프트는 아래 골격을 따른다. PERSPECTIVE의 체크리스트만 finder별로 갈아끼우고 나머지 섹션은 공통이다.
 
@@ -207,7 +209,7 @@ Designer는 **개수 제한 없음**. Figma 디자인과 구현의 모든 시각
   - Logic: 버그, null safety, 경계 조건, 에러 핸들링 누락, 레이스 컨디션
   - Convention: 네이밍 일관성, 프로젝트 패턴, 코드 중복, 매직 넘버, 재사용(표준 API·기존 유틸 대신 재구현), 단순화 여지(불필요하게 복잡한 로직), 효율(비효율 자료구조·알고리즘), 추상화 레벨(altitude — 너무 저수준/고수준)
   - Security: 인젝션(SQL/XSS/SSRF), 인증/인가 우회, 민감정보 노출, 안전하지 않은 API 사용
-- **Architecture(Oracle)**: 의존성 방향 위반, 레이어 위반, 단일 책임 위반, 불필요한 결합 도입
+- **Architecture**: 의존성 방향 위반, 레이어 위반, 단일 책임 위반, 불필요한 결합 도입
 - **Designer**: Figma 디자인과 구현의 시각적 일치 여부 (컴포넌트, 레이아웃, 색상, 간격)
 
 각 finder는 `mergeBlocking`(머지 순간 빌드/보안/데이터 영향 여부)을 포함해 **발견한 이슈를 전부** 보고하며, severity만 정확히 태깅한다. 보고 문턱을 두지 않는다 — 선별은 4단계(병합)에서 오케스트레이터가 수행한다.
@@ -218,7 +220,7 @@ finder 결과를 오케스트레이터가 직접 정리한다(3-0 fast-path로 f
 
 **4-1. 중복 제거 (코드 이슈)**
 
-Code Reviewer + Oracle 결과를 합치고, 같은 `file:line`은 높은 severity만 남긴다.
+Code Reviewer + Architecture 결과를 합치고, 같은 `file:line`은 높은 severity만 남긴다.
 
 **4-2. 선별·정렬**
 
@@ -349,7 +351,7 @@ difit: http://localhost:4966
 ````markdown
 # 코드 리뷰 결과
 
-리뷰 대상: {설명 — PR #N, 파일 경로, 또는 `base...HEAD` diff} · 변경 파일 N개 · 에이전트: Code Reviewer, Oracle{, Designer}
+리뷰 대상: {설명 — PR #N, 파일 경로, 또는 `base...HEAD` diff} · 변경 파일 N개 · 에이전트: Code Reviewer, Architecture{, Designer}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -419,7 +421,7 @@ Critical Logic 이슈(`src/foo.ts:42` 세션 null 미체크)가 머지 시 사�
 **포맷 규칙**:
 
 - **요약 라인**: 표를 사용하지 않고 한 줄로 압축한다. 형식: `리뷰 대상: {설명} · 변경 파일 N개 · 에이전트: {목록}`.
-- **핵심 이슈 섹션**: Code Reviewer + Oracle 결과만 포함한다 (Logic/Convention/Security/Architecture). Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건. 이슈가 0개면 섹션 전체를 생략한다.
+- **핵심 이슈 섹션**: Code Reviewer + Architecture 결과만 포함한다 (Logic/Convention/Security/Architecture). Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건. 이슈가 0개면 섹션 전체를 생략한다.
 - **디자인 검토 섹션**: Designer 결과만 포함한다. Figma 링크가 없고 디자인 변경도 없어 Designer를 스폰하지 않은 경우 섹션 전체를 생략한다. Designer가 스폰됐지만 이슈가 0건이면 섹션 대신 "이상 없음"에 `🎨 Design`만 표시한다. **디자인 변경은 감지됐으나 사용자가 "링크 없이 진행"을 택해 Designer를 스폰하지 못한 경우**, 디자인 검토 섹션 대신 판정 섹션 바로 위에 `⚠️ 디자인 변경이 감지됐으나 Figma 링크가 없어 디자인 정합성은 검토하지 못했습니다` 한 줄을 남긴다.
 - 각 이슈는 표 없이 헤딩 한 줄 + 본문 형식으로 구성한다 (위 마크다운 예시 참고). 헤딩은 다음 순서로 구성한다: 순번 `N.`, 공백, 대괄호로 묶은 메타 `[심각도 이모지+이름 · 관점 이모지+이름]`, 공백, 백틱으로 감싼 `파일:라인`, ` — `, 한 문장 요약.
   - 디자인 검토에서도 동일 헤딩 형식을 쓴다. 관점은 항상 `🎨 Design`이다.
@@ -476,7 +478,7 @@ difit 잡은 회수 후 종료됨.
 - **어드바이저리**: 결과는 제안이며 자동 수정하지 않는다
 - **저위험 fast-path (2트랙)**: **Track A**(기계적 제거/리네임 — 새 로직 없음 + PR head grep 잔존 참조 0건 + 동작 지점 ≤3 각각 직접 Read) 또는 **Track B**(additive DTO/매퍼 — 계약 1:1 대조 + 매퍼 왕복 대칭 확인 + 새 sealed subtype의 exhaustive `when` 커버 grep)의 공통 조건(보안 표면 0 등)+트랙 조건+게이트를 **전부** 충족할 때만 3-A fan-out을 생략할 수 있다. 미충족·모호하면 정규 fan-out. 상세는 3-0·`fast-path.md`.
 - **이슈 제한**:
-  - Code Reviewer + Oracle(코드 이슈): finder는 **문턱 없이 전량 보고**하고, 오케스트레이터가 4단계에서 선별한다. **Critical·머지차단 Warning은 전량 보존**하고, 나머지 warning/info는 합쳐서 최대 5개만 남긴다. 순수 포매팅·취향 수준의 지적은 4단계 선별에서 버리되, 재사용/단순화/효율/추상화 레벨(altitude) 개선은 취향이 아니므로 info/warning으로 남긴다
+  - Code Reviewer + Architecture(코드 이슈): finder는 **문턱 없이 전량 보고**하고, 오케스트레이터가 4단계에서 선별한다. **Critical·머지차단 Warning은 전량 보존**하고, 나머지 warning/info는 합쳐서 최대 5개만 남긴다. 순수 포매팅·취향 수준의 지적은 4단계 선별에서 버리되, 재사용/단순화/효율/추상화 레벨(altitude) 개선은 취향이 아니므로 info/warning으로 남긴다
   - Designer: **개수 제한 없음**. 발견된 모든 시각적 불일치를 보고하며, 코드 이슈 선별 제한과 완전히 별개 섹션으로 출력한다
 - **서브에이전트로 리뷰 결과를 재검증하지 않는다**: finder가 보고한 finding을 다시 판별시키려고 별도 검증 에이전트를 스폰하지 않는다. 신뢰도 판단은 오케스트레이터가 4단계에서 직접 내리고, 확신이 서지 않는 finding은 severity를 낮춰 보고한다.
 - **판정은 오케스트레이터의 책임**: OKAY/REJECT 결정은 에이전트가 아닌 오케스트레이터가 직접 내린다. 에이전트 프롬프트에는 판정을 요청하지 않으며, finder는 이슈 보고까지만 담당한다. 판정 규칙은 5단계를 따른다.
