@@ -1,7 +1,7 @@
 ---
 name: feature-memory
 description: 피처(Jira Epic 단위) 진행 현황을 Jira·Slack·Notion·GitHub에서 자동 수집해 Notion 페이지에 markdown 보고서로 갱신하는 스킬. 사용자가 'feature-memory', '피처 현황', '피처 진행 상황', '피처 상태', '진행 현황 갱신', '진행 상황 업데이트', '피처 보고서', '피처 트래킹', '피처 추적' 등 피처 진행 현황 보고서 생성/갱신/조회를 요청할 때 이 스킬을 사용해야 한다. 매일 새벽 Claude Code의 /schedule routine으로 자동 호출되며, 수동 호출도 동일하게 동작한다. 단순 Jira 이슈 작업(create-jira-issue)이나 일일 업무 기록(snippet)에는 사용하지 않는다.
-argument-hint: "[bootstrap | register <epic-key> | <epic-key> | batch | list [--all] | unregister <epic-key> | reactivate <epic-key>]"
+argument-hint: "[bootstrap | register <epic-key>... | <epic-key> | batch | list [--all] | unregister <epic-key> | reactivate <epic-key>]"
 model: sonnet
 ---
 
@@ -36,6 +36,19 @@ model: sonnet
 **알림 채널**: 본인 Slack user_id를 그대로 channel_id로 사용하여 DM 전송 (`slack_send_message(channel_id=<self_slack_user_id>, text=...)`).
 
 **역할 추론**: Jira 이슈의 본인 assignee/comment 패턴이나 GitHub 리포 이름 컨벤션 등으로 역할(예: "Android 개발자", "iOS 개발자", "서버 개발자")을 추론한다. 명시적으로 모르면 "개발자" 정도로 두고 영향 판단 시 보수적으로 처리 (모든 API 변경을 FYI 후보로 본다).
+
+## 키 체계: 제목의 부모 키 ↔ `epic_key`의 트래킹 대상
+
+> **제목은 부모 Feature 키로 잡고, `epic_key`에는 실제 수집할 플랫폼 에픽 키들이 들어간다.** 부모 키 하나로 등록·호출하되, 하위 에픽 키는 스킬이 해석해 `epic_key`에 채운다 — 사용자가 인자로 나열하지 않는다.
+
+- **제목**: `{부모 Feature 키} - {피처 제목}` (예: `HD-676 - 내차사기 리스트 디자인시스템 공통화`). 사람이 읽는 식별자이자 호출 키다. 하위 에픽이 1개뿐인 평범한 피처는 그 에픽 키를 그대로 쓴다 (`HDA-21208 - ...`).
+- **`epic_key`**: 쉼표로 구분된 **실제 트래킹 대상 키 목록** — 항상 **플랫폼 에픽 키**(`HDA-*`)다. 예: `HDA-22279, HDA-22280, HDA-22281`. 여기 적힌 키만 Jira fetch·URL 추출·GitHub PR 검색 대상이 된다. **부모 Feature 키(`HD-*`)를 `epic_key`에 넣지 않는다.**
+- **해석 (부모 키 → 하위 에픽 키)**: 입력 키의 `issuetype.hierarchyLevel ≥ 2`(Feature)면 `searchJiraIssuesUsingJql(jql="parent = {key} AND project = {Jira project key} ORDER BY key ASC")`로 하위 에픽을 찾아 그 키들을 `epic_key`에 쓴다. `hierarchyLevel ≤ 1`(에픽)이면 그 키 자신이 `epic_key`다.
+- **해석 시점은 등록 + 매 갱신 둘 다**다. 갱신 시에는 제목의 부모 키(또는 트래킹 대상들의 공통 `parent`)로 재해석해 **새로 생긴 하위 에픽을 `epic_key`에 추가**한다 (STEP 5). 기존 키는 자동으로 빼지 않는다 — 사용자가 의도적으로 제거했을 수 있으므로 추가만 한다.
+- `project = {Jira project key}` 필터로 **본인 플랫폼 외 하위 에픽**(예: iOS `HDI-*`)은 `epic_key`에 넣지 않는다. 제외된 키는 `한눈에 보기`에 한 줄로만 남겨 존재는 알린다.
+- 해석 결과가 0건이면 `epic_key`를 입력 키 그대로 두고 `데이터 소스 상태`에 `⚠️ 하위 에픽 0건 (parent={key})`를 남긴다.
+- **부모 Feature 이슈 자체는 수집하지 않는다.** 제목·부모 링크로만 쓴다. 부모 이슈에 코멘트·웹 링크가 쌓이기 시작하면 그때 `epic_key`에 부모 키를 직접 추가한다 (수동 예외).
+- **트리거**: `/feature-memory <key>`는 `epic_key`·제목으로 먼저 찾고, 못 찾으면 그 키의 Jira `parent`를 타고 올라가 재조회한다. 그래서 `HD-676`(제목 매칭)·`HDA-22279`(epic_key 매칭)·그 하위 작업 키(parent 타기) 모두로 같은 페이지에 진입된다.
 
 ## 동작 개요
 
@@ -74,7 +87,7 @@ model: sonnet
 | 커맨드 | 동작 |
 |---|---|
 | `bootstrap` | Notion DB와 알림 채널을 처음 셋업한다 (1회만 호출) |
-| `register <epic-key>` | 새 피처를 등록한다 (Notion DB에 빈 페이지 생성, `status = active`) |
+| `register <epic-key>...` | 새 피처를 등록한다 (Notion DB에 빈 페이지 생성, `status = active`). 플랫폼별로 에픽이 갈렸으면 **부모 Feature 키 1개**를 주면 된다 (하위 에픽 자동 해석). 키를 여러 개 주면 한 페이지로 묶어 등록한다 |
 | `<epic-key>` | 단일 피처의 보고서를 갱신한다 (보관된 피처는 자동 skip) |
 | `batch` | `status = active`인 모든 피처의 보고서를 순차 갱신한다 (routine 진입점) |
 | `list [--all]` | 등록된 피처 목록을 표시한다. 기본은 `status = active`만, `--all`이면 보관 포함 |
@@ -90,7 +103,7 @@ model: sonnet
 | 첫 토큰 | 라우트 |
 |---|---|
 | `bootstrap` | STEP 1 |
-| `register` | STEP 1B (두 번째 토큰을 epic_key로 사용) |
+| `register` | STEP 1B (두 번째 이후 **모든 토큰**을 epic_key 목록으로 사용 — 여러 개면 한 페이지로 묶어 등록) |
 | `list` | STEP 7 (두 번째 토큰이 `--all`이면 보관 포함) |
 | `unregister` | STEP 8 (두 번째 토큰을 epic_key로 사용) |
 | `reactivate` | STEP 9 (두 번째 토큰을 epic_key로 사용) |
@@ -104,6 +117,7 @@ model: sonnet
 사용법:
   /feature-memory bootstrap                                       1회 셋업
   /feature-memory register HDA-12345                              새 피처 등록
+  /feature-memory register HD-676                                  부모 Feature 등록 (하위 에픽 자동 해석)
   /feature-memory HDA-12345                                       단일 피처 갱신
   /feature-memory batch                                           활성 피처 일괄 갱신
   /feature-memory list [--all]                                    등록 피처 조회 (--all: 보관 포함)
@@ -134,13 +148,15 @@ model: sonnet
 2. `epic_key` 중복 확인: Notion DB의 `epic_key` property로 검색.
    - `status = active`로 이미 있으면 → "이미 등록된 피처입니다. 갱신하려면 `/feature-memory {epic_key}`" 안내 후 중단
    - `status = archived`로 이미 있으면 → "보관된 피처입니다. 활성화하려면 `/feature-memory reactivate {epic_key}`" 안내 후 중단
-3. Jira에서 Epic 정보 조회 (`mcp__claude_ai_Atlassian__getJiraIssue`, fields: `summary,status,priority,issuetype`):
+3. Jira에서 이슈 정보 조회 (`mcp__claude_ai_Atlassian__getJiraIssue`, fields: `summary,status,priority,issuetype,parent`) — 키가 여러 개면 병렬 호출:
    - `issuetype.name`이 Epic이 아니면 경고 후 진행 (Story/Task도 허용)
    - `summary` → 페이지 제목 후보
+   - **Feature 이상 키(`hierarchyLevel ≥ 2`, 예: `HD-676`)로 등록하면**: 하위 에픽을 JQL로 해석해(위 `## 키 체계`) **해석된 플랫폼 에픽 키들을 `epic_key`에 쓴다**. 제목은 그 Feature의 `summary`로 잡는다. 부모 키는 `epic_key`에 넣지 않는다.
+   - **하위 에픽 키를 직접 여러 개 받았으면**: 받은 키들을 그대로 `epic_key`에 나열하고, 모두 같은 `parent`를 공유하면 제목을 그 부모 키·`summary`로 잡는다.
 4. Notion DB에 새 페이지 생성 (`mcp__claude_ai_Notion__notion-create-pages`):
-   - 제목: `{epic_key} - {summary}`
+   - 제목: `{제목 키} - {summary}` — 단일 에픽이면 `HDA-12345 - 로그인 개선`, 부모로 묶이면 `HD-676 - 내차사기 리스트 디자인시스템 공통화`
    - properties:
-     - `epic_key` = `HDA-12345`
+     - `epic_key` = 트래킹 대상 플랫폼 에픽 키들. 예: `HDA-12345` 또는 `HDA-22279, HDA-22280, HDA-22281`
      - `status` = `active` (보관/활성 구분 — STEP 6/7/8/9에서 사용)
      - `registered_at` = 현재 시각
      - `last_run_at` = empty
@@ -165,14 +181,17 @@ model: sonnet
 >
 > **⛔ last_run_at-only 종료 금지.** 6 소스 신규 0건이어도 STEP 4 체크박스 sweep은 **항상 실행**한다. 사용자 체크(`- [x]`)는 소스 변경과 무관한 별도 신호다. "멱등이니 last_run_at만 갱신" 하고 본문 처리를 건너뛰면, 사용자가 체크한 항목이 ✅로 이동되지 않고 상단(🎯/⚠️)에 영원히 잔존한다.
 
-1. Notion DB에서 `epic_key` property로 페이지 lookup (`mcp__claude_ai_Notion__notion-search` 또는 동등 조회).
-   - 없으면 "등록되지 않은 피처입니다. `/feature-memory register {epic_key}`로 먼저 등록하세요." 안내 후 중단.
+1. Notion DB에서 `epic_key` property **또는 제목**으로 페이지 lookup (`mcp__claude_ai_Notion__notion-search` 또는 동등 조회). 둘 다 부분 매칭으로 확인한다.
+   - **못 찾으면 Jira `parent`를 타고 올라가 재조회한다** — 하위 에픽 키(`HDA-22279`)나 그 하위 작업 키로 호출했을 때 부모 Feature 키(`HD-676`)로 등록된 페이지를 찾기 위함이다(위 `## 키 체계: epic_key와 트래킹 대상`). `getJiraIssue(key, fields=["parent"])`로 부모 키를 얻어 1~2단계까지만 올라간다.
+   - 그래도 없으면 "등록되지 않은 피처입니다. `/feature-memory register {epic_key}`로 먼저 등록하세요." 안내 후 중단.
    - `status = archived`이면 "보관된 피처입니다. 갱신하려면 `/feature-memory reactivate {epic_key}`로 먼저 활성화하세요." 안내 후 중단. (보관된 페이지를 갱신해 본문이 바뀌면 보관 의도가 흐려지므로 명시적 활성화를 강제.)
 2. **page_id가 확인되면 즉시** `mcp__claude_ai_Notion__notion-fetch(page_id)`로 **전체 본문**을 가져온다. (page property + 본문 markdown 모두 포함) — 위 강제 게이트 적용 대상.
 3. **본인 식별 fetch** — 상단 `## 본인 식별` 절차(3-call 병렬)를 수행해 `self.jira_account_id`·`self.display_name`·`self.email`·`self.slack_user_id`·`self.slack_display_name`·`self.github_login`를 확보한다 (한 세션 1회 캐싱). 호출 상세는 그 섹션 참조 — 여기 중복 기술하지 않는다.
-4. **동시에** Jira에서 Epic 정보 fetch: `mcp__claude_ai_Atlassian__getJiraIssue(issueIdOrKey=epic_key, fields=["summary","status","priority","description","comment","subtasks","parent","labels","components","updated","assignee","issuetype"], responseContentFormat="markdown")` 1회
+4. **동시에** Jira fetch — `epic_key`의 키마다 1회씩 병렬 호출: `mcp__claude_ai_Atlassian__getJiraIssue(issueIdOrKey=<key>, fields=["summary","status","priority","description","comment","subtasks","parent","labels","components","updated","assignee","issuetype"], responseContentFormat="markdown")`
+   - **`epic_key` 재해석 (필수)**: 제목이 부모 Feature 키로 시작하거나 트래킹 대상들이 공통 `parent`를 가지면, 그 부모 키로 `mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql(jql="parent = {parent_key} AND project = {Jira project key} ORDER BY key ASC", fields=<위와 동일>, responseContentFormat="markdown")`를 호출해 **새로 생긴 하위 에픽을 찾는다**. `fields`를 함께 요청하면 해석과 fetch가 한 번에 끝난다. 새 키는 이번 갱신부터 트래킹 대상에 넣고 STEP 5에서 `epic_key`에 추가한다. 필터·폴백은 위 `## 키 체계` 참조.
+   - **부모 Feature 이슈 자체는 fetch·수집하지 않는다** (`epic_key`에 명시적으로 들어 있는 경우만 예외).
    - markdown 포맷이면 description/comment 본문 안의 hyperlinks가 `[text](url)` 형태로 그대로 보존됨 → URL 추출이 쉬움
-5. 추가로 remote issue links 조회: `mcp__claude_ai_Atlassian__getJiraIssueRemoteIssueLinks(epic_key)` — Jira의 "웹 링크" 필드에 등록된 URL들 (Notion 페이지 등이 종종 여기에 붙어 있음)
+5. 추가로 remote issue links 조회: `mcp__claude_ai_Atlassian__getJiraIssueRemoteIssueLinks(<key>)` — `epic_key`의 키 + 해석된 하위 에픽 키마다 병렬 호출. Jira의 "웹 링크" 필드에 등록된 URL들 (Notion 페이지 등이 종종 여기에 붙어 있음)
 6. page property에서 `last_run_at` 추출. 없으면 `since = now - 30일`.
 
 ### 2.2 URL 자동 추출 + 도메인별 분류
@@ -216,7 +235,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 - **Notion 기획서/회의록**: 분류된 Notion URL(기획 성격) 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
 - **API 문서 (1급 참고 문서)**: Notion API 문서는 `notion-fetch`, 외부 API 문서(`docs.prnd.co.kr` 등)는 `~/.claude/rules/api-docs.md`로 view→API URL 변환 후 `WebFetch` 병렬 호출. **API 문서는 이 피처의 핵심 계약**이므로 `since` 무관 **항상 수집·인용**한다(변경 없어도 Reference에 전문 유지). `last_edited`/내용 변경이 감지되면 엔드포인트·필드·enum 변경을 추출해 **⚠️(B-1 확정 결정)로 격상**하고 `## 변경 이력`에 prepend. Reference `API 명세` toggle에 전문 인용. 인식된 API 문서 URL이 0개여도 데이터 소스 상태에 `⚪ API 문서 (링크 없음)`로 명시.
 - **GitHub PR**: 에픽 키 + 하위 이슈 키를 **2-pass로 검색**하고 dedup.
-  1. **에픽 키 검색**: `gh search prs "{epic_key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30`
+  1. **에픽 키 검색**: `gh search prs "{key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30` — 트래킹 대상 키가 여러 개면 `"{k1} OR {k2} OR ... in:title"` 단일 호출로 합친다
   2. **하위 이슈 키 검색**: Jira Epic 응답의 `subtasks[].key` 목록을 추출 → 0건이면 skip. 1~20건이면 `gh search prs "{k1} OR {k2} OR ... in:title" --owner PRNDcompany --json ... --limit 50` 단일 호출. 21건 이상이면 10개씩 분할해 병렬 호출 후 합치기.
   3. 두 pass 결과를 PR `number`로 dedup. Jira에서 추출된 GitHub URL과도 합치기. `updatedAt >= since`만 채택.
 - **Figma**: 페이지 단위 nodeId는 `get_design_context`가 항상 실패(`선택된 레이어 없음`)하므로 **frame 단위로 우회**한다.
@@ -408,8 +427,9 @@ STEP 2.5의 B 리스트를 **체크박스**로 출력. 시간 역순. 도메인 
 ```markdown
 ## 한눈에 보기
 
-- **피처**: {epic_key} {Epic 제목} (parent: [{parent_key} {parent_summary}]({parent_url}))
-- **Jira 상태**: {status} (이슈타입: {issuetype}, 우선순위: {priority}, label: {labels})
+- **피처**: {제목의 식별 키} {피처 제목} (parent: [{parent_key} {parent_summary}]({parent_url}))
+- **트래킹 대상**: [{key1}]({url1}) {status1} · [{key2}]({url2}) {status2} … — `epic_key`의 에픽 전부. 부모 Feature 아래로 묶인 경우 `(parent={parent_key})`를 덧붙이고, project 필터로 제외된 타 플랫폼 하위 에픽이 있으면 `제외: {key} ({project})`를 같은 줄 끝에 남긴다. 트래킹 대상이 1건이면 이 줄을 생략하고 아래 `Jira 상태`로 대체한다
+- **Jira 상태**: {status} (이슈타입: {issuetype}, 우선순위: {priority}, label: {labels}) — 트래킹 대상 1건일 때만
 - **담당**: @{assignee}
 - **하위 이슈 진척**: {done}/{total} ({percent}%) — subtask 0건이면 "0건 (parent 산하 분산)" 표기
 - **A/B 테스트 키**: `{ab_test_key}` (API 문서에 명시되어 있으면)
@@ -419,8 +439,8 @@ STEP 2.5의 B 리스트를 **체크박스**로 출력. 시간 역순. 도메인 
 
 ### `## 현재 상태`
 
-- Jira Epic `description`을 markdown 변환 (보통 외부 링크만 정리되어 있어 짧음)
-- 하위 이슈 표 (subtask 있을 때):
+- Jira Epic `description`을 markdown 변환 (보통 외부 링크만 정리되어 있어 짧음). 트래킹 대상이 2건 이상이고 description이 동일하면 **한 번만** 인용하고 "N개 에픽 공통"이라 표기한다
+- 하위 이슈 표 (subtask 있을 때) — 트래킹 대상이 2건 이상이면 `에픽` 컬럼을 추가해 어느 에픽 산하인지 구분한다:
   ```markdown
   | 키 | 제목 | 상태 | 담당 |
   |---|---|---|---|
@@ -590,6 +610,7 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
 1. `mcp__claude_ai_Notion__notion-update-page` command `update_properties`로 page property 갱신:
    - 모든 소스 정상: `last_run_at = now`, `last_error = ""`
    - 일부 소스 실패: `last_run_at = now` (부분 성공도 갱신), `last_error = "Slack: token expired"` 같은 1줄 사유 (여러 실패 시 ` | `로 합침)
+   - **`epic_key` 추가**: STEP 2.1의 재해석에서 **새 하위 에픽 키**가 나왔으면 `epic_key` 끝에 쉼표로 덧붙인다. 기존 키는 제거하지 않는다 (위 `## 키 체계`). 새 키가 없으면 건드리지 않는다.
    - **URL 미러**: STEP 2.2에서 추출·분류한 핵심 소스 URL을 동명 property(`기획서`·`API 문서`·`Figma`·`Slack`)에 기록. 여러 개면 대표 1개(기획서·API 문서 = 주요/최근 문서, Figma = 메인 파일, Slack = 채널). 추출값이 없으면 공란 유지(빈 값으로 덮어쓰지 않음).
 2. **일부 소스 실패가 있었다면** 알림 채널로 1줄 메시지 송신:
    ```
@@ -668,8 +689,8 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 
 | Property | 타입 | 설명 |
 |---|---|---|
-| 이름 | title | `{epic_key} - {Epic 제목}` |
-| `epic_key` | rich text | 예: `HDA-12345` (검색 키) |
+| 이름 | title | `{식별 키} - {피처 제목}`. 식별 키는 부모 Feature 키여도 된다 (예: `HD-676 - 내차사기 리스트 디자인시스템 공통화`). 사람이 읽는 식별자이며 수집 대상을 결정하지 않는다 |
+| `epic_key` | rich text | **실제 트래킹 대상 플랫폼 에픽 키 목록** (쉼표 구분). 예: `HDA-12345` 또는 `HDA-22279, HDA-22280, HDA-22281`. 여기 적힌 키만 Jira fetch·URL 추출·PR 검색 대상이다. **부모 Feature 키(`HD-*`)는 넣지 않는다** — 부모는 제목에만 쓴다. 새 하위 에픽은 갱신 시 자동 추가된다. 상세: `## 키 체계` |
 | `status` | select (`active` \| `archived`) | 보관/활성 구분. `active`만 batch 대상. unregister는 `archived`, reactivate는 `active`로 변경 |
 | `last_run_at` | date(시간 포함) | 변경 감지 기준 |
 | `last_error` | rich text | 마지막 실행 실패 사유 (없으면 빈 값) |
@@ -696,6 +717,7 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 | 소스 | 실패 사유 예 | 처리 |
 |---|---|---|
 | Jira | 인증 만료, 이슈 삭제, 5xx | `## 데이터 소스 상태`에 🟥 + `last_error` 기록 + Slack 알림 |
+| Jira 하위 에픽 해석 | JQL 실패, `parent` 필드 미지원, 해석 결과 0건 | 기존 `epic_key`를 그대로 써서 보고서는 생성하고(등록 시점이면 입력 키를 그대로 저장), `## 데이터 소스 상태`에 `⚠️ 하위 에픽 해석 실패 (parent={key})` + `last_error` 기록 |
 | Slack | 채널 권한 만료, 스레드 삭제, 잘못된 URL | 동일 |
 | Notion | 페이지 삭제, integration 권한 만료, rate limit | 동일 (rate limit는 1회 재시도 후 실패 처리) |
 | API 문서 | 외부 문서 권한 만료, view→API URL 변환 실패, 빈 응답 | `## 데이터 소스 상태`에 🟥 + `last_error` 기록 + Slack 알림. **변환·fetch 실패 시 view URL을 Reference·참고 링크로 남겨** 링크 자체는 보존 |
@@ -720,6 +742,12 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 
 # 새 피처 등록
 /feature-memory register HDA-12345
+
+# 부모 Feature 키로 등록 — 하위 플랫폼 에픽(HDA-22279/80/81)이 자동 해석되어 트래킹된다
+/feature-memory register HD-676
+
+# 부모 키로 갱신 (하위 에픽은 매 갱신 시 재해석)
+/feature-memory HD-676
 
 # 단일 피처 갱신 (수동)
 /feature-memory HDA-12345
@@ -762,6 +790,10 @@ bootstrap + 첫 register + 첫 수동 갱신을 검증한 후 등록한다.
 - [ ] `bootstrap` → Notion DB가 생성되고 ID가 표시된다 + 본 SKILL.md "기본 정보"의 `{TODO}`가 채워진다
 - [ ] `register HDA-XXX --slack ... --notion-docs ...` → Notion DB에 새 페이지가 만들어진다 (page properties 확인)
 - [ ] `HDA-XXX` 첫 호출 → 6 소스(Jira·Slack·Notion 기획서·API 문서·GitHub·Figma)에서 데이터 수집 + 본문 섹션 생성 + page property `last_run_at` 갱신
+- [ ] `register HD-XXX`(부모 Feature) → 제목은 `HD-XXX - {summary}`, `epic_key`에는 **해석된 하위 플랫폼 에픽 키들**(`HDA-*`)이 채워진다. 부모 키는 `epic_key`에 없다
+- [ ] `HD-XXX` 갱신 → 제목 키로 페이지를 찾고, `한눈에 보기`의 `트래킹 대상`에 `epic_key`의 에픽 전부 표기. 타 플랫폼 하위 에픽은 `제외:`로 표기
+- [ ] 부모 아래에 하위 에픽을 1개 추가한 뒤 갱신 → 그 키가 `epic_key`에 자동 추가되고 트래킹 대상에 들어온다
+- [ ] 하위 에픽 키(`HDA-XXX`)로 호출 → `epic_key` 매칭으로 같은 페이지를 찾아 갱신한다
 - [ ] API 문서 URL이 Jira에 있는 피처 갱신 → `## 데이터 소스 상태`에 `✅ API 문서` 별도 라인 + Reference `API 명세` toggle에 전문 인용. URL이 없으면 `⚪ API 문서 (링크 없음)` 표기
 - [ ] `HDA-XXX` 둘째 연속 호출 → 본문 동일 + `변경 이력` 추가 0건 (멱등성 확인)
 - [ ] Slack 스레드에 메시지 1개 추가 후 호출 → `최근 활동`/`변경 이력`에 그 메시지 1건만 추가

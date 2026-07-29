@@ -9,7 +9,8 @@
 Jira 키(`HDA-\d+` 등)가 등장하는 **구현/조사/디버깅 작업**을 착수할 때:
 
 1. 대상 이슈의 epic_key 또는 부모 에픽 키를 확인한다 (하위 작업이면 Jira `parent`, 에픽이면 자신).
-2. feature-memory DB(`collection://314333d2-57ac-4f15-8fa2-12cee61130e1`)에서 그 키로 페이지를 찾는다 — `notion-search(data_source_url=..., query="<Jira project key 또는 epic_key>")` → 후보 `notion-fetch`. `epic_key` property는 쉼표로 여러 키를 묶을 수 있으니(예: `HDA-21839, HDA-21840`) **부분 매칭**으로 찾는다.
+2. feature-memory DB(`collection://314333d2-57ac-4f15-8fa2-12cee61130e1`)에서 그 키로 페이지를 찾는다 — `notion-search(data_source_url=..., query="<Jira project key 또는 epic_key>")` → 후보 `notion-fetch`. `epic_key` property는 쉼표로 여러 키를 묶을 수 있으니(예: `HDA-21839, HDA-21840`) **부분 매칭**으로 찾고, **제목도 함께 본다**.
+   - **못 찾으면 Jira `parent`를 한 단계 더 타고 올라가 재조회한다.** 여러 플랫폼 에픽이 한 피처로 묶인 경우 페이지 제목은 부모 Feature 키(예: `HD-676`)이고 `epic_key`에는 에픽 키들(`HDA-22279, ...`)이 들어 있다. 하위 작업 키 → 에픽 키 → 부모 Feature 키까지 2단계면 충분하다.
 3. 페이지가 있으면 본문을 fetch해 아래를 컨텍스트로 흡수한다:
    - `🎯 내가 해야 할 일` · `⚠️ 영향 주는 변경 / 알아야 할 결정` · 미결(⏳) 항목
    - `한눈에 보기`의 핵심 링크와 page property URL(`기획서`·`API 문서`·`Figma`·`Slack`)
