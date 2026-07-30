@@ -1,6 +1,6 @@
 ---
 name: publish-spec-plan-as-artifact
-description: Use when a spec (`.agent/specs/`) or plan (`.agent/plans/`) markdown is finalized or approved and should become a readable published Claude Artifact — automatically right after brainstorming spec approval or writing-plans plan approval, or on an explicit request like '아티팩트로 발행', '이 plan 아티팩트로', '가독성 좋게 발행'. Not for arbitrary web pages or non-doc markdown.
+description: Use when a spec (`.agent/specs/`) or plan (`.agent/plans/`) markdown should become a readable published Claude Artifact — automatically right after a spec is written (no approval wait) or after writing-plans plan approval, or on an explicit request like '아티팩트로 발행', '이 plan 아티팩트로', '가독성 좋게 발행'. Not for arbitrary web pages or non-doc markdown.
 allowed-tools: Read, Write, Edit, Bash, Artifact, Skill, AskUserQuestion
 ---
 
@@ -14,7 +14,7 @@ spec/plan markdown 원본을 **고정 디자인 시스템**으로 렌더해 읽�
 
 ## When to use
 
-- brainstorming에서 spec이 사용자 승인된 직후 (자동)
+- spec을 `.agent/specs/`에 작성한 직후 (자동, **사용자 승인 대기 없음**)
 - writing-plans에서 plan이 사용자 리뷰 통과한 직후 (자동)
 - 명시 요청: "아티팩트로 발행", "가독성 좋게"
 
@@ -47,7 +47,7 @@ digraph {
 
 ## Workflow
 
-1. **대상 `.md` 확정 확인** — 승인/최종 상태. 로컬 파일이 원본이며 계속 유지한다.
+1. **대상 `.md` 확인** — spec은 방금 작성된 초안이면 그대로 발행한다(승인 대기 금지). plan은 승인/최종 상태여야 한다. 로컬 파일이 원본이며 계속 유지한다.
 2. **종류 판별** — 경로/제목으로 `spec`(`.agent/specs/`) 또는 `plan`(`.agent/plans/`).
 3. **REQUIRED: `design-system.md`를 Read** (이 스킬 디렉토리). CSS·JS·골격·컴포넌트·적응 규칙·발행 규약이 전부 거기 있다.
 4. **파싱 → 매핑** — Quick Reference대로 문서 요소를 컴포넌트에 매핑하고 위 Decision을 적용한다. 내용은 **실제 문서에서** 가져온다(lorem/요약 날조 금지).

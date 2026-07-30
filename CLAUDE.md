@@ -37,7 +37,14 @@
 # Superpowers 문서 위치
 - spec: `.agent/specs/`에 저장
 - plan: `.agent/plans/`에 저장
-- spec/plan을 확정(사용자 승인)하면 `publish-spec-plan-as-artifact` 스킬로 가독성 좋은 Claude Artifact를 자동 발행한다 (로컬 `.md`가 원본, 발행물 private).
+- plan은 확정(사용자 승인) 후 `publish-spec-plan-as-artifact` 스킬로 발행한다.
+- 로컬 `.md`가 원본이고 발행물은 private로 둔다.
+
+# brainstorming 이후 spec 처리
+- brainstorming 대화가 끝나면 의도 재진술이나 추가 승인 질문 없이 곧바로 spec을 작성하고, 이어서 `publish-spec-plan-as-artifact` 스킬로 발행한 뒤 보고한다. 세 단계 사이에서 멈추지 않는다.
+- 방향 확인은 brainstorming 대화에서 이미 끝났다. 승인을 두 번 받지 않는다.
+- 보고에는 spec 절대경로와 아티팩트 URL을 각각 별도 라인으로 넣고 리뷰를 요청한다. superpowers `brainstorming`의 spec 리뷰 게이트는 이 보고 시점으로 옮긴다.
+- 수정 요청을 받으면 spec을 고치고 같은 URL로 재발행한 뒤 다시 보고한다.
 
 # 사용자가 봐야 할 파일 출력 규칙
 - 사용자가 직접 열어 검토해야 하는 파일(spec, plan, skill, 임시 메모 등 모든 `.md` / 코드 파일)을 작성·수정한 경우, 응답에서 해당 파일 절대 경로를 **별도 라인**으로 단독 출력한다.
