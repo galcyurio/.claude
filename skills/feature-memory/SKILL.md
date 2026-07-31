@@ -239,8 +239,8 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
   2. **하위 이슈 키 검색**: Jira Epic 응답의 `subtasks[].key` 목록을 추출 → 0건이면 skip. 1~20건이면 `gh search prs "{k1} OR {k2} OR ... in:title" --owner PRNDcompany --json ... --limit 50` 단일 호출. 21건 이상이면 10개씩 분할해 병렬 호출 후 합치기.
   3. 두 pass 결과를 PR `number`로 dedup. Jira에서 추출된 GitHub URL과도 합치기. `updatedAt >= since`만 채택.
 - **Figma**: 페이지 단위 nodeId는 `get_design_context`가 항상 실패(`선택된 레이어 없음`)하므로 **frame 단위로 우회**한다.
-  - **① frame 목록 추출** — `get_metadata`(페이지) → 임시 파일에서 `jq`+`grep`+`sed`로 직계 자식 frame 추출. `__skip__` 여부 무관 **항상 수행**, 매 갱신 전량 재생성, 유령 frame 제거. `화면`/`부품·에셋` 2그룹 분리, name 원문 유지.
-  - **② frame별 hash diff** — frame마다 `get_design_context(excludeScreenshot=true)` 병렬 호출 → `data-node-id`·asset URL 제거 후 SHA-256 → `figma_frame_hashes` property와 비교해 신규/변경 감지. `__skip__`이면 ②만 생략.
+  - **① frame 목록 추출** — `get_metadata`(페이지) → 임시 파일에서 `jq`+`grep`+`sed`로 직계 자식 frame 추출. skip 설정 여부 무관 **항상 수행**, 매 갱신 전량 재생성, 유령 frame 제거. `화면`/`부품·에셋` 2그룹 분리, name 원문 유지.
+  - **② frame별 hash diff** — frame마다 `get_design_context(excludeScreenshot=true)` 병렬 호출 → `data-node-id`·asset URL 제거 후 SHA-256 → `figma_frame_hashes` property와 비교해 신규/변경 감지. `figma_frame_hashes`가 **JSON으로 파싱되지 않으면 ②만 생략**한다 (skip 센티넬은 `SKIP`).
   - **③ 변경 기록** — 신규/변경/삭제 frame은 `## 변경 이력`에 prepend(🔄 마커), 변경 frame 코드는 Reference `Figma 디자인 컨텍스트` toggle에 보존.
   - **상세 절차(`jq`/`sed`/`shasum` 전체 명령, 화면/부품 분류 가이드, 비용 제어, 실패 처리)는 → [`figma-tracking.md`](figma-tracking.md) 참조.**
 
@@ -695,7 +695,7 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 | `last_run_at` | date(시간 포함) | 변경 감지 기준 |
 | `last_error` | rich text | 마지막 실행 실패 사유 (없으면 빈 값) |
 | `registered_at` | date | 등록일 |
-| `figma_frame_hashes` | rich text | Figma frame별 디자인 컨텍스트 hash JSON. `{"488:2586": "sha256...", ...}` 형식. STEP 2.3 Figma ②단계의 incremental 변경 감지용. `__skip__`으로 설정하면 ②단계(frame별 `get_design_context`+hash)만 skip(①frame 목록 추출은 항상 수행). 빈 값(`""`)이면 첫 갱신 시 `{}`로 초기화 |
+| `figma_frame_hashes` | rich text | Figma frame별 디자인 컨텍스트 hash JSON. `{"488:2586": "sha256...", ...}` 형식. STEP 2.3 Figma ②단계의 incremental 변경 감지용. **`SKIP`** 으로 설정하면 ②단계(frame별 `get_design_context`+hash)만 skip(①frame 목록 추출은 항상 수행). 빈 값(`""`)이면 첫 갱신 시 `{}`로 초기화. **⛔ 센티넬에 `_`·`*`로 감싼 값(`__skip__` 등)을 쓰지 않는다** — Notion이 마크다운 강조로 파싱해 저장 값이 `**skip**`으로 깨지고 다음 갱신의 문자열 비교가 실패한다(실제 발생). **판정은 문자열 일치가 아니라 "JSON 객체로 파싱되는가"로 한다** — 파싱 실패 시 무조건 ② skip으로 간주해 깨진 값에도 안전하게 동작한다 |
 | `기획서` | url | Notion 기획 문서 URL. **Jira 추출값의 미러**(파생 캐시) — STEP 5에서 매 갱신 시 갱신 |
 | `API 문서` | url | API 명세 문서 URL (Notion 또는 외부 `docs.prnd.co.kr` 등). 미러. 없으면 공란 |
 | `Figma` | url | 디자인 파일 URL. 미러 |
@@ -801,7 +801,8 @@ bootstrap + 첫 register + 첫 수동 갱신을 검증한 후 등록한다.
 - [ ] Figma frame이 1개라도 있는 피처 첫 갱신 → `figma_frame_hashes`가 JSON `{...}`으로 채워지고 Reference의 `Figma 디자인 컨텍스트` toggle에 신규 frame 코드 노출
 - [ ] Figma frame 코드가 변경되지 않은 상태로 다시 갱신 → `## 변경 이력`에 Figma 항목 0건 추가 (멱등성)
 - [ ] Figma에서 frame 하나 수정 후 갱신 → 해당 frame만 `## 변경 이력`에 prepend, `figma_frame_hashes` 해당 키만 갱신
-- [ ] `figma_frame_hashes = "__skip__"` 설정 후 갱신 → frame 목록만 갱신되고 `get_design_context` 호출 0건
+- [ ] `figma_frame_hashes = "SKIP"` 설정 후 갱신 → frame 목록만 갱신되고 `get_design_context` 호출 0건
+- [ ] `figma_frame_hashes`에 JSON이 아닌 임의 문자열(예: 과거에 깨진 `**skip**`)이 들어 있어도 → 오류 없이 ②만 skip되고 보고서는 정상 생성
 - [ ] `list` → 활성 피처만 표로 표시 (보관 페이지는 숨김)
 - [ ] `list --all` → 활성 + 보관 페이지 모두 `status` 컬럼과 함께 표시
 - [ ] `unregister HDA-XXX` → page property `status = archived` (페이지는 Notion에서 계속 열람 가능, 휴지통에 들어가지 않음)

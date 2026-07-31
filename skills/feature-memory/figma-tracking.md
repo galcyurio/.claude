@@ -29,7 +29,7 @@ python3 ~/.claude/skills/feature-memory/figma-diff.py \
 
 각 줄은 `nodeId|name|WxH` 형태 (표 구성 시 참고). frame 목록 표로 정리해 본문 `## 📚 Reference`의 `Figma frame 목록` toggle에 부착. 각 frame은 `https://www.figma.com/design/{fileKey}/?node-id={nodeId_with_dash}` (콜론을 대시로 변환) 형식의 클릭 링크.
 
-**frame 목록 표는 매 갱신 시 get_metadata 결과로 전량 재생성한다** (직전 표에 누적 prepend 금지). 1단계는 페이지당 `get_metadata` 1회라 비용이 낮으므로 `__skip__` 여부와 무관하게 **항상 수행**한다. 직전 목록·`figma_frame_hashes`에는 있으나 이번 결과에 없는 nodeId는 **유령 frame**(Figma에서 삭제·이동됨)이므로 표와 hash dict에서 즉시 제거한다. 표가 stale해져 존재하지 않는 frame이 잔존하면 이를 참조하는 review-by-agents 등 하위 소비자가 헛도므로 신선도 유지가 중요하다.
+**frame 목록 표는 매 갱신 시 get_metadata 결과로 전량 재생성한다** (직전 표에 누적 prepend 금지). 1단계는 페이지당 `get_metadata` 1회라 비용이 낮으므로 skip 설정 여부와 무관하게 **항상 수행**한다. 직전 목록·`figma_frame_hashes`에는 있으나 이번 결과에 없는 nodeId는 **유령 frame**(Figma에서 삭제·이동됨)이므로 표와 hash dict에서 즉시 제거한다. 표가 stale해져 존재하지 않는 frame이 잔존하면 이를 참조하는 review-by-agents 등 하위 소비자가 헛도므로 신선도 유지가 중요하다.
 
 **frame 이름은 Figma name 원문 그대로 쓴다.** 동명 frame이 여럿이어도 `한화면`·`(2)`·`신규` 같은 임의 suffix를 붙이지 않는다 — 구별은 표의 별도 nodeId 칼럼으로 한다 (Figma에서 "홈_최초" 같은 이름이 여러 frame에 중복되는 경우가 흔하다). 이름 기반으로 frame을 참조하는 소비자가 임의 suffix 때문에 매칭에 실패하는 것을 막는다.
 
@@ -55,7 +55,7 @@ Figma API는 `last_modified`를 제공하지 않으므로 **응답 코드 hash �
    - 신규 frame (직전 dict에 없음) → `## 변경 이력`에 `- (YYYY-MM-DD) · [Figma](url) · 신규 frame 추가 — "{name}" (WxH)` prepend
    - hash 변경 → `## 변경 이력`에 `- (YYYY-MM-DD) · [Figma](url) · frame 디자인 변경 — "{name}"` prepend
    - hash 동일 → 본문에 반영하지 않음
-5. 1단계에서 더 이상 보이지 않는 frame (직전 dict에는 있는데 새 목록에 없음) → 위 1단계에서 표·hash dict에서 이미 제거된 항목이다. `## 변경 이력`에 `- (YYYY-MM-DD) · [Figma](url) · frame 삭제 — "{name}"` prepend한다. 이 비교는 frame 목록만으로 가능하므로 2단계를 `__skip__`해도 수행한다.
+5. 1단계에서 더 이상 보이지 않는 frame (직전 dict에는 있는데 새 목록에 없음) → 위 1단계에서 표·hash dict에서 이미 제거된 항목이다. `## 변경 이력`에 `- (YYYY-MM-DD) · [Figma](url) · frame 삭제 — "{name}"` prepend한다. 이 비교는 frame 목록만으로 가능하므로 2단계를 skip해도 수행한다.
 6. 새 hash dict를 JSON 직렬화하여 STEP 5에서 `figma_frame_hashes` property에 저장.
 7. Reference의 `Figma frame 목록` 표에서 변경된 frame은 이름 앞에 🔄 마커를 붙여 시각적으로 구분한다 (`🔄 관심 차 가격 변동`).
 
@@ -81,7 +81,7 @@ Figma API는 `last_modified`를 제공하지 않으므로 **응답 코드 hash �
 
 ## 비용 제어
 
-비싼 단계는 2단계(frame별 `get_design_context` + hash 계산)다. `figma_frame_hashes`가 `__skip__`으로 설정되면 **2단계만 skip**하고 **1단계 `get_metadata` + frame 목록 표 재생성은 항상 수행**한다 (유령 frame 방지를 위해 표 신선도는 비용 제어와 무관하게 유지). frame 수가 30개를 초과해 2단계 비용이 부담될 때 활용한다.
+비싼 단계는 2단계(frame별 `get_design_context` + hash 계산)다. `figma_frame_hashes`가 **JSON 객체로 파싱되지 않으면**(skip 센티넬 `SKIP`, 또는 과거에 깨진 값) **2단계만 skip**하고 **1단계 `get_metadata` + frame 목록 표 재생성은 항상 수행**한다 (유령 frame 방지를 위해 표 신선도는 비용 제어와 무관하게 유지). frame 수가 30개를 초과해 2단계 비용이 부담될 때 활용한다.
 
 ## 실패 처리
 
