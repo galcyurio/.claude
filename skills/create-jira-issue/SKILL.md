@@ -109,7 +109,18 @@ description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명�
     - 예: 입력 `UI 구현` -> 표시 `[고객] 로그인 기능 추가 - UI 구현`
     - 설명은 Atlassian Document Format(ADF) JSON으로 작성하고, `--description-file`로 반영한다.
     - Jira Cloud는 마크다운/wiki markup을 자동 변환하지 않으므로, 반드시 ADF를 사용한다.
-    - ADF 예시:
+    - **ADF를 손으로 쓰지 말고 `md2adf.py`를 쓴다.** 본문을 markdown으로 작성한 뒤 변환한다 — ADF JSON을 직접 쓰면 길고 중첩이 깊어 오타가 나기 쉽다.
+      ```bash
+      # 1) 본문을 markdown으로 작성 (스크래치패드에)
+      #    지원: '### 제목', '- bullet' (2칸 들여쓰기로 중첩), 일반 문단, 인라인 `code`, **bold**, [text](url)
+      # 2) ADF로 변환
+      python3 ~/.claude/skills/create-jira-issue/md2adf.py <입력>.md <출력>-desc.txt
+      # 3) JSON 유효성 확인 후 반영
+      python3 -m json.tool <출력>-desc.txt > /dev/null
+      acli jira workitem edit --key HDA-XXXX --description-file <출력>-desc.txt --yes --json
+      ```
+      표(`<table>`)는 지원하지 않는다. 표가 필요하면 그 부분만 ADF `table` 노드를 직접 만들어 합친다.
+    - ADF 예시 (직접 작성해야 할 때):
 
 ```json
 {
