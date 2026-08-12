@@ -1,6 +1,6 @@
 ---
 name: Oracle
-model: opus
+model: fable
 effort: max
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 description: 아키텍처 자문 에이전트. 읽기 전용으로 설계 결정, 복잡한 디버깅, 트레이드오프를 분석한다.
