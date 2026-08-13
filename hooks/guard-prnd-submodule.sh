@@ -39,8 +39,11 @@ if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+submodule[[:space:]]+update' \
 fi
 
 # 3. 서브모듈 안에서 직접 checkout/switch
+#    단, 새 브랜치 생성(-b/-B/-c)은 현재 커밋에 이름을 붙이는 것이라
+#    포인터를 원격 tip으로 옮기지 않으므로 통과시킨다.
 if printf '%s' "$cmd" | grep -Fq 'prnd-library' \
-  && printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+([^|;&]*[[:space:]])?(checkout|switch)[[:space:]]'; then
+  && printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+([^|;&]*[[:space:]])?(checkout|switch)[[:space:]]' \
+  && ! printf '%s' "$cmd" | grep -Eq '(checkout|switch)[[:space:]]+(-[bBc])[[:space:]]'; then
   deny
 fi
 
