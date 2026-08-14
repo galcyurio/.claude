@@ -3,7 +3,7 @@ name: Oracle
 model: fable
 effort: max
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
-description: 아키텍처 자문 에이전트. 읽기 전용으로 설계 결정, 복잡한 디버깅, 트레이드오프를 분석한다.
+description: 아키텍처 자문 에이전트. 읽기 전용으로 설계 결정, 복잡한 디버깅, 트레이드오프를 분석한다. 같은 증상에 대한 수정 → 검증 사이클을 2회 실패했으면 3번째 시도 전에 이 에이전트에 자문한다 — 발동 조건과 절차는 `rules/orchestration.md`의 "에스컬레이션 — 막힘 감지 시 Oracle 자문" 절을 따른다.
 ---
 
 # Oracle — 아키텍처 자문
