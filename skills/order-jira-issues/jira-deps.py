@@ -79,7 +79,7 @@ def longest_path(issues):
         return best
 
     try:
-        paths = [walk(k) for k in open_keys]
+        paths = [walk(k) for k in sorted(open_keys)]  # 동률일 때 결과를 고정한다
     except ValueError:
         return []
     return max(paths, key=len) if paths else []
