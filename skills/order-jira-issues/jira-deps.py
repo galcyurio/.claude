@@ -144,22 +144,19 @@ def render_graph(issues, keys, crit):
                 if b in issues and not issues[b]["done"]]
 
     waves, cyclic = build_waves(issues, keys, open_blockers)
-    done_keys = [k for k in keys if issues[k]["done"]]
 
     def label(k):
         i = issues[k]
         # 마커는 East Asian Wide 글리프만 쓴다. ○ ▶ ✔ 는 폭이 터미널마다 1~2 로
         # 달라져서 뒤따르는 화살표 열이 어긋난다.
-        if i["done"]:
-            mark = "✅"
-        elif open_blockers(k):
+        if open_blockers(k):
             mark = "⛔"
         elif i["active"]:
             mark = "🟠"
         else:
             mark = "🟢"
         s = f"{mark} {k}  {trunc(i['summary'], SUMMARY_MAX)}"
-        if i["active"] or i["done"]:
+        if i["active"]:
             s += f" ({i['status']})"
         if k not in inside:
             s += " (에픽 밖)"
@@ -167,15 +164,19 @@ def render_graph(issues, keys, crit):
             s += " *"
         return s
 
-    shown = [k for lv in sorted(waves) for k in waves[lv]] + cyclic + done_keys
+    shown = [k for lv in sorted(waves) for k in waves[lv]] + cyclic
+    if not shown:
+        print("## 그래프\n\n열린 이슈가 없다.")
+        return
     labels = {k: label(k) for k in shown}
     col = max((dwidth(v) for v in labels.values()), default=0) + 4
 
     def block(k):
         rows = []
         head = "  " + labels[k]
-        outs = ["✔" + t if t in issues and issues[t]["done"] else t
-                for t in issues[k]["blocks"]]
+        outs = [t if t in issues else t + "(?)"
+                for t in issues[k]["blocks"]
+                if not (t in issues and issues[t]["done"])]
         # 조회 못 한 blocker 도 그린다. 안 그리면 그래프가 실제보다 낙관적으로 보인다.
         ins = open_blockers(k) + [b + "(?)" for b in issues[k]["blocked_by"]
                                   if b not in issues]
@@ -205,11 +206,7 @@ def render_graph(issues, keys, crit):
         print("\n순환 ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다")
         for k in cyclic:
             print(block(k))
-    if done_keys:
-        print(f"\n✅ 완료 ({len(done_keys)}건)")
-        for k in done_keys:
-            print(block(k))
-    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘  ✅ 완료  * 임계 경로"
+    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘  * 임계 경로"
           "  ───▶ blocks  ▲ 남은 blocker  (?) 조회 실패")
 
 
