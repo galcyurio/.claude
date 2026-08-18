@@ -73,18 +73,28 @@ description: 피처(Jira 에픽) 작업을 착수할 때 Jira·Slack·Notion·Fi
 
 이 세 단계를 순서대로 실행한다. 전체 링크 명령을 한 번에 실행하지 않는다 — 방향이 반대면 되돌릴 링크가 그만큼 늘어난다.
 
+**`--out`이 후행이다.** 이름과 반대이므로 외우지 말고 아래 예시를 그대로 쓴다. `--out A --in B`는 "A는 B에 막혀 있다"(B가 선행)로 걸린다. 성공 메시지는 `A Blocks B`라고 출력되지만 실제 저장은 그 반대다 — **메시지를 믿지 말고 ②로 확인한다.**
+
 ```bash
-# ① 첫 1건만 생성. --out = 선행(blocker), --in = 후행(blocked)
-acli jira workitem link create --out <선행> --in <후행> --type Blocks --yes
+# ① 첫 1건만 생성. --out = 후행(blocked), --in = 선행(blocker)
+acli jira workitem link create --out <후행> --in <선행> --type Blocks --yes
 
 # ② 방향 검증. 후행 쪽에 "is blocked by <선행>"으로 보여야 정상
 acli jira workitem link list --key <후행> --json
+```
+
+`link list`는 상대 키를 한쪽 관점에서만 주므로, 방향까지 보려면 이슈 조회가 확실하다.
+
+```bash
+acli jira workitem view <후행> --fields "key,issuelinks" --json
+# inwardIssue 에 <선행>이 있으면 정상 ("<후행> is blocked by <선행>")
+# outwardIssue 에 <선행>이 있으면 거꾸로 걸린 것이다
 
 # ③ ②가 정상일 때만 나머지를 배치로 생성
 acli jira workitem link create --from-json <파일> --yes
 ```
 
-- ③의 배치 JSON: `[{ "outwardIssue": "<선행>", "inwardIssue": "<후행>", "type": "Blocks" }, ...]`
+- ③의 배치 JSON도 플래그와 같은 규칙이다: `[{ "outwardIssue": "<후행>", "inwardIssue": "<선행>", "type": "Blocks" }, ...]`
 - ②가 반대로 나오면 응답의 링크 `id`로 지우고(`acli jira workitem link delete --id <id> --yes`) `--out`/`--in`을 바꿔 ①부터 다시 한다.
 - ⛔ **MCP `createIssueLink`를 쓰지 않는다.** 이 도구는 inward/outward를 반대로 매핑한 이력이 있고 도구 설명 자체가 Jira REST 스펙과 반대다 (`atlassian/atlassian-mcp-server#112`). 쓰면 링크가 전부 거꾸로 걸린다. `acli`만 쓴다.
 
@@ -100,7 +110,7 @@ acli jira workitem link create --from-json <파일> --yes
 | 멀티소스 파악 없이 이슈 만들지 않는다 | Jira만 보면 Slack/Notion에서 합의된 스펙(추가 필터·확정 구간)을 놓친다 |
 | 분해 단위는 사용자가 정한다 (`AskUserQuestion`) | 쪼개는 굵기는 정답이 없다. 자동 추정하면 과대/과소 분해 |
 | 생성은 `create-jira-issue` 위임 | 중복 구현 = prefix·App 필드 실수 재발. 위임이 단일 경로 |
-| 블로커 링크는 `acli`로, `--out`이 선행 | MCP `createIssueLink`는 방향이 반대다. 전부 거꾸로 걸린다 |
+| 블로커 링크는 `acli`로, `--in`이 선행 | MCP `createIssueLink`는 방향이 반대다. `acli`도 플래그 이름과 반대이고 성공 메시지까지 거꾸로 찍히니 반드시 ②로 검증 |
 | 링크는 진짜 블로커만 | 순서 취향까지 링크하면 "지금 뭘 할 수 있나"가 안 보인다 |
 
 ## Red Flags — 멈추고 점검
@@ -110,6 +120,7 @@ acli jira workitem link create --from-json <파일> --yes
 - "MCP `createJiraIssue`로 직접 만들었다" → 6단계 위임 위반. prefix·필드 실수 위험.
 - "summary에 `[고객]` prefix를 넣었다" → automation이 또 붙여 중복. 순수 제목만.
 - "이슈만 만들고 끝냈다" → 7단계 누락. 어떤 이슈를 먼저 해야 하는지 아무도 모른다.
-- "MCP `createIssueLink`로 링크했다" → 방향이 반대다. `acli` + `--out`=선행으로 다시.
+- "MCP `createIssueLink`로 링크했다" → 방향이 반대다. `acli` + `--in`=선행으로 다시.
+- "`acli` 성공 메시지가 `A Blocks B`로 나왔으니 맞다" → 그 메시지는 거꾸로 찍힌다. `view`의 inward/outward로만 판정한다.
 - "링크 명령을 한 번에 다 실행했다" → 7-3 ①②③ 위반. 첫 1건 방향 확인 후 나머지.
 - "작업 순서상 A 다음 B니까 링크했다" → 블로커가 아니면 링크하지 않는다.
