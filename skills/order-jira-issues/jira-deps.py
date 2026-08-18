@@ -238,61 +238,38 @@ def main():
     inside = [issues[k] for k in keys]
     open_issues = [i for i in inside if not i["done"]]
 
-    def blockers_of(i):
-        return [b for b in i["blocked_by"] if b in issues and not issues[b]["done"]]
-
-    ready = [i for i in open_issues if not blockers_of(i)]
-    waiting = [i for i in open_issues if blockers_of(i)]
     path = longest_path({k: v for k, v in issues.items() if k in keys})
 
     print(f"# {args.epic or 'JQL'} — 열린 {len(open_issues)}건 / 전체 {len(inside)}건\n")
 
     render_graph(issues, keys, set(path) if len(path) > 1 else set())
 
-    print("\n## 지금 착수 가능")
-    if ready:
-        for i in ready:
-            mark = " ← 이미 진행 중" if i["active"] else ""
-            print(f"- {i['key']} {i['summary']} ({i['status']}){mark}")
-        idle = [i for i in ready if not i["active"]]
-        if not idle:
-            print("\n  놀고 있는 것은 없다. 병렬로 더 잡으려면 아래 대기 목록에서 "
-                  "blocker 가 곧 풀리는 것을 본다.")
-    else:
-        print("- 없다. 열린 이슈가 전부 막혀 있다.")
-
-    print("\n## 대기")
-    for i in waiting:
-        print(f"- {i['key']} {i['summary']} ← {', '.join(blockers_of(i))}")
-
     if len(path) > 1:
         print("\n## 임계 경로")
         print("  " + " → ".join(path))
 
-    print("\n## 이상 징후")
-    found = False
+    # 이상 징후는 있을 때만 낸다. "없다" 한 줄도 그래프를 화면 밖으로 밀어낸다.
+    notes = []
     for i in inside:
         # 완료 이슈가 미완료 이슈에 막혀 있는 역전. 링크 방향이 뒤집혔거나 잔재다.
         # (완료 이슈가 무언가를 blocks 하는 것은 정상 이력이므로 짚지 않는다.)
         reversed_ = [b for b in i["blocked_by"] if b in issues and not issues[b]["done"]]
         if i["done"] and reversed_:
-            found = True
-            print(f"- {i['key']}({i['status']}) 은 완료인데 미완료 {', '.join(reversed_)} 에 "
-                  f"blocked by 로 걸려 있다 — 링크 방향이 뒤집혔거나 잔재다")
+            notes.append(f"- {i['key']}({i['status']}) 은 완료인데 미완료 "
+                         f"{', '.join(reversed_)} 에 blocked by 로 걸려 있다 — "
+                         f"링크 방향이 뒤집혔거나 잔재다")
     for i in inside:
         for b in i["blocked_by"]:
             if b not in issues:
-                found = True
-                print(f"- {i['key']} 의 blocker {b} 를 조회하지 못했다 — 권한이나 키를 확인한다")
+                notes.append(f"- {i['key']} 의 blocker {b} 를 조회하지 못했다 — "
+                             f"권한이나 키를 확인한다")
             elif issues[b].get("outside"):
-                found = True
-                print(f"- {i['key']} 은 에픽 밖 {b}({issues[b]['status']}) 에 막혀 있다")
+                notes.append(f"- {i['key']} 은 에픽 밖 {b}({issues[b]['status']}) 에 막혀 있다")
     if not path and open_issues:
-        found = True
-        print("- blocks 링크에 순환이 있다 — 임계 경로를 계산할 수 없다")
-    if not found:
-        print("- 없다")
-
+        notes.append("- blocks 링크에 순환이 있다 — 임계 경로를 계산할 수 없다")
+    if notes:
+        print("\n## 이상 징후")
+        print("\n".join(notes))
 
 if __name__ == "__main__":
     try:
