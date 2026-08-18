@@ -28,18 +28,23 @@ adb shell input keyevent KEYCODE_WAKEUP
 
 ## 1. 저장 위치
 
-| 사용자 표현 | 저장 위치 |
+| 구분 | 위치 |
 |---|---|
-| 경로를 직접 지정 (`~/Downloads/demo.mp4` 등) | **그 경로와 그 파일명을 그대로 쓴다** |
-| "다운로드에 넣어줘" | `~/Downloads/{티켓ID}_{용도}.mp4` |
-| 지정 없음 | 세션 scratchpad |
+| **최종 결과물** — 사용자가 열어볼 스크린샷·영상 | **항상 `~/Downloads/`** |
+| 사용자가 경로를 직접 지정한 경우 | 그 경로와 그 파일명을 그대로 쓴다 |
+| 중간 산출물 — 좌표 확정용 스크린샷, 검증용 추출 프레임 | 세션 scratchpad |
 
-- 스크린샷·추출 프레임 같은 중간 산출물은 **항상 scratchpad**에 둔다. 상대 경로로 만들면 프로젝트 저장소가 오염된다.
-- 사용자가 열어볼 파일은 응답에서 **절대 경로를 별도 라인으로** 출력한다.
+- 최종 결과물을 scratchpad에 두지 않는다. 사용자가 직접 열어봐야 하는 파일이므로 손이 닿는 곳에 있어야 한다.
+- 중간 산출물은 상대 경로로 만들면 프로젝트 저장소가 오염되니 반드시 scratchpad를 명시한다.
+- 파일명은 `{티켓ID}_{용도}.{png,mp4}` 형태로 짓는다(예: `hda22556_test.mp4`).
+- 결과물 경로는 응답에서 **절대 경로를 별도 라인으로** 출력한다.
 
 ## 2. 스크린샷
 
 ```bash
+# 결과물로 남길 스크린샷
+adb shell screencap -p /sdcard/shot.png && adb pull /sdcard/shot.png ~/Downloads/<이름>.png
+# 좌표 확정용(중간 산출물)
 adb shell screencap -p /sdcard/shot.png && adb pull /sdcard/shot.png <scratchpad>/shot.png
 ```
 
@@ -101,7 +106,7 @@ ffmpeg -v error -ss 12 -i <파일> -frames:v 1 <scratchpad>/f12.png -y
 | 목적 | 명령 |
 |---|---|
 | 기기 확인 / 깨우기 | `adb devices -l` / `adb shell input keyevent KEYCODE_WAKEUP` |
-| 스크린샷 | `adb shell screencap -p /sdcard/x.png` → `adb pull` |
+| 스크린샷 | `adb shell screencap -p /sdcard/x.png` → `adb pull` (결과물은 `~/Downloads/`) |
 | 녹화 시작 | `adb shell screenrecord --time-limit N --bit-rate 6000000 /sdcard/x.mp4 &` |
 | 녹화 시작 확인 | `adb shell pidof screenrecord` |
 | 녹화 종료 | `adb shell pkill -INT screenrecord` |
@@ -122,4 +127,5 @@ ffmpeg -v error -ss 12 -i <파일> -frames:v 1 <scratchpad>/f12.png -y
 | 표시 좌표를 그대로 `input tap`에 사용 | 엉뚱한 위치를 누름 | Read가 알려준 배율을 곱한다 |
 | 파일 크기만 보고 성공 판정 | 비어 있거나 잘린 영상을 전달 | `ffprobe` 길이 + 핵심 프레임 확인 |
 | 앱을 이어서 실행한 상태로 녹화 | 앞선 조작 상태가 남아 시나리오가 어긋남 | `am force-stop` 후 재시작 |
+| 결과물 영상·스크린샷을 scratchpad에 남김 | 사용자가 찾아 열기 어렵다 | 결과물은 항상 `~/Downloads/` |
 | 공유 기기에서 `pkill -INT screenrecord` 실행 | 다른 세션의 녹화까지 끊김 | §0에서 기기 점유를 먼저 확인 |
