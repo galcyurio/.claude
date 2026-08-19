@@ -10,7 +10,7 @@ argument-hint: "[PR URL, PR 번호, 파일 경로, 또는 생략(현재 변경�
 
 diff 모드(PR · 현재 변경사항)에서 **이슈가 1건 이상**이면 리뷰 결과를 difit 뷰어에 인라인 코멘트로 프리로드해 띄우고(상세는 difit에서 확인), 터미널에는 인덱스와 판정만 압축 출력한다. **이슈가 0건(깨끗한 리뷰)이거나** difit를 띄울 수 없으면(파일 모드 · 미설치 · 실패) difit를 띄우지 않고 터미널에만 결과를 출력한다.
 
-difit를 띄운 경우, 사용자는 difit에서 직접 리뷰하며 내 코멘트에 답글을 달거나 새 코멘트를 남길 수 있다. **사용자가 리뷰를 끝냈다고 알리면**(명시적 종료 신호) `difit comment get`으로 실행 중 서버에서 코멘트를 회수해 사용자 추가분만 정리 보고하고(6-D), 회수 후 difit 잡을 종료한다. **회수는 읽기 전용**이다(코멘트를 보고만 하고 코드를 수정하지 않는다).
+difit를 띄운 경우, 사용자는 difit에서 직접 리뷰하며 내 코멘트에 답글을 달거나 새 코멘트를 남길 수 있다. **사용자가 리뷰를 끝냈다고 알리면**(명시적 종료 신호) `difit comment get`으로 실행 중 서버에서 코멘트를 회수해 사용자 추가분만 정리 보고하고(6-D), 회수 후 그 difit 서버를 종료한다. **회수는 읽기 전용**이다(코멘트를 보고만 하고 코드를 수정하지 않는다).
 
 ## 입력 형태
 
@@ -264,17 +264,17 @@ Code Reviewer + Architecture 결과를 합치고, 같은 `file:line`은 높은 s
 이 스킬이 계약 위에 얹는 런치 옵션:
 
 - `--no-open`(계약)이라 브라우저가 자동으로 열리지 않으므로, 터미널 게이트(6-B)를 먼저 보여주고 **사용자가 URL을 클릭해 연다.**
-- 포트는 `--port <N>`으로 명시해 URL을 확정하고 다른 세션 difit와의 충돌을 피한다(점유 시 difit가 자동으로 다음 포트로 이동하므로 실제 바인딩 포트를 런치 후 확인한다).
+- 포트는 `--port <N>`으로 희망값을 주어 다른 세션 difit와의 충돌을 피한다. 점유 시 difit가 다음 포트로 이동하므로 **실제 바인딩 포트는 런치 로그 배너에서 확인한다**(계약의 "실행").
 - **`--clean`을 반드시 붙인다** — difit는 코멘트를 브라우저 localStorage(origin=`localhost:<port>`)에 영속하고 로드 시 이전 세션·타 PR 코멘트를 복원하므로, 없으면 잔존 코멘트가 이번 리뷰의 게이트(6-B)와 6-D 회수를 오염시킨다. `--clean`을 붙이면 클라이언트가 로드 시 localStorage를 비워 **회수가 프리로드 + 사용자 추가분만** 담게 된다(상세: 계약의 "코멘트 영속과 세션 격리").
 
 **모드별 diff 소스**:
 
 | 모드 | difit diff 소스 |
 |------|--------------|
-| PR 모드 | `gh pr diff <PR-URL> \| <difit-command>` — PR diff를 **stdin으로 파이프**한다. **`--pr`를 쓰지 않는다**: `--pr`는 diff와 함께 GitHub PR 리뷰 코멘트를 무조건 가져와(difit `getPrCommentImports`, 끄는 플래그 없음) 내 프리로드 코멘트 앞에 prepend하고, 그 코멘트들이 6-D 회수 덤프에 섞여 baseline 대조를 오염시킨다. `gh pr diff`는 `--pr`가 내부적으로 쓰는 것과 같은 명령이므로, stdin 파이프로 같은 diff를 **PR 코멘트 import 없이** 얻는다 |
+| PR 모드 | `gh pr diff <PR-URL> > <스크래치패드>/pr.patch` 로 받아 `<difit-command> … < <스크래치패드>/pr.patch` 로 **stdin 리다이렉트**한다(detach 실행에는 파이프를 물릴 수 없다 — 계약의 "실행"). **`--pr`를 쓰지 않는다**: `--pr`는 diff와 함께 GitHub PR 리뷰 코멘트를 무조건 가져와(difit `getPrCommentImports`, 끄는 플래그 없음) 내 프리로드 코멘트 앞에 prepend하고, 그 코멘트들이 6-D 회수 덤프에 섞여 baseline 대조를 오염시킨다. `gh pr diff`는 `--pr`가 내부적으로 쓰는 것과 같은 명령이므로, stdin으로 같은 diff를 **PR 코멘트 import 없이** 얻는다 |
 | 현재 변경사항 모드 | `<difit-command> HEAD <base> --merge-base` — merge-base(`<base>`, HEAD)부터의 diff(three-dot). `<base>`는 1단계에서 감지한 base 브랜치 |
 
-> **`--merge-base` 필수(현재 변경사항 모드)**: 없이 `difit HEAD <base>`는 **two-dot 직접 비교**(`git diff <base> HEAD`)라, base 브랜치가 fork 이후 앞으로 이동하면 그 사이 base에 병합된 커밋들이 diff에 전부 섞여 나온다. 1단계 에이전트 입력은 `git diff <base>...HEAD`(three-dot)이므로 `--merge-base`를 붙여 difit도 fork point 기준으로 맞춰야 **에이전트가 검토한 diff와 difit 렌더가 일치**한다. base가 빠르게 움직이는 레포(예: PRND develop)에서 특히 중요하다. `--merge-base`는 Git revision 모드 전용이며 **stdin 파이프(PR 모드)에서는 difit가 거부**하므로 PR 모드에는 붙이지 않는다(`gh pr diff`가 이미 PR의 병합 기준 diff를 준다).
+> **`--merge-base` 필수(현재 변경사항 모드)**: 없이 `difit HEAD <base>`는 **two-dot 직접 비교**(`git diff <base> HEAD`)라, base 브랜치가 fork 이후 앞으로 이동하면 그 사이 base에 병합된 커밋들이 diff에 전부 섞여 나온다. 1단계 에이전트 입력은 `git diff <base>...HEAD`(three-dot)이므로 `--merge-base`를 붙여 difit도 fork point 기준으로 맞춰야 **에이전트가 검토한 diff와 difit 렌더가 일치**한다. base가 빠르게 움직이는 레포(예: PRND develop)에서 특히 중요하다. `--merge-base`는 Git revision 모드 전용이며 **stdin 입력(PR 모드)에서는 difit가 거부**하므로 PR 모드에는 붙이지 않는다(`gh pr diff`가 이미 PR의 병합 기준 diff를 준다).
 
 PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌드박스에서는 계약의 네트워크 권한 규칙을 따른다.
 
@@ -296,11 +296,25 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
 
 **런치**:
 
-- 모드별 런치 형태로 **하니스 백그라운드(run_in_background)로 실행**한다 (계약의 "실행" — `--no-open`·`--keep-alive`·`--clean`. `--keep-alive`라 브라우저 닫힘으로 자가 종료하지 않고, 6-D 회수 트리거는 **사용자의 명시적 종료 신호**다):
-  - **현재 변경사항 모드**: `<difit-command> HEAD <base> --merge-base --comment "$(cat <commentsFile>)" --clean --no-open --keep-alive --port <N>`
-  - **PR 모드**: `gh pr diff <PR-URL> | <difit-command> --comment "$(cat <commentsFile>)" --clean --no-open --keep-alive --port <N>` — diff가 stdin으로 들어오므로 target 인자·`--merge-base`를 붙이지 않는다.
+- 모드별 런치 형태를 **포그라운드 Bash 호출 안에서 nohup detach**로 실행한다 (계약의 "실행" — `run_in_background` 금지 · difit `--background` 금지 · `--no-open`·`--keep-alive`·`--clean`). 6-D 회수 트리거는 **사용자의 명시적 종료 신호**다:
+  - **현재 변경사항 모드**:
+
+    ```bash
+    nohup <difit-command> HEAD <base> --merge-base --comment "$(cat <commentsFile>)" \
+      --clean --no-open --keep-alive --port <N> > <스크래치패드>/difit-<N>.log 2>&1 &
+    ```
+
+  - **PR 모드**: PR diff를 파일로 먼저 받고 stdin 리다이렉트로 넣는다. diff가 stdin으로 들어오므로 target 인자·`--merge-base`를 붙이지 않는다.
+
+    ```bash
+    gh pr diff <PR-URL> > <스크래치패드>/pr.patch
+    nohup <difit-command> --comment "$(cat <commentsFile>)" --clean --no-open --keep-alive \
+      --port <N> < <스크래치패드>/pr.patch > <스크래치패드>/difit-<N>.log 2>&1 &
+    ```
+
 - `--comment`는 JSON **배열**을 받으므로 `commentsFile`(thread 배열) 하나로 모든 프리로드 코멘트가 주입된다. 셸이 `"$(cat …)"`로 파일 내용을 넣으므로 JSON을 명령줄에 손으로 적지 않는다.
-- 런치 직후 `curl -s -o /dev/null -w '%{http_code}' http://localhost:<N>/`를 폴링해 `200`을 확인하고(PR 모드는 `gh pr diff` 실행 후 바인딩까지 수 초 걸린다), 바인딩된 포트로 최종 URL을 확정한다. diff fetch·bind 로그만 보고 URL을 성급히 안내하지 않는다.
+- 런치 1~3초 후 `<스크래치패드>/difit-<N>.log`에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 **실제 바인딩 포트로 URL을 확정**하고, `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`로 `200`을 한 번 확인한다. 배너가 없으면 다시 읽고, 배너 없이 URL을 성급히 안내하지 않는다. pid는 `lsof -ti tcp:<port>`로 얻어 기록한다(6-D 종료에 쓴다).
+- 하니스 태스크를 남기지 않으므로 리뷰 결과를 출력하면 **그 턴이 완료 처리된다**. 서버는 detach된 채 사용자가 리뷰를 마칠 때까지 유지되고, 정리는 6-D에서 한다.
 - **프리로드 baseline**: `build-difit-comments.js`가 `baselineFile`에 각 프리로드 `{file, line, body}`를 이미 기록해 뒀다. 6-D 회수(`comment get`)는 프리로드 코멘트도 함께 돌려주므로, 이 파일과 대조해 사용자 추가분(새 코멘트·답글)을 가려낸다(프리로드 0건이면 빈 배열).
 - 6-A 진입 시점에 프리로드할 이슈는 항상 1건 이상이다(0건이면 6단계 게이트에서 6-C로 빠진다). 따라서 difit는 최소 1개 코멘트를 프리로드한 상태로 뜬다.
 - difit 실행이 실패하면 6-C 폴백으로 전환한다.
@@ -340,7 +354,7 @@ difit: http://localhost:4966
 - **이상 없음 · 판정**: 6-C와 동일 규칙을 따른다. 판정은 이슈가 0건이어도 항상 출력한다.
 - **디자인 미검토 경고**: 디자인 변경이 감지됐으나 Figma 링크가 없어 Designer를 스폰하지 못한 경우, 판정 섹션 바로 위에 `⚠️ 디자인 변경이 감지됐으나 Figma 링크가 없어 디자인 정합성은 검토하지 못했습니다` 한 줄을 둔다.
 - 마지막 줄에 `difit: {URL}`을 둔다. (6-B는 이슈 ≥1일 때만 도달하므로 프리로드 코멘트는 항상 1건 이상이다.)
-- **readback 진입 안내**: `difit: {URL}` 다음 줄에 사용자에게 **URL을 열어 리뷰하고, 끝나면 브라우저를 닫고 알려달라**는 안내를 한 줄 둔다. 안내 후 **턴을 종료한다**. 사용자가 리뷰 완료를 알리면 그때 회수한다(6-D). `--keep-alive`라 브라우저를 닫아도 서버는 유지되므로, 브라우저 닫힘을 폴링하거나 잡 완료를 기다리지 않는다.
+- **readback 진입 안내**: `difit: {URL}` 다음 줄에 사용자에게 **URL을 열어 리뷰하고, 끝나면 브라우저를 닫고 알려달라**는 안내를 한 줄 둔다. 안내 후 **턴을 종료한다**. 사용자가 리뷰 완료를 알리면 그때 회수한다(6-D). `--keep-alive`라 브라우저를 닫아도 서버는 유지되므로, 브라우저 닫힘을 폴링하지 않는다(detach 실행이라 기다릴 하니스 잡도 없다).
 
 #### 6-C. 터미널 출력 — difit 미런치 시 (전체 상세)
 
@@ -440,20 +454,20 @@ Critical Logic 이슈(`src/foo.ts:42` 세션 null 미체크)가 머지 시 사�
 
 #### 6-D. difit 답변 readback (difit 런치 성공 시 항상)
 
-6-A에서 difit를 띄운 모든 경우(PR · 현재 변경사항 모드)에 **항상** 적용한다. 6-C 폴백(difit 미런치)은 회수할 잡이 없으므로 적용하지 않는다.
+6-A에서 difit를 띄운 모든 경우(PR · 현재 변경사항 모드)에 **항상** 적용한다. 6-C 폴백(difit 미런치)은 회수할 서버가 없으므로 적용하지 않는다.
 
-difit 수명·회수는 계약을 따른다: readback 트리거는 **사용자의 명시적 종료 신호**(리뷰 완료 알림)이고, 신호를 받으면 `difit comment get`으로 실행 중 서버에서 코멘트를 회수한 뒤 difit 잡을 종료한다. 아래는 이 스킬 고유의 **프리로드 대조**를 더한 절차다.
+difit 수명·회수는 계약을 따른다: readback 트리거는 **사용자의 명시적 종료 신호**(리뷰 완료 알림)이고, 신호를 받으면 `difit comment get`으로 실행 중 서버에서 코멘트를 회수한 뒤 그 difit 서버를 종료한다. 아래는 이 스킬 고유의 **프리로드 대조**를 더한 절차다.
 
 **절차**:
 
-1. **종료 신호 대기** — 6-B에서 "URL을 열어 리뷰하고, 끝나면 브라우저를 닫고 알려달라"고 안내한 뒤 **턴을 종료한다**. 사용자가 리뷰 완료를 알릴 때까지 기다린다. `--keep-alive`라 브라우저 닫힘으로 서버가 죽지 않으므로, 잡 완료를 기다리거나 먼저 kill하지 않는다.
+1. **종료 신호 대기** — 6-B에서 "URL을 열어 리뷰하고, 끝나면 브라우저를 닫고 알려달라"고 안내한 뒤 **턴을 종료한다**. 사용자가 리뷰 완료를 알릴 때까지 기다린다. `--keep-alive`라 브라우저 닫힘으로 서버가 죽지 않으므로, 먼저 kill하지 않는다(detach 실행이라 기다릴 하니스 잡도 없다).
 2. **회수 + 파싱** — 신호를 받으면 `difit comment get --port <N> --format text`로 실행 중 서버에서 코멘트를 회수하고, 출력의 `📝 Comments from review session:` 블록을 계약의 "회수" 포맷대로 파싱한다(thread별 `file:Lline` + 첫 메시지 + `Reply N` 답글, 끝에 `Total comments: N`). 블록이 없거나 `Total comments: 0`이면 남긴 코멘트 없음으로 본다.
 3. **사용자 추가분 식별 (content 대조 — id 없음)** — 6-A의 `baselineFile`(`build-difit-comments.js`가 쓴 `[{file,line,body}]`)을 Read해 프리로드 본문과 대조한다. `comment get`은 프리로드 코멘트도 함께 돌려주므로 대조가 필요하다:
    - **답글(`Reply N (author)`)**: 프리로드는 답글을 달지 않으므로 **모든 답글은 사용자 추가분**이다.
    - **새 코멘트**: 첫 메시지 본문이 baseline의 어떤 프리로드 본문과도 매칭되지 않는 thread → **사용자가 새로 남긴 코멘트**.
    - 첫 메시지 본문이 프리로드 본문과 매칭되고 답글도 없는 thread → 내가 넣은 것 그대로이므로 **보고에서 제외**한다.
 4. **보고** — 사용자 추가분을 `file:line`별로 정리해 출력한다(아래 형식). **읽기 전용**: 코멘트 내용을 보고만 하고 코드를 수정하지 않는다. 후속 반영이 필요하면 사용자가 별도로 지시한다(예: `apply-pr-feedback`).
-5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 **우리가 이번에 띄운 그 difit 잡만** 종료한다. 무관한 difit 서버까지 광범위하게 죽이지 않는다.
+5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 **우리가 쓴 그 포트에 한정해** `kill $(lsof -ti tcp:<port>)`로 종료한다. detach된 프로세스는 하니스가 정리해 주지 않으므로 이 단계를 건너뛰면 서버가 남고, `pkill difit`처럼 포트를 특정하지 않는 명령은 쓰지 않는다.
 
 **회수 보고 형식**:
 
@@ -463,12 +477,12 @@ difit 수명·회수는 계약을 따른다: readback 트리거는 **사용자�
 - `a.txt:2` (답글) — "확인함, 의도된 변경 맞음"
 - `b.kt:40` (신규 코멘트) — "여기 네이밍 BarViewModel로 바꿔주세요"
 
-difit 잡은 회수 후 종료됨.
+difit 서버는 회수 후 종료됨.
 ````
 
-- 사용자 추가분이 0건이면 `## 💬 difit 답변 회수` 아래 `남긴 답변 없음` 한 줄만 출력한다(회수 후 difit 잡은 종료).
+- 사용자 추가분이 0건이면 `## 💬 difit 답변 회수` 아래 `남긴 답변 없음` 한 줄만 출력한다(회수 후 difit 서버는 종료).
 - `(답글)`/`(신규 코멘트)` 구분은 3단계 식별 결과를 따른다. 내 원본 코멘트 맥락이 필요하면 같은 thread의 프리로드 본문(첫 메시지)을 함께 인용한다.
-- 회수 트리거는 사용자의 명시적 종료 신호다. `comment get`은 실행 중 서버에서 조회하므로, 신호를 받은 뒤 회수하고 곧바로 우리가 띄운 잡을 종료한다.
+- 회수 트리거는 사용자의 명시적 종료 신호다. `comment get`은 실행 중 서버에서 조회하므로, 신호를 받은 뒤 회수하고 곧바로 우리가 띄운 서버를 종료한다.
 
 ---
 
@@ -483,4 +497,4 @@ difit 잡은 회수 후 종료됨.
 - **서브에이전트로 리뷰 결과를 재검증하지 않는다**: finder가 보고한 finding을 다시 판별시키려고 별도 검증 에이전트를 스폰하지 않는다. 신뢰도 판단은 오케스트레이터가 4단계에서 직접 내리고, 확신이 서지 않는 finding은 severity를 낮춰 보고한다.
 - **판정은 오케스트레이터의 책임**: OKAY/REJECT 결정은 에이전트가 아닌 오케스트레이터가 직접 내린다. 에이전트 프롬프트에는 판정을 요청하지 않으며, finder는 이슈 보고까지만 담당한다. 판정 규칙은 5단계를 따른다.
 - **difit 출력**: diff 모드(PR · 현재 변경사항)에서 **이슈가 1건 이상일 때만** finding을 difit 인라인 코멘트로 프리로드한다(6단계). **이슈 0건(깨끗한 리뷰)이면 difit를 띄우지 않고 터미널 출력(6-C)만 한다.** difit는 로컬 뷰어이며 **PR 모드라도 원격 GitHub에 코멘트를 달지 않는다**. 시크릿·토큰·키·PII는 difit 코멘트 본문·명령줄 인자에 복사하지 않는다.
-- **difit 수명·회수·종료**: `~/.claude/skills/review-by-self/difit-contract.md` 계약을 따른다(`--no-open`·`--keep-alive` → 브라우저 닫혀도 서버 유지, **사용자 종료 신호** = 6-D 트리거, `comment get`으로 회수 후 우리가 띄운 잡만 종료).
+- **difit 수명·회수·종료**: `~/.claude/skills/review-by-self/difit-contract.md` 계약을 따른다(nohup detach 실행 → 하니스 태스크를 남기지 않아 리뷰 출력과 함께 턴이 완료 처리된다, `--no-open`·`--keep-alive` → 브라우저 닫혀도 서버 유지, **사용자 종료 신호** = 6-D 트리거, `comment get`으로 회수 후 그 포트의 서버만 종료).
