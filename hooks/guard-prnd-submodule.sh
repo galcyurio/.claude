@@ -7,6 +7,14 @@
 set -uo pipefail
 
 input=$(cat)
+
+# 빠른 탈출: 아래 차단 규칙은 모두 명령에 서브모듈 관련 키워드가 있어야 성립한다.
+# 없으면 jq 를 띄우지 않고 즉시 통과한다 — 이 훅은 모든 Bash 호출마다 실행되므로
+# jq 기동 비용(약 30ms)이 그대로 누적된다.
+case "$input" in
+  *submodule*|*prnd-library*) ;;
+  *) exit 0 ;;
+esac
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null || printf '')
 
 [ -z "$cmd" ] && exit 0
