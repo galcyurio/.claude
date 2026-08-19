@@ -1,7 +1,3 @@
-# 커밋 규칙
-
-커밋을 만들기 전에 **반드시 `~/.claude/references/commit-rules.md`를 Read한다.** 메시지 형식·태그·종결어와 커밋 단위 분리 원칙이 거기 있다. 읽지 않은 채 커밋 메시지를 작성하지 않는다.
-
 # 브랜치 생성 규칙
 
 - 브랜치는 base 브랜치(develop 등)로 **먼저 이동한 뒤** `git checkout -b feature/X`만 사용한다.
