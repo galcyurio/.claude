@@ -7,7 +7,7 @@ paths:
 
 # Kotlin 테스트 코드 작성
 
-> 이 규칙은 테스트 파일을 열 때만 로드된다. 테스트 커밋 단위·커밋 메시지 규칙은 `~/.claude/rules/coding_standard.md`, Compose 화면 패턴은 `~/.claude/rules/kotlin-compose.md`를 따른다.
+> 이 규칙은 테스트 파일을 열 때만 로드된다. 테스트 커밋 단위·커밋 메시지 규칙은 `~/.claude/rules/git.md`, Compose 화면 패턴은 `~/.claude/rules/kotlin-compose.md`를 따른다.
 
 ## 테스트 코드 스타일
 

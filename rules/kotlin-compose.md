@@ -5,7 +5,7 @@ paths:
 
 # Android Compose 코드 패턴
 
-> 이 규칙은 Kotlin 파일(`**/*.kt`)을 열 때만 로드된다. 커밋 단위·커밋 메시지 규칙은 `~/.claude/rules/coding_standard.md`, 테스트 코드 스타일은 `~/.claude/rules/kotlin-test.md`를 따른다.
+> 이 규칙은 Kotlin 파일(`**/*.kt`)을 열 때만 로드된다. 커밋 단위·커밋 메시지 규칙은 `~/.claude/rules/git.md`, 테스트 코드 스타일은 `~/.claude/rules/kotlin-test.md`를 따른다.
 
 > Android 프로젝트(heydealer, for-dealer, inspector, revolt)에서 공통으로 적용되는 패턴이다. 레이어 구조, ViewModel, Repository, Model 매핑 등 상세 규칙은 `~/.android-ai-prompts/rules/`에 별도 정리되어 있으며 이 섹션은 그 외 화면 골격/네이밍 패턴을 보완한다.
 
