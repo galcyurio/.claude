@@ -9,7 +9,7 @@ description: "오케스트레이션 규칙·에이전트 정의·스킬 정의�
 
 ## 기본 정보
 
-- **Rules 전체**: `~/.claude/rules/*.md` (orchestration, intent-gate, plan, git-commit-message, external-links 등)
+- **Rules 전체**: `~/.claude/rules/*.md` (orchestration, intent-gate, git, references 등)
 - **에이전트 정의**: `~/.claude/agents/*.md`
 - **스킬 정의**: `~/.claude/skills/*/SKILL.md`
 - **팀 설정**: `~/.claude/teams/*/config.json`

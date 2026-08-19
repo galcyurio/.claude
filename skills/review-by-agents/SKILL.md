@@ -63,7 +63,7 @@ JSON을 파싱해 분기한다:
 
 `gh pr view --json body`로 PR 본문을 가져온다.
 
-본문에서 외부 링크를 추출하고, `~/.claude/rules/external-links.md` 규칙에 따라 각 링크에서 관련 정보를 수집한다.
+본문에서 외부 링크를 추출하고, `~/.claude/references/external-links.md` 규칙에 따라 각 링크에서 관련 정보를 수집한다.
 
 수집된 정보를 요약하여 에이전트 프롬프트의 CONTEXT에 전달한다.
 

@@ -19,7 +19,7 @@ description: 피처(Jira 에픽) 작업을 착수할 때 Jira·Slack·Notion·Fi
 
 ### 2. 멀티소스 파악 (병렬 fetch)
 - 에픽 fetch: `getJiraIssue` (description·comment·subtasks·parent), `getJiraIssueRemoteIssueLinks` (웹 링크).
-- description·comment·remote link에서 URL 추출 → `~/.claude/rules/external-links.md` 규칙으로 도메인 분류.
+- description·comment·remote link에서 URL 추출 → `~/.claude/references/external-links.md` 규칙으로 도메인 분류.
 - Slack/Notion/Figma 병렬 fetch:
   - **Slack**: 채널·스레드에서 **결정사항·미결 질문**을 본다 (단순 채팅 아님).
   - **Notion**: 기획서 — 목적·해결방향·필요 데이터·시안.

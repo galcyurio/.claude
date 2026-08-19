@@ -203,7 +203,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 | 도메인 패턴 | 분류 | 처리 |
 |---|---|---|
 | `*.notion.so`, `*.notion.site` | **Notion** (기획서·회의록) 또는 **API 문서** | `notion-fetch`로 last_edited_time 비교 + 본문 요약. **제목/내용이 API 명세 성격**(제목에 `API`·`명세`·`스펙`·`endpoint`, 또는 엔드포인트·요청/응답 표 포함)이면 아래 **API 문서**로 재분류 |
-| `docs.prnd.co.kr/view/...`, 기타 사내 API 문서 호스트 | **API 문서** (1급) | SPA라 view URL을 그대로 fetch하면 빈 응답 → `~/.claude/rules/api-docs.md`로 view→API URL 변환 후 `WebFetch`. 엔드포인트·필드·enum 인용 |
+| `docs.prnd.co.kr/view/...`, 기타 사내 API 문서 호스트 | **API 문서** (1급) | SPA라 view URL을 그대로 fetch하면 빈 응답 → `~/.claude/references/external-links.md`로 view→API URL 변환 후 `WebFetch`. 엔드포인트·필드·enum 인용 |
 | `*.slack.com/archives/...` | **Slack** | `slack_read_thread`로 스레드 읽기 |
 | `figma.com/design/...`, `figma.com/board/...` | **Figma** | `get_design_context` 우선 → 실패 시 `get_screenshot` 폴백. **페이지 단위 노드면 추가로 `get_metadata` 호출 → 임시 파일에서 직계 자식 frame 목록 추출** (jq + grep, token-cheap) |
 | `github.com/PRNDcompany/...` | **GitHub** (PR/issue) | URL로 직접 fetch 또는 search 결과와 dedup |
@@ -216,7 +216,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 ### 2.3 6 소스 병렬 dispatch — **반드시 한 번의 응답 메시지에 모든 tool_use 호출을 함께 보낸다**
 
 - **Jira 활동 (이미 fetch된 응답 재사용)**: `comment.comments`에서 `created >= since` 필터. subtask 상태는 응답에 포함됨
-- **Slack**: 분류된 Slack URL 각각을 `~/.claude/rules/external-links.md` 규칙으로 `channelId`+`threadTs` 추출 → `slack_read_thread` (스레드 ts 있을 때) 또는 `slack_read_channel` (채널 전체) 병렬 호출. **`response_format="detailed"` 필수** — 각 메시지의 `ts` 필드를 보존해야 본문에 영구 링크(`https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` — `ts`에서 `.` 제거)를 부착할 수 있다. `ts >= since`만 채택.
+- **Slack**: 분류된 Slack URL 각각을 `~/.claude/references/external-links.md` 규칙으로 `channelId`+`threadTs` 추출 → `slack_read_thread` (스레드 ts 있을 때) 또는 `slack_read_channel` (채널 전체) 병렬 호출. **`response_format="detailed"` 필수** — 각 메시지의 `ts` 필드를 보존해야 본문에 영구 링크(`https://prnd.slack.com/archives/{channel_id}/p{ts_without_dot}` — `ts`에서 `.` 제거)를 부착할 수 있다. `ts >= since`만 채택.
 
   > **`oldest` 파라미터는 반드시 Python으로 계산한 Unix timestamp를 넣는다.** LLM이 직접 ISO → Unix 변환 시 약 23시간 오차가 재현된 바 있어 LLM 직접 계산 금지. `slack_read_channel` 호출 직전에 아래 명령으로 계산하고, 그 값을 `oldest`에 그대로 넘긴다:
   >
@@ -233,7 +233,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
   >
   > **⛔ top-level만 보지 말고 thread 내부까지 전개한다.** `slack_read_channel`은 top-level 메시지만 반환한다 — thread reply 안의 본인 발화는 보이지 않는다. reply ≥1인 스레드 중 **(a) parent author가 본인, (b) parent에 본인 멘션, (c) 최신 reply ts ≥ since** 중 하나라도 해당하면 `slack_read_thread`로 전개해 내부 reply까지 검사한다. 특히 **본인 발화(author=self)가 스레드 마지막이고 멘션을 포함하는데 이후 reply 0 + reaction에 타인 없음 → 미응답 TODO 후보**(STEP 2.5). top-level만 보면 이 케이스를 통째로 놓친다 (실제 누락 사례 있었음).
 - **Notion 기획서/회의록**: 분류된 Notion URL(기획 성격) 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
-- **API 문서 (1급 참고 문서)**: Notion API 문서는 `notion-fetch`, 외부 API 문서(`docs.prnd.co.kr` 등)는 `~/.claude/rules/api-docs.md`로 view→API URL 변환 후 `WebFetch` 병렬 호출. **API 문서는 이 피처의 핵심 계약**이므로 `since` 무관 **항상 수집·인용**한다(변경 없어도 Reference에 전문 유지). `last_edited`/내용 변경이 감지되면 엔드포인트·필드·enum 변경을 추출해 **⚠️(B-1 확정 결정)로 격상**하고 `## 변경 이력`에 prepend. Reference `API 명세` toggle에 전문 인용. 인식된 API 문서 URL이 0개여도 데이터 소스 상태에 `⚪ API 문서 (링크 없음)`로 명시.
+- **API 문서 (1급 참고 문서)**: Notion API 문서는 `notion-fetch`, 외부 API 문서(`docs.prnd.co.kr` 등)는 `~/.claude/references/external-links.md`로 view→API URL 변환 후 `WebFetch` 병렬 호출. **API 문서는 이 피처의 핵심 계약**이므로 `since` 무관 **항상 수집·인용**한다(변경 없어도 Reference에 전문 유지). `last_edited`/내용 변경이 감지되면 엔드포인트·필드·enum 변경을 추출해 **⚠️(B-1 확정 결정)로 격상**하고 `## 변경 이력`에 prepend. Reference `API 명세` toggle에 전문 인용. 인식된 API 문서 URL이 0개여도 데이터 소스 상태에 `⚪ API 문서 (링크 없음)`로 명시.
 - **GitHub PR**: 에픽 키 + 하위 이슈 키를 **2-pass로 검색**하고 dedup.
   1. **에픽 키 검색**: `gh search prs "{key} in:title" --owner PRNDcompany --json title,number,url,state,updatedAt,author,createdAt,repository --limit 30` — 트래킹 대상 키가 여러 개면 `"{k1} OR {k2} OR ... in:title"` 단일 호출로 합친다
   2. **하위 이슈 키 검색**: Jira Epic 응답의 `subtasks[].key` 목록을 추출 → 0건이면 skip. 1~20건이면 `gh search prs "{k1} OR {k2} OR ... in:title" --owner PRNDcompany --json ... --limit 50` 단일 호출. 21건 이상이면 10개씩 분할해 병렬 호출 후 합치기.
@@ -706,7 +706,7 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 
 ## URL 파싱 규칙
 
-`~/.claude/rules/external-links.md`를 그대로 따른다.
+`~/.claude/references/external-links.md`를 그대로 따른다.
 
 - **Slack 스레드 URL**: `https://prnd.slack.com/archives/{channelId}/p{timestamp}` → `channelId`, `threadTs` (timestamp의 10번째 자리에 `.` 삽입)
 - **Notion 페이지 URL**: 마지막 세그먼트에서 `-` 기준 마지막 32자리 hex가 page ID

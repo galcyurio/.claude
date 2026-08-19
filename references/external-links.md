@@ -12,6 +12,7 @@
 | `figma.com` | Figma |
 | `*.atlassian.net`, `*.jira.com` | Jira |
 | `*.slack.com` | Slack |
+| `docs.prnd.co.kr` | 사내 API 문서 |
 
 ## 링크 유형별 수집 방법
 
@@ -21,6 +22,7 @@
 | Figma | `figma.com` | `mcp__claude_ai_Figma__get_design_context`, `mcp__claude_ai_Figma__get_screenshot` | 디자인 컨텍스트, 스크린샷 |
 | Jira | `*.atlassian.net`, `*.jira.com` | `mcp__claude_ai_Atlassian__getJiraIssue` | 이슈 제목, 설명, AC |
 | Slack | `*.slack.com` | `mcp__claude_ai_Slack__slack_read_thread`, `mcp__claude_ai_Slack__slack_read_channel` | 메시지/스레드 내용 |
+| 사내 API 문서 | `docs.prnd.co.kr` | `WebFetch` (view→API URL 변환 후) | 엔드포인트·필드·enum |
 
 ## URL 파싱 규칙
 
@@ -74,3 +76,21 @@ https://{workspace}.slack.com/archives/{channelId}
 - 링크는 **병렬로 수집**한다. 유형이 다르거나 독립적인 링크는 동시에 MCP 도구를 호출한다.
 - MCP 도구 호출 실패 시 해당 링크를 **skip**하고 경고를 출력한다. 나머지 링크 수집과 워크플로우는 계속 진행한다.
 - 같은 URL이 중복 등장하면 한 번만 수집한다.
+
+## 사내 API 문서 — SPA view URL 변환
+
+내부 문서 중 일부는 SPA라 view URL을 그대로 WebFetch하면 빈 응답이 온다. 아래 도메인의 view URL을 보면 — 사용자 메시지든 Jira·Slack 본문에 섞여 있든 — 자동으로 API URL로 바꿔서 가져온다.
+
+### docs.prnd.co.kr
+
+```
+View:  https://docs.prnd.co.kr/view/{PATH}?branch={BRANCH}
+API:   https://docs.prnd.co.kr/api/files/content?branch={BRANCH}&path={urlencode(PATH)}
+```
+
+- `{PATH}`는 `path=` 쿼리로 옮기고 `/`를 `%2F`로 인코딩
+- `{BRANCH}`는 양쪽 동일
+
+예시:
+- View: `https://docs.prnd.co.kr/view/docs/feature/HDS-18029/market_api.md?branch=feature%2FHDS-18029`
+- API:  `https://docs.prnd.co.kr/api/files/content?branch=feature%2FHDS-18029&path=docs%2Ffeature%2FHDS-18029%2Fmarket_api.md`
