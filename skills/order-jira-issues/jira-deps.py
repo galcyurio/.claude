@@ -196,9 +196,16 @@ def render_graph(issues, keys, crit):
 
     print("## 그래프")
     for lv in sorted(waves):
-        n = len([k for k in waves[lv] if k in inside])  # 에픽 밖 노드는 세지 않는다
-        head = (f"Wave 1 ─ 지금 착수 가능 (병렬 {n})" if lv == 1
-                else f"Wave {lv} ─ Wave {lv - 1} 이후 ({n}건)")
+        mine = [k for k in waves[lv] if k in inside]  # 에픽 밖 노드는 세지 않는다
+        n = len(mine)
+        if lv == 1:
+            # Wave 1 은 "미완료 blocker 가 없다"는 뜻일 뿐이다. 이미 누가 잡고 있는
+            # 이슈까지 "착수 가능"으로 세면 병렬 여력이 실제보다 커 보인다.
+            active = len([k for k in mine if issues[k]["active"]])
+            head = f"Wave 1 ─ 막힌 것 없음 (착수 가능 {n - active}"
+            head += f" · 진행 중 {active})" if active else ")"
+        else:
+            head = f"Wave {lv} ─ Wave {lv - 1} 이후 ({n}건)"
         print(f"\n{head}")
         for k in waves[lv]:
             print(block(k))
