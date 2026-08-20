@@ -11,7 +11,7 @@
 ## 실행 — nohup detach (포그라운드 호출)
 
 - `nohup <difit-command> <인자…> > <스크래치패드>/difit-<N>.log 2>&1 &` 형태로 **평범한 포그라운드 Bash 호출 안에서 detach**한다. **하니스 백그라운드(`run_in_background`)를 쓰지 않는다.**
-- 이유: `run_in_background` + `--keep-alive`는 **끝나지 않는 하니스 태스크**를 남긴다. 그 잡이 exit하는 순간은 회수 후 우리가 kill할 때뿐이라, 리뷰가 준비된 뒤에도 `/tasks`·Tasks 패인에 계속 `running`으로 남아 **사용자가 리뷰 준비 완료를 인지할 수 없다**. `nohup … &`는 호출 셸이 끝나면 `PPID=1`로 재부모화돼 살아남으므로(실측: 호출 종료 후에도 HTTP 200 · `comment get` 정상), 추적 태스크 없이 서버가 턴을 넘어 유지된다.
+- 이유: `run_in_background` + `--keep-alive`는 **끝나지 않는 하니스 태스크**를 남긴다. 그 잡이 exit하는 순간은 회수 후 우리가 kill할 때뿐이라, 리뷰가 준비된 뒤에도 `/tasks`·Tasks 패인에 계속 `running`으로 남아 **사용자가 리뷰 준비 완료를 인지할 수 없다**. `nohup … &`는 호출 셸이 끝나면 `PPID=1`로 재부모화돼 살아남으므로(실측: 호출 종료 후는 물론 **턴 경계를 넘긴 다음 턴에도** HTTP 200 · `comment get` 정상), 추적 태스크 없이 서버가 턴을 넘어 유지된다. `PGID`는 호출 셸 그룹에 남지만 그것 때문에 죽지는 않는다.
 - **difit 자체 `--background` 플래그는 쓰지 않는다.** 실측으로 확인된 두 가지 결함이 있다:
   - `--background`는 자식을 `stdio: ['ignore', …]`로 spawn하고 **부모가 stdin을 읽기 전에** 넘긴다 → **stdin diff가 조용히 무시되고 `HEAD^..HEAD`로 대체된다.** 6파일 stdin diff를 파이프했는데 데몬은 2파일 리비전 diff(`b25d03b...1159a8e`)를 렌더했다. PR 모드가 **엉뚱한 diff를 리뷰하게 되므로 치명적**이다.
   - `--port`가 점유되면 stdout에 `Port <N> is busy, trying <N+1>...` 한 줄만 나오고 **JSON이 나오지 않아** URL·pid를 확정할 수 없다.
