@@ -264,14 +264,14 @@ Code Reviewer + Architecture 결과를 합치고, 같은 `file:line`은 높은 s
 이 스킬이 계약 위에 얹는 런치 옵션:
 
 - `--no-open`(계약)이라 브라우저가 자동으로 열리지 않으므로, 터미널 게이트(6-B)를 먼저 보여주고 **사용자가 URL을 클릭해 연다.**
-- 포트는 `--port <N>`으로 희망값을 주어 다른 세션 difit와의 충돌을 피한다. 점유 시 difit가 다음 포트로 이동하므로 **실제 바인딩 포트는 런치 로그 배너에서 확인한다**(계약의 "실행").
+- 포트는 `--port <N>`으로 희망값을 주어 다른 세션 difit와의 충돌을 피한다. 점유 시 difit가 다음 포트로 이동하므로 **실제 바인딩 포트는 런처 JSON의 `port`로 확정한다**(계약의 "실행").
 - **`--clean`을 반드시 붙인다** — difit는 코멘트를 브라우저 localStorage(origin=`localhost:<port>`)에 영속하고 로드 시 이전 세션·타 PR 코멘트를 복원하므로, 없으면 잔존 코멘트가 이번 리뷰의 게이트(6-B)와 6-D 회수를 오염시킨다. `--clean`을 붙이면 클라이언트가 로드 시 localStorage를 비워 **회수가 프리로드 + 사용자 추가분만** 담게 된다(상세: 계약의 "코멘트 영속과 세션 격리").
 
 **모드별 diff 소스**:
 
 | 모드 | difit diff 소스 |
 |------|--------------|
-| PR 모드 | `gh pr diff <PR-URL> > <스크래치패드>/pr.patch` 로 받아 `<difit-command> … < <스크래치패드>/pr.patch` 로 **stdin 리다이렉트**한다(detach 실행에는 파이프를 물릴 수 없다 — 계약의 "실행"). **`--pr`를 쓰지 않는다**: `--pr`는 diff와 함께 GitHub PR 리뷰 코멘트를 무조건 가져와(difit `getPrCommentImports`, 끄는 플래그 없음) 내 프리로드 코멘트 앞에 prepend하고, 그 코멘트들이 6-D 회수 덤프에 섞여 baseline 대조를 오염시킨다. `gh pr diff`는 `--pr`가 내부적으로 쓰는 것과 같은 명령이므로, stdin으로 같은 diff를 **PR 코멘트 import 없이** 얻는다 |
+| PR 모드 | `gh pr diff <PR-URL> > <스크래치패드>/pr.patch` 로 받아 런처의 `--stdin <스크래치패드>/pr.patch` 로 넘긴다(detach 실행에는 파이프를 물릴 수 없다 — 계약의 "실행"). **`--pr`를 쓰지 않는다**: `--pr`는 diff와 함께 GitHub PR 리뷰 코멘트를 무조건 가져와(difit `getPrCommentImports`, 끄는 플래그 없음) 내 프리로드 코멘트 앞에 prepend하고, 그 코멘트들이 6-D 회수 덤프에 섞여 baseline 대조를 오염시킨다. `gh pr diff`는 `--pr`가 내부적으로 쓰는 것과 같은 명령이므로, stdin으로 같은 diff를 **PR 코멘트 import 없이** 얻는다 |
 | 현재 변경사항 모드 | `<difit-command> HEAD <base> --merge-base` — merge-base(`<base>`, HEAD)부터의 diff(three-dot). `<base>`는 1단계에서 감지한 base 브랜치 |
 
 > **`--merge-base` 필수(현재 변경사항 모드)**: 없이 `difit HEAD <base>`는 **two-dot 직접 비교**(`git diff <base> HEAD`)라, base 브랜치가 fork 이후 앞으로 이동하면 그 사이 base에 병합된 커밋들이 diff에 전부 섞여 나온다. 1단계 에이전트 입력은 `git diff <base>...HEAD`(three-dot)이므로 `--merge-base`를 붙여 difit도 fork point 기준으로 맞춰야 **에이전트가 검토한 diff와 difit 렌더가 일치**한다. base가 빠르게 움직이는 레포(예: PRND develop)에서 특히 중요하다. `--merge-base`는 Git revision 모드 전용이며 **stdin 입력(PR 모드)에서는 difit가 거부**하므로 PR 모드에는 붙이지 않는다(`gh pr diff`가 이미 PR의 병합 기준 diff를 준다).
@@ -296,25 +296,27 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
 
 **런치**:
 
-- 모드별 런치 형태를 **포그라운드 Bash 호출 안에서 nohup detach**로 실행한다 (계약의 "실행" — `run_in_background` 금지 · difit `--background` 금지 · `--no-open`·`--keep-alive`·`--clean`). 6-D 회수 트리거는 **사용자의 명시적 종료 신호**다:
+- 모드별 런치 형태를 **`launch-difit.py` 런처**로 실행한다 (계약의 "실행" — `run_in_background` 금지 · `nohup` 금지 · difit `--background` 금지 · `--no-open`·`--keep-alive`·`--clean`). 6-D 회수 트리거는 **사용자의 명시적 종료 신호**다:
   - **현재 변경사항 모드**:
 
     ```bash
-    nohup <difit-command> HEAD <base> --merge-base --comment "$(cat <commentsFile>)" \
-      --clean --no-open --keep-alive --port <N> > <스크래치패드>/difit-<N>.log 2>&1 &
+    python3 ~/.claude/skills/review-by-self/launch-difit.py --log <스크래치패드>/difit.log -- \
+      <difit-command> HEAD <base> --merge-base --comment "$(cat <commentsFile>)" \
+      --clean --no-open --keep-alive --port <N>
     ```
 
-  - **PR 모드**: PR diff를 파일로 먼저 받고 stdin 리다이렉트로 넣는다. diff가 stdin으로 들어오므로 target 인자·`--merge-base`를 붙이지 않는다.
+  - **PR 모드**: PR diff를 파일로 먼저 받아 `--stdin`으로 넘긴다. diff가 stdin으로 들어오므로 target 인자·`--merge-base`를 붙이지 않는다.
 
     ```bash
     gh pr diff <PR-URL> > <스크래치패드>/pr.patch
-    nohup <difit-command> --comment "$(cat <commentsFile>)" --clean --no-open --keep-alive \
-      --port <N> < <스크래치패드>/pr.patch > <스크래치패드>/difit-<N>.log 2>&1 &
+    python3 ~/.claude/skills/review-by-self/launch-difit.py \
+      --log <스크래치패드>/difit.log --stdin <스크래치패드>/pr.patch -- \
+      <difit-command> --comment "$(cat <commentsFile>)" --clean --no-open --keep-alive --port <N>
     ```
 
 - `--comment`는 JSON **배열**을 받으므로 `commentsFile`(thread 배열) 하나로 모든 프리로드 코멘트가 주입된다. 셸이 `"$(cat …)"`로 파일 내용을 넣으므로 JSON을 명령줄에 손으로 적지 않는다.
-- 런치 1~3초 후 `<스크래치패드>/difit-<N>.log`에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 **실제 바인딩 포트로 URL을 확정**하고, `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`로 `200`을 한 번 확인한다. 배너가 없으면 다시 읽고, 배너 없이 URL을 성급히 안내하지 않는다. pid는 `lsof -ti tcp:<port>`로 얻어 기록한다(6-D 종료에 쓴다).
-- 하니스 태스크를 남기지 않으므로 리뷰 결과를 출력하면 **그 턴이 완료 처리된다**. 서버는 detach된 채 사용자가 리뷰를 마칠 때까지 유지되고, 정리는 6-D에서 한다.
+- 런처가 출력하는 JSON 한 줄 `{"port": N, "url": …, "pid": P}`로 **URL과 pid를 확정**한다. 배너 대기·HTTP 200 확인은 런처가 이미 끝냈으므로 따로 폴링하지 않는다. `pid`는 6-D 종료에 쓴다. 런처가 exit 1이면 기동 실패이므로 6-C 폴백으로 간다.
+- 하니스 태스크를 남기지 않으므로 리뷰 결과를 출력하면 **그 턴이 완료 처리된다**. 서버는 새 세션으로 detach된 채 사용자가 리뷰를 마칠 때까지 유지되고, 정리는 6-D에서 한다.
 - **프리로드 baseline**: `build-difit-comments.js`가 `baselineFile`에 각 프리로드 `{file, line, body}`를 이미 기록해 뒀다. 6-D 회수(`comment get`)는 프리로드 코멘트도 함께 돌려주므로, 이 파일과 대조해 사용자 추가분(새 코멘트·답글)을 가려낸다(프리로드 0건이면 빈 배열).
 - 6-A 진입 시점에 프리로드할 이슈는 항상 1건 이상이다(0건이면 6단계 게이트에서 6-C로 빠진다). 따라서 difit는 최소 1개 코멘트를 프리로드한 상태로 뜬다.
 - difit 실행이 실패하면 6-C 폴백으로 전환한다.
@@ -467,7 +469,7 @@ difit 수명·회수는 계약을 따른다: readback 트리거는 **사용자�
    - **새 코멘트**: 첫 메시지 본문이 baseline의 어떤 프리로드 본문과도 매칭되지 않는 thread → **사용자가 새로 남긴 코멘트**.
    - 첫 메시지 본문이 프리로드 본문과 매칭되고 답글도 없는 thread → 내가 넣은 것 그대로이므로 **보고에서 제외**한다.
 4. **보고** — 사용자 추가분을 `file:line`별로 정리해 출력한다(아래 형식). **읽기 전용**: 코멘트 내용을 보고만 하고 코드를 수정하지 않는다. 후속 반영이 필요하면 사용자가 별도로 지시한다(예: `apply-pr-feedback`).
-5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 **우리가 쓴 그 포트에 한정해** `kill $(lsof -ti tcp:<port>)`로 종료한다. detach된 프로세스는 하니스가 정리해 주지 않으므로 이 단계를 건너뛰면 서버가 남고, `pkill difit`처럼 포트를 특정하지 않는 명령은 쓰지 않는다.
+5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 6-A 런처 JSON의 `pid`로 `kill <pid>`한다(pid를 잃었으면 **우리가 쓴 그 포트에 한정해** `kill $(lsof -ti tcp:<port>)`). detach된 프로세스는 하니스가 정리해 주지 않으므로 이 단계를 건너뛰면 서버가 남고, `pkill difit`처럼 포트를 특정하지 않는 명령은 쓰지 않는다.
 
 **회수 보고 형식**:
 
@@ -497,4 +499,4 @@ difit 서버는 회수 후 종료됨.
 - **서브에이전트로 리뷰 결과를 재검증하지 않는다**: finder가 보고한 finding을 다시 판별시키려고 별도 검증 에이전트를 스폰하지 않는다. 신뢰도 판단은 오케스트레이터가 4단계에서 직접 내리고, 확신이 서지 않는 finding은 severity를 낮춰 보고한다.
 - **판정은 오케스트레이터의 책임**: OKAY/REJECT 결정은 에이전트가 아닌 오케스트레이터가 직접 내린다. 에이전트 프롬프트에는 판정을 요청하지 않으며, finder는 이슈 보고까지만 담당한다. 판정 규칙은 5단계를 따른다.
 - **difit 출력**: diff 모드(PR · 현재 변경사항)에서 **이슈가 1건 이상일 때만** finding을 difit 인라인 코멘트로 프리로드한다(6단계). **이슈 0건(깨끗한 리뷰)이면 difit를 띄우지 않고 터미널 출력(6-C)만 한다.** difit는 로컬 뷰어이며 **PR 모드라도 원격 GitHub에 코멘트를 달지 않는다**. 시크릿·토큰·키·PII는 difit 코멘트 본문·명령줄 인자에 복사하지 않는다.
-- **difit 수명·회수·종료**: `~/.claude/skills/review-by-self/difit-contract.md` 계약을 따른다(nohup detach 실행 → 하니스 태스크를 남기지 않아 리뷰 출력과 함께 턴이 완료 처리된다, `--no-open`·`--keep-alive` → 브라우저 닫혀도 서버 유지, **사용자 종료 신호** = 6-D 트리거, `comment get`으로 회수 후 그 포트의 서버만 종료).
+- **difit 수명·회수·종료**: `~/.claude/skills/review-by-self/difit-contract.md` 계약을 따른다(`launch-difit.py`로 새 세션 detach → 하니스 태스크를 남기지 않아 리뷰 출력과 함께 턴이 완료 처리된다, `--no-open`·`--keep-alive` → 브라우저 닫혀도 서버 유지, **사용자 종료 신호** = 6-D 트리거, `comment get`으로 회수 후 그 포트의 서버만 종료).

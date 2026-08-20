@@ -31,10 +31,16 @@ effort: low
 
 ## 런치 (논블로킹)
 
-difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이 막히지 않게 하고, **끝나지 않는 하니스 태스크도 남기지 않는다** (계약의 "실행" 참고 — `run_in_background`·difit `--background` 모두 쓰지 않는다).
+difit를 `launch-difit.py`로 새 세션에 detach해 띄워 사용자가 리뷰하는 동안 세션이 막히지 않게 하고, **끝나지 않는 하니스 태스크도 남기지 않는다** (계약의 "실행" 참고 — `run_in_background`·`nohup`·difit `--background` 모두 쓰지 않는다).
 
-- `nohup <difit-command> <target> --no-open --keep-alive --clean --port <N> > <스크래치패드>/difit-<N>.log 2>&1 &` 형태로 띄운다. **`--comment` 프리로드는 넣지 않는다**(시작 코멘트를 쓰지 않음 — 아래 참고).
-- **`--no-open`이라 difit가 브라우저를 자동으로 열지 않는다.** 런치 1~3초 후 로그에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 실제 바인딩 포트로 URL을 확정하고, pid는 `lsof -ti tcp:<port>`로 얻어 기록한다.
+- 아래 형태로 띄운다. **`--comment` 프리로드는 넣지 않는다**(시작 코멘트를 쓰지 않음 — 아래 참고).
+
+  ```bash
+  python3 ~/.claude/skills/review-by-self/launch-difit.py --log <스크래치패드>/difit.log -- \
+    <difit-command> <target> --no-open --keep-alive --clean --port <N>
+  ```
+
+- **`--no-open`이라 difit가 브라우저를 자동으로 열지 않는다.** 런처가 출력하는 JSON 한 줄 `{"port": N, "url": …, "pid": P}`로 URL과 pid를 확정한다(런처가 배너 대기·HTTP 200 확인까지 끝낸다). exit 1이면 기동 실패다.
 - 사용자에게 **URL을 안내**하고, **직접 브라우저를 열어 리뷰한 뒤 끝나면 알려달라**고 안내한 뒤 턴을 종료한다. `--keep-alive`라 브라우저를 닫아도 서버는 유지되므로, 브라우저 닫힘을 폴링하지 않는다(detach 실행이라 기다릴 하니스 잡도 없다).
 
 ## 코멘트 회수
@@ -43,7 +49,7 @@ difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이
 
 - 코멘트가 있으면 각 코멘트(`file`:`line` + 본문)를 반영하고 작업을 이어간다.
 - `Total comments: 0`이거나 블록이 없으면 "리뷰 코멘트 없음"으로 간주한다. difit를 다시 띄울 필요 없다.
-- 회수를 끝냈으면 계약의 "회수 후 종료"에 따라 **우리가 쓴 그 포트의 difit 서버를 종료**한다(회수 → 종료 순서, `kill $(lsof -ti tcp:<port>)`).
+- 회수를 끝냈으면 계약의 "회수 후 종료"에 따라 **우리가 띄운 그 difit 서버를 종료**한다(회수 → 종료 순서, 런처 JSON의 `pid`로 `kill <pid>`).
 
 ## 시작 코멘트를 쓰지 않는다
 
@@ -54,4 +60,4 @@ difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이
 ## 제약
 
 - Git으로 관리되는 디렉토리 안에서만 사용할 수 있다.
-- 회수를 끝내기 전에는 difit 서버를 종료하지 않는다. 회수 후에는 **우리가 쓴 그 포트만** 종료하고, 무관한 difit 서버까지 광범위하게 죽이지 않는다. detach된 프로세스는 하니스가 정리해 주지 않으므로 종료를 건너뛰면 서버가 남는다 (계약의 "회수 후 종료" 참고).
+- 회수를 끝내기 전에는 difit 서버를 종료하지 않는다. 회수 후에는 **우리가 띄운 그 pid만** 종료하고, 무관한 difit 서버까지 광범위하게 죽이지 않는다. detach된 프로세스는 하니스가 정리해 주지 않으므로 종료를 건너뛰면 서버가 남는다 (계약의 "회수 후 종료" 참고).
