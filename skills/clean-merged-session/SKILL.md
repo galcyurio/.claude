@@ -1,13 +1,13 @@
 ---
 name: clean-merged-session
 effort: low
-description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌리는 스킬. 사용자가 'clean-merged-session', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
+description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌린 다음, orca 워크스페이스 카드를 Todo로 되돌리고 작업 탭을 닫아 세션을 마감하는 스킬. 사용자가 'clean-merged-session', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소', '세션 정리', '작업 끝났으니 정리하고 탭 닫아' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
 argument-hint: "[branch-name]"
 ---
 
 ## 역할
 
-원격에서 머지가 끝난 로컬 작업 브랜치를 안전하게 삭제하고, 현재 worktree를 해당 PR의 base 브랜치로 되돌린다. 머지 여부는 `gh pr`로 확인하고, base는 PR의 `baseRefName`으로 판별하며, worktree 접미사에 맞는 base 사본 브랜치로 전환한다.
+원격에서 머지가 끝난 로컬 작업 브랜치를 안전하게 삭제하고, 현재 worktree를 해당 PR의 base 브랜치로 되돌린다. 머지 여부는 `gh pr`로 확인하고, base는 PR의 `baseRefName`으로 판별하며, worktree 접미사에 맞는 base 사본 브랜치로 전환한다. git 정리가 끝나면 orca 워크스페이스 카드를 Todo로 되돌리고 이 작업 탭을 닫아 세션을 마감한다.
 
 사용자 입력: $ARGUMENTS
 
@@ -160,6 +160,33 @@ git branch --merged <base 사본>
 
 후보가 없으면 질문 없이 "추가 정리 대상 없음"으로 마무리한다.
 
+### 8. orca 카드 상태를 Todo로 되돌린다
+
+세션이 끝났으니 워크스페이스 카드를 백로그 상태로 되돌린다.
+
+```bash
+orca worktree set --worktree active --workspace-status todo --json
+```
+
+- 실행 파일 이름은 `orca-cli` 스킬의 해석 규칙을 따른다 (`ORCA_CLI_COMMAND` → Linux에서 orca 터미널 밖이면 `orca-ide` → 그 외 `orca`).
+- `ORCA_WORKTREE_ID` 환경변수가 없으면 orca가 관리하는 세션이 아니다. 8·9단계를 건너뛰고 이유를 보고한다.
+- 실패하면 git 정리 결과는 그대로 두고 실패 사실만 보고한다. 재시도하지 않는다.
+
+### 9. 최종 보고를 남긴 뒤 탭을 닫는다
+
+**보고를 먼저 출력하고, 그다음에 닫는다.** 탭을 닫으면 이 세션이 즉시 종료되므로 그 뒤에는 아무것도 출력할 수 없다.
+
+```bash
+orca terminal close --terminal "$ORCA_TERMINAL_HANDLE" --tab --json
+```
+
+- 핸들은 `ORCA_TERMINAL_HANDLE` 환경변수에서 얻는다. 이 값은 팬(pane) 하나를 가리키는 런타임 핸들이고, `--tab`은 그 팬이 속한 탭 전체를 닫는다.
+- 변수가 없으면 `orca terminal list --worktree active --json`에서 `tabId`가 `ORCA_TAB_ID`와, `leafId`가 `ORCA_PANE_KEY`(`<tabId>:<leafId>` 형식)의 뒷부분과 일치하는 항목을 찾는다. **목록에서 임의로 고르지 않는다** — 한 워크스페이스에 탭이 여러 개 열려 있어 엉뚱한 탭을 닫게 된다.
+- 이 변수들이 전부 없으면 Orca가 만든 터미널이 아니다. 탭 종료를 건너뛰고 그 이유를 보고한다.
+- 핸들은 영구 ID가 아니라 터미널 재시작 시 바뀐다. `terminal_handle_stale`이 오면 위 매칭으로 한 번만 다시 찾고, 또 실패하면 보고하고 멈춘다.
+- `--tab`을 생략하지 않는다. 붙이지 않으면 팬만 닫히고 탭이 남는다. `--tab`은 탭이 영속적으로 제거될 때까지 기다린다.
+- 절전(sleep) 전환은 orca CLI에 명령이 없어 이 스킬 범위 밖이다. 필요하면 사용자가 사이드바에서 직접 절전한다.
+
 ## 예시
 
 | 현재 worktree | 대상 브랜치 | PR base | 전환할 base 사본 |
@@ -175,4 +202,5 @@ git branch --merged <base 사본>
 - **삭제는 `-d`만.** `-D`는 사용자 명시 요청 전용.
 - **원격 브랜치는 건드리지 않는다.** GitHub이 머지 시 자동 삭제한다. `git fetch --prune`으로 충분하다.
 - **현재 worktree만 건드린다.** 다른 worktree의 브랜치는 보고만 하고 전환·삭제하지 않는다.
-- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`update-git-submodule`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구. 발견하면 보고만 한다.
+- **카드 상태 전환과 탭 종료는 성공 경로에서만 한다.** 머지 미확인 중단, stash 거부, `git branch -d` 거부, 다른 worktree 점유로 종료한 경로는 사용자가 이어서 손봐야 하므로 카드도 탭도 그대로 둔다.
+- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`update-git-submodule`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구, worktree 절전 전환. 발견하면 보고만 한다.
