@@ -3,204 +3,68 @@ name: clean-merged-session
 effort: low
 description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌린 다음, orca 워크스페이스 카드를 Todo로 되돌리고 작업 탭을 닫아 세션을 마감하는 스킬. 사용자가 'clean-merged-session', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소', '세션 정리', '작업 끝났으니 정리하고 탭 닫아' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
 argument-hint: "[branch-name]"
+allowed-tools: Bash
 ---
 
 ## 역할
 
-원격에서 머지가 끝난 로컬 작업 브랜치를 안전하게 삭제하고, 현재 worktree를 해당 PR의 base 브랜치로 되돌린다. 머지 여부는 `gh pr`로 확인하고, base는 PR의 `baseRefName`으로 판별하며, worktree 접미사에 맞는 base 사본 브랜치로 전환한다. git 정리가 끝나면 orca 워크스페이스 카드를 Todo로 되돌리고 이 작업 탭을 닫아 세션을 마감한다.
+머지가 끝난 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 사본으로 되돌린 뒤, Orca 카드를 Todo로 되돌리고 작업 탭을 닫는다. 판정과 실행은 전부 스크립트가 한다. 이 스킬이 하는 일은 사용자 발화를 플래그로 옮기고, 스크립트가 중단했을 때 그 이유를 사용자에게 전달하는 것뿐이다.
 
 사용자 입력: $ARGUMENTS
 
-## 입력 형식
+## 입력을 플래그로 옮긴다
 
-- `branch-name` (선택): 정리할 로컬 브랜치 이름. 미지정 시 현재 체크아웃 중인 브랜치를 대상으로 삼는다.
-  - 현재가 detached HEAD이고 인자도 없으면 안내 후 종료: "정리할 브랜치를 지정해 주세요 (현재 detached HEAD)."
+| 사용자 발화 | 플래그 |
+|---|---|
+| 브랜치 이름을 지정 | 첫 인자 (생략하면 현재 브랜치) |
+| "base는 X야" | `--base X` |
+| "변경사항은 stash하고 정리해" | `--stash` |
+| "커밋 날아가도 좋으니 지워" | `--force-delete` |
+| "머지된 브랜치 다 지워" | `--sweep` |
+| "결과 보고 먼저 보고 싶어", "탭은 두고" | `--no-close` |
 
-## 사전 검증
-
-### 1. 대상 브랜치 확정과 머지 확인
-
-```bash
-gh pr list --state merged --head <branch> --json number,baseRefName,mergedAt --limit 1
-```
-
-| 결과 | 처리 |
-|------|------|
-| PR 1건 | `baseRefName`을 base로 확정하고 진행 |
-| 빈 배열 | 머지된 PR 없음 → 아래 `AskUserQuestion` |
-
-**upstream이 `gone`이라는 이유만으로 머지되었다고 판정하지 않는다.** 원격 브랜치를 수동 삭제했거나 PR이 머지 없이 닫혔을 때도 `gone`이 된다.
-
-PR이 없으면 `AskUserQuestion`:
-
-- 옵션 1: `중단 (Recommended)` — 머지 여부를 사람이 확인한 뒤 다시 실행
-- 옵션 2: `base를 직접 지정하고 진행` — 사용자가 base 브랜치 이름을 입력. 이 경로에서도 삭제는 `-d`를 유지한다.
-- 옵션 3: `강제 삭제 -D` — 사용자가 명시적으로 요청한 경우에만. 커밋 손실을 감수한다.
-
-### 2. base 사본 브랜치 결정 (접미사 자동 매칭)
-
-이 저장소는 같은 base를 여러 worktree에서 쓰기 위해 `-2`, `-3` 접미사 사본을 둔다. git은 한 브랜치를 두 worktree에서 동시에 체크아웃할 수 없기 때문이다.
-
-```bash
-git rev-parse --git-common-dir   # 메인 worktree의 .git → 부모가 메인 디렉토리
-git rev-parse --show-toplevel    # 현재 worktree 디렉토리
-```
-
-현재 worktree 디렉토리 이름에서 메인 worktree 디렉토리 이름을 뺀 나머지가 접미사다 (`heydealer-android-3` − `heydealer-android` = `-3`). 메인 worktree면 접미사는 빈 문자열.
-
-후보를 순서대로 시도한다.
-
-| 순서 | 후보 | 채택 조건 |
-|------|------|----------|
-| 1 | `<baseRefName><접미사>` | 로컬에 존재하고 다른 worktree가 점유하지 않음 |
-| 2 | `<baseRefName>` (접미사 없는 원본) | 위가 없고, 이것도 다른 worktree가 점유하지 않음 |
-| 3 | — | 둘 다 실패 → `AskUserQuestion` |
-
-3번에 도달하면 `git branch --list '<baseRefName>*'` 결과를 옵션으로 제시하고 사용자가 고르게 한다. 사본을 임의로 새로 만들지 않는다.
-
-점유 여부는 `git worktree list --porcelain`의 `branch refs/heads/<name>` 항목으로 확인한다.
-
-### 3. 손실 위험 점검
-
-대상 브랜치가 **현재 체크아웃 중일 때만** 브랜치를 전환하므로, 아래 검증도 그 경우에만 수행한다.
-
-```bash
-git status --porcelain
-```
-
-비어 있지 않으면 변경 파일(최대 10개) 표시 후 `AskUserQuestion`:
-
-- 옵션 1: `중단 (Recommended)` — 커밋하거나 stash한 뒤 다시 실행
-- 옵션 2: `stash 후 진행` — `git stash push -u -m "clean-merged-session: <branch>"`
-
-미push 커밋은 별도로 묻지 않는다. base 사본에 포함되지 않은 커밋이 있으면 5단계의 `git branch -d`가 스스로 거부한다.
-
-### 4. 대상 브랜치 점유 확인
-
-대상 브랜치를 다른 worktree가 체크아웃 중이면 삭제할 수 없다. 그 경우 해당 worktree 경로와 함께 보고하고 종료한다.
-
-> `<branch>`는 `<worktree-path>`가 체크아웃 중이라 삭제할 수 없습니다. 그 worktree에서 정리하거나 `remove-worktree`로 제거해 주세요.
-
-**다른 worktree의 브랜치를 대신 전환하지 않는다.** 이 스킬은 현재 worktree만 건드린다.
+**플래그를 추정해서 붙이지 않는다.** `--stash`, `--force-delete`, `--sweep`은 사용자가 그 뜻으로 말했을 때만 붙이고, 판단이 필요하면 `AskUserQuestion`으로 묻는다.
 
 ## 실행
 
-아래 순서를 그대로 따른다. 명령을 생략하거나 순서를 바꾸지 않는다.
+worktree 루트에서 아래 한 줄을 Bash 도구로 실행한다.
 
-### 1. 원격 상태 갱신
-
-```bash
-git fetch --prune
+```
+${CLAUDE_SKILL_DIR}/clean-merged-session.sh [<branch>] [플래그]
 ```
 
-머지 시 GitHub이 원격 head 브랜치를 자동 삭제하므로, stale 추적 ref만 정리하면 된다. **`git push origin --delete`는 실행하지 않는다.**
+스크립트가 수행하는 일:
 
-### 2. base 사본으로 전환
+1. 대상 브랜치 확정 (detached HEAD·미존재·보호 브랜치는 중단)
+2. `gh pr list --state merged`로 머지 확인, `baseRefName`으로 base 판별
+3. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인
+4. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch` → `git pull --ff-only` → `git submodule update`
+5. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제
+6. `orca worktree set --workspace-status todo` → `orca terminal close --tab`
 
-대상 브랜치가 현재 체크아웃 중일 때만 실행한다. 아니면 이 단계와 3·4단계를 건너뛰고 5단계로 간다.
+접미사 매칭 예시:
 
-```bash
-git switch <base 사본>
-```
+| 현재 worktree | PR base | 전환할 base 사본 |
+|---|---|---|
+| `heydealer-android-3` | `feature-base/HDA-22279-...` | `feature-base/HDA-22279-...-3` |
+| `heydealer-android` (메인) | `develop` | `develop` |
+| `heydealer-android-2` | `develop` | `develop-2` (없으면 `develop`) |
 
-### 3. base 사본 최신화
+## 스크립트가 중단했을 때 (exit 1)
 
-```bash
-git pull --ff-only
-```
+중단하면 카드 상태와 탭은 그대로 남는다. 스크립트 출력을 그대로 사용자에게 전달하고, 아래 판단을 **사용자에게 넘긴다**.
 
-base 사본은 접미사 없는 원격 ref를 upstream으로 갖는다(`develop-3` → `origin/develop`). `--ff-only`로 예기치 않은 머지 커밋 생성을 막는다. 거부되면 사본이 갈라진 상태이니 강제로 맞추지 말고 보고 후 중단한다.
+| 중단 이유 | 다음 행동 |
+|---|---|
+| 머지된 PR 없음 | 머지 여부를 사용자가 확인한다. base를 알려주면 `--base`로 재실행. **base를 추정하지 않는다.** |
+| working tree가 깨끗하지 않음 | 커밋할지 stash할지 사용자가 고른다. |
+| `git branch -d` 거부 | 거부 메시지를 그대로 보여준다. `--force-delete`는 명시 요청 전용. |
+| base 사본을 못 찾음 | 스크립트가 출력한 후보 목록을 보여주고 사용자가 고르게 한다. **사본을 새로 만들지 않는다.** |
+| 다른 worktree가 점유 | 그 worktree 경로를 보고하고 끝낸다. |
 
-### 4. 서브모듈 동기화
+## 주의
 
-```bash
-git submodule update
-```
-
-**경로 인자를 붙이지 않는다.** `git submodule update -- prnd-library`와 `git restore --source=HEAD --worktree -- prnd-library`는 훅이 차단한다. 포인터를 의도적으로 바꿔야 하면 `update-git-submodule` 스킬을 경유한다.
-
-### 5. 브랜치 삭제
-
-```bash
-git branch -d <branch>
-```
-
-**`-D`는 사용자가 명시적으로 요청한 경우에만 쓴다.** `-d`가 거부하면 base에 포함되지 않은 커밋이 있다는 뜻이므로, 거부 메시지를 그대로 보여주고 중단한다. 자동으로 `-D`로 승격하지 않는다.
-
-머지 판정은 항상 **base 기준**이다(`git branch --merged <base 사본>`). develop 기준으로 판정하면 epic base에만 머지된 브랜치를 미머지로 오판한다.
-
-### 6. 결과 보고
-
-- 삭제한 브랜치
-- 현재 위치한 base 사본 브랜치와 최신화 결과
-- 서브모듈 동기화 여부
-- 건너뛴 항목과 이유 (다른 worktree 점유, stash 처리 등)
-
-### 7. 남은 머지 브랜치 보고 (기본 동작)
-
-정리 후 같은 base에 이미 머지된 다른 로컬 브랜치를 조사한다.
-
-```bash
-git branch --merged <base 사본>
-```
-
-아래를 제외한 나머지가 후보다.
-
-- 현재 브랜치
-- base 사본 계열 전부 (`<baseRefName>`, `<baseRefName>-2`, `<baseRefName>-3` …)
-- `develop*`, `main`, `master`
-- 다른 worktree가 점유 중인 브랜치 (점유 사실과 함께 별도로 표시)
-
-후보가 있으면 목록만 보고하고 자동으로 지우지 않는다. 이어서 `AskUserQuestion`:
-
-- 옵션 1: `여기서 종료 (Recommended)` — 목록만 남긴다
-- 옵션 2: `전부 스윕 삭제` — 각 후보에 `git branch -d <candidate>`를 적용한다
-
-**스윕에서는 `gh pr`을 다시 조회하지 않는다.** 후보는 이미 `git branch --merged <base 사본>`로 base 포함이 확인된 브랜치이고, `gh pr`은 base를 알아내기 위한 수단이었을 뿐이다. PR 기록 없이 직접 머지된 브랜치까지 재확인 루프에 가두지 않는다. 스윕에서도 `-d`만 쓰고, 거부당한 후보는 건너뛰어 이유와 함께 보고한다.
-
-후보가 없으면 질문 없이 "추가 정리 대상 없음"으로 마무리한다.
-
-### 8. orca 카드 상태를 Todo로 되돌린다
-
-세션이 끝났으니 워크스페이스 카드를 백로그 상태로 되돌린다.
-
-```bash
-orca worktree set --worktree active --workspace-status todo --json
-```
-
-- 실행 파일 이름은 `orca-cli` 스킬의 해석 규칙을 따른다 (`ORCA_CLI_COMMAND` → Linux에서 orca 터미널 밖이면 `orca-ide` → 그 외 `orca`).
-- `ORCA_WORKTREE_ID` 환경변수가 없으면 orca가 관리하는 세션이 아니다. 8·9단계를 건너뛰고 이유를 보고한다.
-- 실패하면 git 정리 결과는 그대로 두고 실패 사실만 보고한다. 재시도하지 않는다.
-
-### 9. 최종 보고를 남긴 뒤 탭을 닫는다
-
-**보고를 먼저 출력하고, 그다음에 닫는다.** 탭을 닫으면 이 세션이 즉시 종료되므로 그 뒤에는 아무것도 출력할 수 없다.
-
-```bash
-orca terminal close --terminal "$ORCA_TERMINAL_HANDLE" --tab --json
-```
-
-- 핸들은 `ORCA_TERMINAL_HANDLE` 환경변수에서 얻는다. 이 값은 팬(pane) 하나를 가리키는 런타임 핸들이고, `--tab`은 그 팬이 속한 탭 전체를 닫는다.
-- 변수가 없으면 `orca terminal list --worktree active --json`에서 `tabId`가 `ORCA_TAB_ID`와, `leafId`가 `ORCA_PANE_KEY`(`<tabId>:<leafId>` 형식)의 뒷부분과 일치하는 항목을 찾는다. **목록에서 임의로 고르지 않는다** — 한 워크스페이스에 탭이 여러 개 열려 있어 엉뚱한 탭을 닫게 된다.
-- 이 변수들이 전부 없으면 Orca가 만든 터미널이 아니다. 탭 종료를 건너뛰고 그 이유를 보고한다.
-- 핸들은 영구 ID가 아니라 터미널 재시작 시 바뀐다. `terminal_handle_stale`이 오면 위 매칭으로 한 번만 다시 찾고, 또 실패하면 보고하고 멈춘다.
-- `--tab`을 생략하지 않는다. 붙이지 않으면 팬만 닫히고 탭이 남는다. `--tab`은 탭이 영속적으로 제거될 때까지 기다린다.
-- 절전(sleep) 전환은 orca CLI에 명령이 없어 이 스킬 범위 밖이다. 필요하면 사용자가 사이드바에서 직접 절전한다.
-
-## 예시
-
-| 현재 worktree | 대상 브랜치 | PR base | 전환할 base 사본 |
-|---------------|------------|---------|-----------------|
-| `heydealer-android-3` | `feature/HDA-22364-...` | `feature-base/HDA-22279-car-list-design-system` | `feature-base/HDA-22279-car-list-design-system-3` |
-| `heydealer-android` (메인) | `feature/HDA-22339-...` | `develop` | `develop` |
-| `heydealer-android-2` | `feature/HDA-22338-...` | `develop` | `develop-2` (없으면 `develop`) |
-
-## 주의사항
-
-- **base를 develop으로 가정하지 않는다.** 이 프로젝트는 에픽 단위 `feature-base/HDA-xxxxx-*` 위에서 작업 브랜치가 갈라진다. base는 항상 PR의 `baseRefName`에서 온다.
-- **머지 판정은 `gh pr`로 한다.** upstream `gone`은 근거가 되지 않는다.
-- **삭제는 `-d`만.** `-D`는 사용자 명시 요청 전용.
-- **원격 브랜치는 건드리지 않는다.** GitHub이 머지 시 자동 삭제한다. `git fetch --prune`으로 충분하다.
-- **현재 worktree만 건드린다.** 다른 worktree의 브랜치는 보고만 하고 전환·삭제하지 않는다.
-- **카드 상태 전환과 탭 종료는 성공 경로에서만 한다.** 머지 미확인 중단, stash 거부, `git branch -d` 거부, 다른 worktree 점유로 종료한 경로는 사용자가 이어서 손봐야 하므로 카드도 탭도 그대로 둔다.
-- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`update-git-submodule`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구, worktree 절전 전환. 발견하면 보고만 한다.
+- **스크립트를 우회해 git 명령을 직접 실행하지 않는다.** 가드레일이 스크립트 안에 있다.
+- **성공 경로에서는 보고할 기회가 없다.** 탭이 닫히는 순간 이 세션이 끝나므로 스크립트 뒤에 아무것도 출력할 수 없다. 결과를 보여줘야 하는 상황이면 `--no-close`로 실행하고, 탭은 사용자가 닫도록 안내한다.
+- **절전(sleep) 전환은 orca CLI에 명령이 없어 범위 밖이다.** 필요하면 사용자가 사이드바에서 직접 절전한다.
+- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`update-git-submodule`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구. 발견하면 보고만 한다.
