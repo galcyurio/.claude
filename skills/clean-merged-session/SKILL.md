@@ -1,7 +1,7 @@
 ---
-name: clean-merged-branch
+name: clean-merged-session
 effort: low
-description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌리는 스킬. 사용자가 'clean-merged-branch', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
+description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌리는 스킬. 사용자가 'clean-merged-session', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
 argument-hint: "[branch-name]"
 ---
 
@@ -71,7 +71,7 @@ git status --porcelain
 비어 있지 않으면 변경 파일(최대 10개) 표시 후 `AskUserQuestion`:
 
 - 옵션 1: `중단 (Recommended)` — 커밋하거나 stash한 뒤 다시 실행
-- 옵션 2: `stash 후 진행` — `git stash push -u -m "clean-merged-branch: <branch>"`
+- 옵션 2: `stash 후 진행` — `git stash push -u -m "clean-merged-session: <branch>"`
 
 미push 커밋은 별도로 묻지 않는다. base 사본에 포함되지 않은 커밋이 있으면 5단계의 `git branch -d`가 스스로 거부한다.
 
