@@ -131,9 +131,11 @@ fi
 
 ## 3. 손실 위험 점검 (현재 브랜치를 정리할 때만)
 
-if [ "$is_current" = 1 ] && [ -n "$(git status --porcelain)" ]; then
+tracked_changes() { git status --porcelain --untracked-files=no --ignore-submodules=all; }
+
+if [ "$is_current" = 1 ] && [ -n "$(tracked_changes)" ]; then
   echo "변경된 파일:" >&2
-  git status --porcelain | head -10 >&2
+  tracked_changes | head -10 >&2
   if [ "$opt_stash" = 1 ]; then
     info "[2/6] stash 후 진행합니다."
     git stash push -u -m "clean-merged-session: $branch"
