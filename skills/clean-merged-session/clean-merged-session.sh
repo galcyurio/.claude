@@ -173,7 +173,25 @@ if [ "$is_current" = 1 ]; then
   fi
 
   if [ -f "$top/.gitmodules" ]; then
-    git submodule update
+    while IFS= read -r sub; do
+      [ -n "$sub" ] || continue
+      head_before="$(git -C "$top/$sub" rev-parse --short HEAD 2>/dev/null || true)"
+      branch_before="$(git -C "$top/$sub" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+      [ -n "$branch_before" ] || continue
+      warn "서브모듈 $sub 이 $branch_before($head_before) 를 가리키고 있어 base 기준으로 되돌립니다."
+    done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+    if ! git submodule update; then
+      echo "[오류] 서브모듈을 base 기준으로 되돌리지 못했습니다." >&2
+      while IFS= read -r sub; do
+        [ -n "$sub" ] || continue
+        dirty="$(git -C "$top/$sub" status --short 2>/dev/null || true)"
+        [ -n "$dirty" ] || continue
+        echo "  $sub 에 정리되지 않은 변경이 있습니다:" >&2
+        echo "$dirty" | head -10 >&2
+      done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+      echo "  서브모듈 안에서 커밋·push하거나 stash한 뒤 다시 실행하세요. 임의로 버리지 않습니다." >&2
+      exit 1
+    fi
   fi
 else
   info "[4/6] 현재 브랜치가 아니므로 전환·최신화를 건너뜁니다 (현재: ${current_branch:-detached})"
