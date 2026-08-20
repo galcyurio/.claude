@@ -8,7 +8,7 @@ allowed-tools: Bash
 
 ## 역할
 
-머지가 끝난 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 사본으로 되돌린 뒤, Orca 카드를 Todo로 되돌리고 작업 탭을 닫는다. 판정과 실행은 전부 스크립트가 한다. 이 스킬이 하는 일은 사용자 발화를 플래그로 옮기고, 스크립트가 중단했을 때 그 이유를 사용자에게 전달하는 것뿐이다.
+머지가 끝난 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 사본으로 되돌린 뒤, Orca 카드를 Todo로 되돌리고 작업 탭을 닫는다. 현재 브랜치가 이미 base(`develop`·`feature-base/*` 등)면 삭제할 작업 브랜치가 없으므로 **최신화 전용 모드**로 돌아 base를 원격 최신으로 맞추고 세션만 마감한다. 판정과 실행은 전부 스크립트가 한다. 이 스킬이 하는 일은 사용자 발화를 플래그로 옮기고, 스크립트가 중단했을 때 그 이유를 사용자에게 전달하는 것뿐이다.
 
 사용자 입력: $ARGUMENTS
 
@@ -35,11 +35,11 @@ ${CLAUDE_SKILL_DIR}/clean-merged-session.sh [<branch>] [플래그]
 
 스크립트가 수행하는 일:
 
-1. 대상 브랜치 확정 (detached HEAD·미존재·보호 브랜치는 중단)
+1. 대상 브랜치 확정 (detached HEAD·미존재는 중단). 보호 브랜치는 **인자로 지정했을 때만** 중단하고, 현재 브랜치가 보호 브랜치면 최신화 전용 모드로 전환한다
 2. `gh pr list --state merged`로 머지 확인, `baseRefName`으로 base 판별
 3. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인
-4. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch` → `git pull --ff-only` → `git submodule update`
-5. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제
+4. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch`(이미 그 브랜치면 생략) → `git pull --ff-only` → `git submodule update`
+5. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제. 최신화 전용 모드에서는 삭제를 건너뛴다
 6. `orca worktree set --workspace-status todo` → `orca terminal close --tab`
 
 접미사 매칭 예시:
@@ -58,6 +58,7 @@ ${CLAUDE_SKILL_DIR}/clean-merged-session.sh [<branch>] [플래그]
 |---|---|
 | 머지된 PR 없음 | 머지 여부를 사용자가 확인한다. base를 알려주면 `--base`로 재실행. **base를 추정하지 않는다.** |
 | working tree가 깨끗하지 않음 | 커밋할지 stash할지 사용자가 고른다. |
+| 인자로 지정한 브랜치가 보호 브랜치 | 지울 대상이 맞는지 사용자가 확인한다. 인자 없이 실행하면 최신화 전용 모드로 돈다. |
 | `git branch -d` 거부 | 거부 메시지를 그대로 보여준다. `--force-delete`는 명시 요청 전용. |
 | base 사본을 못 찾음 | 스크립트가 출력한 후보 목록을 보여주고 사용자가 고르게 한다. **사본을 새로 만들지 않는다.** |
 | 다른 worktree가 점유 | 그 worktree 경로를 보고하고 끝낸다. |

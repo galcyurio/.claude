@@ -5,6 +5,7 @@
 #
 # 사용법: clean-merged-session.sh [<branch>] [옵션]
 #   <branch>          정리할 로컬 브랜치. 생략하면 현재 체크아웃된 브랜치.
+#                     현재 브랜치가 base(develop·feature-base/*)면 삭제 없이 최신화만 한다.
 #   --base <name>     PR을 못 찾았거나 접미사 매칭을 건너뛰고 싶을 때 되돌아갈 base 사본을 직접 지정
 #   --stash           working tree가 깨끗하지 않으면 stash하고 진행 (기본은 중단)
 #   --force-delete    git branch -D 로 삭제 (기본은 -d)
@@ -20,6 +21,8 @@ warn() { echo "[경고] $*" >&2; }
 info() { echo "$*"; }
 
 branch=""
+explicit_branch=0
+sync_only=0
 opt_base=""
 opt_stash=0
 opt_force_delete=0
@@ -35,7 +38,7 @@ while [ $# -gt 0 ]; do
     --no-close) opt_no_close=1 ;;
     -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     -*) die "알 수 없는 옵션: $1" ;;
-    *) [ -z "$branch" ] || die "브랜치는 하나만 지정할 수 있습니다: $branch, $1"; branch="$1" ;;
+    *) [ -z "$branch" ] || die "브랜치는 하나만 지정할 수 있습니다: $branch, $1"; branch="$1"; explicit_branch=1 ;;
   esac
   shift
 done
@@ -65,12 +68,18 @@ git rev-parse --verify --quiet "refs/heads/$branch" > /dev/null \
 
 case "$branch" in
   develop|develop-*|main|master|feature-base/*)
-    die "보호 대상 브랜치는 이 스크립트로 삭제하지 않습니다: $branch" ;;
+    [ "$explicit_branch" = 0 ] \
+      || die "보호 대상 브랜치는 이 스크립트로 삭제하지 않습니다: $branch"
+    sync_only=1 ;;
 esac
 
 ## 2. 머지 확인과 base 판별
 
-if [ -n "$opt_base" ]; then
+if [ "$sync_only" = 1 ]; then
+  base_copy="$branch"
+  base_ref="$branch"
+  info "[1/6] base 브랜치에 있으므로 삭제 없이 최신화만 합니다: $branch"
+elif [ -n "$opt_base" ]; then
   base_copy="$opt_base"
   base_ref="$opt_base"
   info "[1/6] base를 직접 지정했습니다: $base_copy (머지 확인 생략)"
@@ -148,8 +157,12 @@ info "[3/6] 원격 상태 갱신: git fetch --prune"
 git fetch --prune
 
 if [ "$is_current" = 1 ]; then
-  info "[4/6] base 사본으로 전환: $base_copy"
-  git switch "$base_copy"
+  if [ "$base_copy" = "$current_branch" ]; then
+    info "[4/6] 이미 $base_copy 에 있어 전환을 건너뜁니다"
+  else
+    info "[4/6] base 사본으로 전환: $base_copy"
+    git switch "$base_copy"
+  fi
 
   if git rev-parse --verify --quiet "@{upstream}" > /dev/null; then
     git pull --ff-only || die "base 사본이 원격과 갈라졌습니다. 강제로 맞추지 않고 중단합니다."
@@ -164,7 +177,9 @@ else
   info "[4/6] 현재 브랜치가 아니므로 전환·최신화를 건너뜁니다 (현재: ${current_branch:-detached})"
 fi
 
-if [ "$opt_force_delete" = 1 ]; then
+if [ "$sync_only" = 1 ]; then
+  info "[5/6] 삭제할 작업 브랜치가 없습니다"
+elif [ "$opt_force_delete" = 1 ]; then
   info "[5/6] 브랜치 강제 삭제: git branch -D $branch"
   git branch -D "$branch"
 else
@@ -200,7 +215,11 @@ else
   for b in "${candidates[@]}"; do info "  - $b"; done
 fi
 
-info "[완료] $branch 삭제, 현재 위치 $base_copy"
+if [ "$sync_only" = 1 ]; then
+  info "[완료] $base_copy 최신화"
+else
+  info "[완료] $branch 삭제, 현재 위치 $base_copy"
+fi
 
 ## 7. Orca 카드 상태와 탭
 
