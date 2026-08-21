@@ -313,7 +313,7 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
     ```
 
 - `--comment`는 JSON **배열**을 받으므로 `commentsFile`(thread 배열) 하나로 모든 프리로드 코멘트가 주입된다. 셸이 `"$(cat …)"`로 파일 내용을 넣으므로 JSON을 명령줄에 손으로 적지 않는다.
-- 런치 1~3초 후 `<스크래치패드>/difit-<N>.log`에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 **실제 바인딩 포트로 URL을 확정**하고, `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`로 `200`을 한 번 확인한다. 배너가 없으면 다시 읽고, 배너 없이 URL을 성급히 안내하지 않는다. pid는 `lsof -ti tcp:<port>`로 얻어 기록한다(6-D 종료에 쓴다).
+- 런치 1~3초 후 `<스크래치패드>/difit-<N>.log`에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 **실제 바인딩 포트로 URL을 확정**하고, `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/`로 `200`을 한 번 확인한다. 배너가 없으면 다시 읽고, 배너 없이 URL을 성급히 안내하지 않는다. pid는 `lsof -ti tcp:<port> -sTCP:LISTEN`으로 얻어 기록한다(6-D 종료에 쓴다).
 - 하니스 태스크를 남기지 않으므로 리뷰 결과를 출력하면 **그 턴이 완료 처리된다**. 서버는 detach된 채 사용자가 리뷰를 마칠 때까지 유지되고, 정리는 6-D에서 한다.
 - **프리로드 baseline**: `build-difit-comments.js`가 `baselineFile`에 각 프리로드 `{file, line, body}`를 이미 기록해 뒀다. 6-D 회수(`comment get`)는 프리로드 코멘트도 함께 돌려주므로, 이 파일과 대조해 사용자 추가분(새 코멘트·답글)을 가려낸다(프리로드 0건이면 빈 배열).
 - 6-A 진입 시점에 프리로드할 이슈는 항상 1건 이상이다(0건이면 6단계 게이트에서 6-C로 빠진다). 따라서 difit는 최소 1개 코멘트를 프리로드한 상태로 뜬다.
@@ -467,7 +467,7 @@ difit 수명·회수는 계약을 따른다: readback 트리거는 **사용자�
    - **새 코멘트**: 첫 메시지 본문이 baseline의 어떤 프리로드 본문과도 매칭되지 않는 thread → **사용자가 새로 남긴 코멘트**.
    - 첫 메시지 본문이 프리로드 본문과 매칭되고 답글도 없는 thread → 내가 넣은 것 그대로이므로 **보고에서 제외**한다.
 4. **보고** — 사용자 추가분을 `file:line`별로 정리해 출력한다(아래 형식). **읽기 전용**: 코멘트 내용을 보고만 하고 코드를 수정하지 않는다. 후속 반영이 필요하면 사용자가 별도로 지시한다(예: `apply-pr-feedback`).
-5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 **우리가 쓴 그 포트에 한정해** `kill $(lsof -ti tcp:<port>)`로 종료한다. detach된 프로세스는 하니스가 정리해 주지 않으므로 이 단계를 건너뛰면 서버가 남고, `pkill difit`처럼 포트를 특정하지 않는 명령은 쓰지 않는다.
+5. **회수 후 종료** — 계약의 "회수 후 종료"를 따른다. `comment get`으로 회수를 끝낸 뒤 **우리가 쓴 그 포트를 LISTEN하는 프로세스에 한정해** `kill $(lsof -ti tcp:<port> -sTCP:LISTEN)`로 종료한다. `-sTCP:LISTEN`을 빼면 그 포트에 접속 중인 브라우저 pid까지 함께 죽는다. detach된 프로세스는 하니스가 정리해 주지 않으므로 이 단계를 건너뛰면 서버가 남고, `pkill difit`처럼 포트를 특정하지 않는 명령은 쓰지 않는다.
 
 **회수 보고 형식**:
 

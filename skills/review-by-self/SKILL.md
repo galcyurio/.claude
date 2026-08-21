@@ -34,7 +34,7 @@ effort: low
 difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이 막히지 않게 하고, **끝나지 않는 하니스 태스크도 남기지 않는다** (계약의 "실행" 참고 — `run_in_background`·difit `--background` 모두 쓰지 않는다).
 
 - `nohup <difit-command> <target> --no-open --keep-alive --clean --port <N> > <스크래치패드>/difit-<N>.log 2>&1 &` 형태로 띄운다. **`--comment` 프리로드는 넣지 않는다**(시작 코멘트를 쓰지 않음 — 아래 참고).
-- **`--no-open`이라 difit가 브라우저를 자동으로 열지 않는다.** 런치 1~3초 후 로그에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 실제 바인딩 포트로 URL을 확정하고, pid는 `lsof -ti tcp:<port>`로 얻어 기록한다.
+- **`--no-open`이라 difit가 브라우저를 자동으로 열지 않는다.** 런치 1~3초 후 로그에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 실제 바인딩 포트로 URL을 확정하고, pid는 `lsof -ti tcp:<port> -sTCP:LISTEN`으로 얻어 기록한다.
 - 사용자에게 **URL을 안내**하고, **직접 브라우저를 열어 리뷰한 뒤 끝나면 알려달라**고 안내한 뒤 턴을 종료한다. `--keep-alive`라 브라우저를 닫아도 서버는 유지되므로, 브라우저 닫힘을 폴링하지 않는다(detach 실행이라 기다릴 하니스 잡도 없다).
 
 ## 코멘트 회수
@@ -43,7 +43,7 @@ difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이
 
 - 코멘트가 있으면 각 코멘트(`file`:`line` + 본문)를 반영하고 작업을 이어간다.
 - `Total comments: 0`이거나 블록이 없으면 "리뷰 코멘트 없음"으로 간주한다. difit를 다시 띄울 필요 없다.
-- 회수를 끝냈으면 계약의 "회수 후 종료"에 따라 **우리가 쓴 그 포트의 difit 서버를 종료**한다(회수 → 종료 순서, `kill $(lsof -ti tcp:<port>)`).
+- 회수를 끝냈으면 계약의 "회수 후 종료"에 따라 **우리가 쓴 그 포트의 difit 서버를 종료**한다(회수 → 종료 순서, `kill $(lsof -ti tcp:<port> -sTCP:LISTEN)` — `-sTCP:LISTEN`을 빼면 접속 중인 브라우저까지 종료된다).
 
 ## 시작 코멘트를 쓰지 않는다
 
