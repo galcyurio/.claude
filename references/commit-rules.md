@@ -71,18 +71,17 @@
 
 분리 단위 — 작업 성격에 맞춰 선택:
 
-- **각 layer 한 번에 추가** (보통): `feat: 각 layer에 X DTO를 추가한다` — Response/Request + Entity + Domain + Model을 묶음
-- **layer별 분리** (큰 모델): `feat(API): X Response DTO를 추가한다`, `feat: X 도메인 모델을 추가한다` 식으로 layer별 커밋
+- **각 layer 한 번에 추가** (보통): `feat(DTO): 각 layer에 X DTO를 추가한다` — Response/Request + Entity + Domain + Model을 묶음
+- **layer별 분리** (큰 모델): `feat(DTO): X Response DTO를 추가한다`, `feat(DTO): X 도메인 모델을 추가한다` 식으로 layer별 커밋
 - **Mapper만 추가**: `feat(DTO): toDomain(), toData(), toLocal() 함수를 추가한다`
-- **필드만 추가/변경**: `feat(DTO): recall 필드를 추가한다`, `feat(API): 예약 상세 DTO에 car, nickname을 추가한다`
-- **DTO 선언과 필드 채우기 분리**: `feat: CarDetail DTO 선언하고 최상위 필드들을 추가한다` → 이후 `feat: 하위 DTO들에 Mapper를 추가한다` 식으로 단계적 채움
+- **필드만 추가/변경**: `feat(DTO): recall 필드를 추가한다`, `feat(DTO): 예약 상세 DTO에 car, nickname을 추가한다`
+- **DTO 선언과 필드 채우기 분리**: `feat(DTO): CarDetail DTO 선언하고 최상위 필드들을 추가한다` → 이후 `feat(DTO): 하위 DTO들에 Mapper를 추가한다` 식으로 단계적 채움
 - **여러 DTO**: 각 DTO마다 별도 커밋
 
 권장 scope:
 
-- `feat(API):` — API 엔드포인트 관점 (Response/Request 추가, 필드 추가)
-- `feat(DTO):` — DTO 자체 관점 (Mapper, 공통 필드)
-- `feat(post):` / `feat(get):` — HTTP 메서드별 구분이 필요한 경우
+- `feat(DTO):` — DTO 코드를 변경하는 경우
+- `feat(API):` — UseCase, Repository, DataSource에서 API 요청을 위한 코드를 작성하는 경우
 
 > 정의 자체와 layer 간 매핑 규칙은 `~/.android-ai-prompts/rules/common/model-mapping.md`를 따른다. 이 섹션은 **커밋 분리 단위**만 다룬다.
 
