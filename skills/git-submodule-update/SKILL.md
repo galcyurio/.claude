@@ -1,5 +1,5 @@
 ---
-name: update-git-submodule
+name: git-submodule-update
 effort: low
 description: Use when 현재 프로젝트의 prnd-library 서브모듈을 특정 release/feature 브랜치로 전환하고 원격 최신 커밋으로 업데이트한 뒤 커밋까지 한 번에 처리하고 싶을 때 사용한다. 사용자가 'prnd-library 업데이트', 'prnd-library 최신화', '라이브러리 업데이트', '라이브러리 최신화', 'prnd-library를 feature/release 브랜치로 변경', '서브모듈 업데이트' 등을 요청할 때 사용한다.
 argument-hint: "[branch]"
@@ -30,7 +30,7 @@ branch가 주어지지 않았으면 어떤 브랜치로 전환할지 사용자�
 프로젝트 루트에서 아래 한 줄을 Bash 도구로 실행한다:
 
 ```
-${CLAUDE_SKILL_DIR}/update-git-submodule.sh "<branch>"
+${CLAUDE_SKILL_DIR}/git-submodule-update.sh "<branch>"
 ```
 
 스크립트가 수행하는 일:

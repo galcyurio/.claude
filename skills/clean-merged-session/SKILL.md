@@ -75,4 +75,4 @@ ${CLAUDE_SKILL_DIR}/clean-merged-session.sh [<branch>] [플래그]
 - **스크립트를 우회해 git 명령을 직접 실행하지 않는다.** 가드레일이 스크립트 안에 있다.
 - **성공 경로에서는 보고할 기회가 없다.** 탭이 닫히는 순간 이 세션이 끝나므로 스크립트 뒤에 아무것도 출력할 수 없다. 결과를 보여줘야 하는 상황이면 `--no-close`로 실행하고, 탭은 사용자가 닫도록 안내한다.
 - **절전(sleep) 전환은 orca CLI에 명령이 없어 범위 밖이다.** 필요하면 사용자가 사이드바에서 직접 절전한다.
-- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`update-git-submodule`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구. 발견하면 보고만 한다.
+- **범위 밖은 손대지 않는다**: worktree 제거(`remove-worktree`), develop 반영(`merge-develop`), 서브모듈 포인터 변경(`git-submodule-update`), 무관한 stash 정리, reflog에 떠 있는 버려진 커밋 복구. 발견하면 보고만 한다.

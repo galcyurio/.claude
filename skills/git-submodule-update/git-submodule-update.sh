@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# update-git-submodule.sh
+# git-submodule-update.sh
 # 현재 프로젝트의 prnd-library 서브모듈을 지정 브랜치로 전환하고 원격 최신으로 업데이트한 뒤 커밋한다.
-# 사용법: update-git-submodule.sh <branch>
+# 사용법: git-submodule-update.sh <branch>
 #   branch 이름에는 release 또는 feature 가 포함되어야 한다.
 # 참조: ~/.prnd-cli/git_submodule_update.mjs
 

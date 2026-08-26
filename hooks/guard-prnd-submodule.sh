@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # prnd-library 서브모듈 포인터를 손으로 바꾸는 Bash 명령을 차단하고
-# update-git-submodule 스킬로 유도한다.
+# git-submodule-update 스킬로 유도한다.
 #
 # 스킬 스크립트는 문제의 git 명령을 자기 내부에서 실행하므로
 # Bash 도구 호출로 노출되지 않는다. 따라서 이 훅이 스킬 자신을 막지 않는다.
@@ -19,7 +19,7 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // ""' 2>/dev/null || pr
 
 [ -z "$cmd" ] && exit 0
 
-REASON='prnd-library 서브모듈 포인터를 손으로 바꾸지 않는다. update-git-submodule 스킬을 사용하라 — Skill(update-git-submodule, args: "release/... 또는 feature/... 브랜치명"). 이 스킬이 .gitmodules의 branch 필드와 서브모듈 포인터를 한 커밋으로 함께 처리한다. 손으로 하면 .gitmodules 갱신이 빠진다.'
+REASON='prnd-library 서브모듈 포인터를 손으로 바꾸지 않는다. git-submodule-update 스킬을 사용하라 — Skill(git-submodule-update, args: "release/... 또는 feature/... 브랜치명"). 이 스킬이 .gitmodules의 branch 필드와 서브모듈 포인터를 한 커밋으로 함께 처리한다. 손으로 하면 .gitmodules 갱신이 빠진다.'
 
 deny() {
   jq -n --arg reason "$REASON" '{
@@ -34,7 +34,7 @@ deny() {
 
 # 스킬 경로와 worktree 초기화는 통과
 case "$cmd" in
-  *update-git-submodule.sh*|*create-worktree/init.sh*) exit 0 ;;
+  *git-submodule-update.sh*|*create-worktree/init.sh*) exit 0 ;;
 esac
 
 # 1. .gitmodules의 추적 브랜치를 바꾸는 명령
