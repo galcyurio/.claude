@@ -12,6 +12,9 @@ transcripts/
 # 프로젝트별 데이터 (경로 의존적)
 projects/
 
+# 전역 auto memory (autoMemoryDirectory)
+/memory/
+
 # 런타임 데이터
 plans/
 tasks/
