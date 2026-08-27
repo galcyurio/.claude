@@ -58,12 +58,13 @@
 
 1. **API/DTO 추가** (필요 시 선행) — 아래 "API/DTO 작업 분리" 참고
 2. **골격(skeleton) 추가**: Activity + Screen + UiState + UiAction + ViewModel + Manifest 등록 → 한 커밋
-3. **텍스트 리소스 추가** (strings.xml 등)
-4. **UiState 필드 추가**
-5. **UiAction 항목 추가** — `sealed`에 subtype을 새로 추가하는 커밋은 그것을 소비하는 `when`(보통 `Screen` onAction) 갱신과 **같은 커밋으로 묶는다**. subtype만 추가하고 소비 `when`을 다음 커밋으로 미루면 Kotlin exhaustive `when` 때문에 그 중간 커밋이 컴파일되지 않는다(위 "단독 컴파일 가능" 원칙 위반).
-6. **UI 본문 구현** (Composable 채우기)
-7. **개별 기능 단위로 분리** (edge-to-edge 적용, LazyColumn 전환, 로딩 인디케이터, 페이징 등 각각 별도 커밋)
-8. **fix**: 리뷰/디자인 반영, 누락 수정, 엣지 케이스 처리
+3. **UiState 필드 추가**
+4. **UiAction 항목 추가** — `sealed`에 subtype을 새로 추가하는 커밋은 그것을 소비하는 `when`(보통 `Screen` onAction) 갱신과 **같은 커밋으로 묶는다**. subtype만 추가하고 소비 `when`을 다음 커밋으로 미루면 Kotlin exhaustive `when` 때문에 그 중간 커밋이 컴파일되지 않는다(위 "단독 컴파일 가능" 원칙 위반).
+5. **UI 본문 구현** (Composable 채우기)
+6. **개별 기능 단위로 분리** (edge-to-edge 적용, LazyColumn 전환, 로딩 인디케이터, 페이징 등 각각 별도 커밋)
+7. **fix**: 리뷰/디자인 반영, 누락 수정, 엣지 케이스 처리
+
+**텍스트 리소스(strings.xml 등)는 독립 커밋으로 두지 않는다.** 그 문구를 처음 사용하는 단계(보통 UI 본문 구현)의 커밋에 함께 담는다. 리소스만 있는 커밋은 어디에 쓰이는지 알 수 없어 리뷰·revert 단위가 사용처와 어긋나기 때문이다. 계획 문서에서도 문구 리소스를 별도 작업 항목으로 쪼개지 않는다.
 
 ### API/DTO 작업 분리
 
