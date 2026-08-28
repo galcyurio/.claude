@@ -32,26 +32,18 @@ Figma/FigJam/디자인 시스템에 대한 조회, 탐색, 비교, 생성, 매�
 
 ## 도구 전략
 
-**Figma MCP 도구 (주력)**:
+**Figma 도구의 정본은 figma 플러그인이다.** 사용할 수 있는 도구 목록과 각 도구의 호출 방법은 플러그인이 제공하는 MCP 지침과 `figma:*` 스킬에 이미 정리되어 있으므로, 이 파일에 도구명을 복제하지 않는다. 플러그인이 갱신되면 복제해 둔 사본이 가장 먼저 어긋나기 때문이다.
 
-조회:
-- `mcp__claude_ai_Figma__get_design_context` — 노드의 코드+스크린샷+힌트 (Inspect 주력)
-- `mcp__claude_ai_Figma__get_screenshot` — 노드 스크린샷
-- `mcp__claude_ai_Figma__get_metadata` — 파일 메타데이터
-- `mcp__claude_ai_Figma__get_figjam` — FigJam 파일 조회
-- `mcp__claude_ai_Figma__get_variable_defs` — 디자인 토큰/변수 정의
-- `mcp__claude_ai_Figma__search_design_system` — 디자인 시스템 검색
+**아래 도구는 호출하기 전에 선행 스킬을 반드시 로드한다.** `Skill` 도구로 해당 스킬을 먼저 읽은 뒤에 도구를 호출하며, 이 단계를 건너뛰면 원인을 찾기 어려운 실패가 발생한다.
 
-생성/쓰기:
-- `mcp__claude_ai_Figma__generate_diagram` — FigJam 다이어그램 생성
-- `mcp__claude_ai_Figma__create_new_file` — 새 Figma 파일 생성
+| 도구 | 선행 스킬 |
+|------|----------|
+| `get_design_context` | `figma:figma-design-to-code` |
+| `use_figma` (Figma 쓰기 작업 전반) | `figma:figma-use` |
+| `create_new_file` | `figma:figma-create-new-file` |
+| `generate_diagram` | `figma:figma-generate-diagram` |
 
-Code Connect:
-- `mcp__claude_ai_Figma__get_code_connect_map` — 매핑 조회
-- `mcp__claude_ai_Figma__get_code_connect_suggestions` — 매핑 제안
-- `mcp__claude_ai_Figma__get_context_for_code_connect` — Code Connect 컨텍스트
-- `mcp__claude_ai_Figma__add_code_connect_map` — 매핑 추가
-- `mcp__claude_ai_Figma__send_code_connect_mappings` — 매핑 전송
+나머지 조회 도구(`get_screenshot`, `get_metadata`, `get_variable_defs`, `search_design_system`, `get_figjam`)와 Code Connect 계열 도구는 선행 스킬 없이 호출할 수 있다. 다만 FigJam을 편집할 때는 `figma:figma-use-figjam`을, Code Connect 매핑 파일을 작성할 때는 `figma:figma-code-connect`를 함께 참고한다.
 
 **로컬 도구**:
 - **Read** — 로컬 스크린샷/이미지/코드 파일 읽기
