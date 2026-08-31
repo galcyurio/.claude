@@ -19,7 +19,7 @@
 | 링크 유형 | 도메인 패턴 | MCP 도구 | 수집 내용 |
 |-----------|------------|----------|----------|
 | Notion | `*.notion.so`, `*.notion.site` | `mcp__claude_ai_Notion__notion-fetch` | 페이지 내용 |
-| Figma | `figma.com` | `mcp__claude_ai_Figma__get_design_context`, `mcp__claude_ai_Figma__get_screenshot` | 디자인 컨텍스트, 스크린샷 |
+| Figma | `figma.com` | figma 플러그인의 `get_design_context`, `get_screenshot` | 디자인 컨텍스트, 스크린샷 |
 | Jira | `*.atlassian.net`, `*.jira.com` | `mcp__claude_ai_Atlassian__getJiraIssue` | 이슈 제목, 설명, AC |
 | Slack | `*.slack.com` | `mcp__claude_ai_Slack__slack_read_thread`, `mcp__claude_ai_Slack__slack_read_channel` | 메시지/스레드 내용 |
 | 사내 API 문서 | `docs.prnd.co.kr` | `WebFetch` (view→API URL 변환 후) | 엔드포인트·필드·enum |
@@ -46,8 +46,8 @@ https://figma.com/design/{fileKey}/{fileName}?node-id={nodeId}
 - `fileKey`: URL 경로의 세 번째 세그먼트
 - `nodeId`: 쿼리 파라미터 `node-id` 값. `-`는 `:`로 변환하여 사용
 - 예: `node-id=123-456` → `123:456`
-- `mcp__claude_ai_Figma__get_design_context`에 `fileKey`, `nodeId` 전달
-- `mcp__claude_ai_Figma__get_screenshot`으로 스크린샷 추가 수집
+- `get_design_context`에 `fileKey`, `nodeId` 전달. 이 도구는 호출하기 전에 `figma:figma-design-to-code` 스킬을 먼저 로드해야 한다.
+- `get_screenshot`으로 스크린샷 추가 수집
 
 ### Jira
 

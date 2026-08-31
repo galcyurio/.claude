@@ -6,7 +6,7 @@
 
 ## 1단계 — frame 목록 추출 + diff
 
-`mcp__claude_ai_Figma__get_metadata(fileKey, page_nodeId)` 호출. 응답은 수십만 자로 token limit 초과하지만 도구가 자동으로 임시 파일에 저장한다 (응답 메시지에 파일 경로 포함). 그 임시 파일과 기존 `figma_frame_hashes`를 **`figma-diff.py` 스크립트에 전달**해 frame 추출 + diff를 한 번에 수행한다:
+`get_metadata(fileKey, page_nodeId)` 호출. 응답은 수십만 자로 token limit 초과하지만 도구가 자동으로 임시 파일에 저장한다 (응답 메시지에 파일 경로 포함). 그 임시 파일과 기존 `figma_frame_hashes`를 **`figma-diff.py` 스크립트에 전달**해 frame 추출 + diff를 한 번에 수행한다:
 
 ```bash
 python3 ~/.claude/skills/feature-memory/figma-diff.py \
@@ -43,7 +43,7 @@ python3 ~/.claude/skills/feature-memory/figma-diff.py \
 
 Figma API는 `last_modified`를 제공하지 않으므로 **응답 코드 hash 비교 방식**으로 변경 감지를 구현한다.
 
-1. 1단계에서 얻은 모든 frame nodeId에 대해 `mcp__claude_ai_Figma__get_design_context(fileKey, frame_nodeId, excludeScreenshot=true)`를 **병렬 호출**한다 (응답 크기를 줄이기 위해 스크린샷 제외).
+1. 1단계에서 얻은 모든 frame nodeId에 대해 `get_design_context(fileKey, frame_nodeId, excludeScreenshot=true)`를 **병렬 호출**한다 (응답 크기를 줄이기 위해 스크린샷 제외).
 2. 각 응답의 React 코드 문자열에서 변동성 높은 부분(`data-node-id` 속성값, `https://www.figma.com/api/mcp/asset/...` asset URL — asset URL은 7일마다 재발급되므로 hash에 포함하면 항상 변경으로 잡힘)을 정규식으로 제거한 뒤 SHA-256 해시 계산:
    ```bash
    echo "$response_code" \
