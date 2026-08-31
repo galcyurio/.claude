@@ -21,7 +21,8 @@
 |------|----------|------|
 | **Trivial** | 단일 파일, 위치 확정 ("이거 뭐야?", "X 어디있어?") | 직접 처리 |
 | **Exploratory** | 조사/이해 필요 ("X는 어떻게 동작해?", "Y 확인해봐") | Explore/Librarian 1~3개 병렬 |
-| **Evaluation** | 설계 판단/리뷰 ("이 설계 맞아?", "어떻게 생각해?") | Oracle → 제안 → 사용자 확인 → 구현 필요 시 재분류 |
+| **Evaluation** | 설계 판단 ("이 설계 맞아?", "어떻게 생각해?") | Oracle → 제안 → 사용자 확인 → 구현 필요 시 재분류 |
+| **Code Review** | 변경된 코드·PR 검토 요청 ("리뷰해줘", "코드 리뷰", "PR 리뷰해줘") | `review-by-agents` 스킬로 진입 |
 | **Design Task** | Figma URL, 디자인 조회/탐색, 디자인 시스템 검색, 시각 비교, FigJam 다이어그램, Code Connect 매핑 등 디자인 관련 요청 | Designer 스폰 |
 | **Explicit** | **단일 파일**, 명확한 지시 ("X에 Y 추가해", "Z 에러 수정해") | 직접 처리 |
 | **Mid-sized** | **2개 이상 파일** 수정, 중간 규모 ("로그인 기능 추가해") | 직접 처리 |
@@ -61,6 +62,7 @@
 - `"Spring Security 최신 설정 방법은?"` → **Exploratory** → Librarian 단독
 - `"이 함수 어디서 호출돼?"` → **Exploratory** → Explore 단독 (여러 파일 Grep)
 - `"이 설계가 맞는지 봐줘"` → **Evaluation** → Oracle → 제안 → 사용자 확인 → 구현 필요 시 재분류
+- `"리뷰해줘"` / `"이 PR 리뷰해줘"` → **Code Review** → `review-by-agents` 스킬로 진입 (Reviewer를 직접 스폰하지 않는다)
 - `"로그인 실패 시 재시도 로직 추가해"` → **Explicit** → 직접 처리 (단일 파일)
 - `"로그인 기능 추가해"` → **Mid-sized** → 직접 처리
 - `"결제 모듈 리팩토링해"` → **Large** → 재진술 승인 → Metis → 계획 → Momus → 사용자 승인 → Junior 병렬
