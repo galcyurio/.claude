@@ -96,4 +96,3 @@ HeyDealer 또는 Revolt 테마의 Composable 함수 1개와 `@Preview` 를 생�
 
 - **`git add`는 정확히 생성된 파일 절대경로만 지정**한다. `git add .`이나 `git add -A`를 쓰지 않는다. working tree의 다른 변경을 보호하기 위함이다.
 - `${NAME}`·`${PACKAGE_NAME}` placeholder는 정확히 그 형태로 등장한다. 다른 변수는 치환하지 않는다.
-- 커밋 메시지는 `~/.claude/rules/git.md` 규칙을 따른다.
