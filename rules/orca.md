@@ -6,6 +6,7 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 | 시점 | 훅 이벤트 | status id | 보드 컬럼 |
 |---|---|---|---|
+| 세션이 시작된 순간 | `SessionStart` | `todo` | Todo |
 | 사용자가 프롬프트를 보낸 순간 | `UserPromptSubmit` | `in-progress` | In progress |
 | `gh pr create`가 성공한 직후 | `PostToolUse` | `in-review` | In review |
 | 세션이 끝난 순간 | `SessionEnd` | `completed` | Done |
@@ -13,7 +14,7 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 - 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Done으로 내려가지 않게 하려는 것이다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
-- `todo`로 되돌리는 일은 `clean-merged-session` 스킬의 세션 마감 단계가 담당한다. 그 밖에서 임의로 `todo`로 내리지 않는다.
+- 세션을 새로 열면 카드는 `todo`로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. 세션 마감 시점의 `todo` 복귀는 `clean-merged-session` 스킬이 담당하며, 그 밖에서 내가 임의로 `todo`로 내리지 않는다.
 
 ## 훅이 닿지 않는 경우
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Orca 워크스페이스 카드 상태를 전이시킨다. 규칙 본문은 ~/.claude/rules/orca.md 를 따른다.
-# usage: orca-workspace-status.sh <in-progress|in-review|completed> [--dry-run]
+# usage: orca-workspace-status.sh <todo|in-progress|in-review|completed> [--dry-run]
 
 set -u
 
@@ -8,7 +8,7 @@ target="${1:-}"
 dry_run="${2:-}"
 
 case "$target" in
-  in-progress | in-review | completed) ;;
+  todo | in-progress | in-review | completed) ;;
   *) exit 0 ;;
 esac
 
