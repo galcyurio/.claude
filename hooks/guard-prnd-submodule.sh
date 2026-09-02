@@ -47,11 +47,14 @@ if printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+submodule[[:space:]]+update' \
 fi
 
 # 3. 서브모듈 안에서 직접 checkout/switch
-#    단, 새 브랜치 생성(-b/-B/-c)은 현재 커밋에 이름을 붙이는 것이라
-#    포인터를 원격 tip으로 옮기지 않으므로 통과시킨다.
+#    아래 셋은 통과시킨다.
+#    - 새 브랜치 생성(-b/-B/-c): 현재 커밋에 이름을 붙이는 것이라 포인터를 원격 tip 으로 옮기지 않는다.
+#    - feature/ 브랜치 전환: 라이브러리 작업 자체에 필요하다. .gitmodules 갱신은
+#      PR 머지 후 release 브랜치로 bump 할 때 스킬이 처리한다.
+#    - checkout -- <path>: 파일 내용 원복이라 포인터와 무관하다.
 if printf '%s' "$cmd" | grep -Fq 'prnd-library' \
   && printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+([^|;&]*[[:space:]])?(checkout|switch)[[:space:]]' \
-  && ! printf '%s' "$cmd" | grep -Eq '(checkout|switch)[[:space:]]+(-[bBc])[[:space:]]'; then
+  && ! printf '%s' "$cmd" | grep -Eq '(checkout|switch)[[:space:]]+(-[bBc][[:space:]]|--[[:space:]]|feature/)'; then
   deny
 fi
 
