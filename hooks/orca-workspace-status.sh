@@ -31,7 +31,10 @@ fi
 ORCA="${ORCA_CLI_COMMAND:-orca}"
 command -v "$ORCA" > /dev/null 2>&1 || exit 0
 
-current=$("$ORCA" worktree current --json 2>/dev/null \
+# 세션이 사라진 뒤에는 cwd로 워크트리를 찾지 못하므로 id 셀렉터를 쓴다.
+selector="id:$ORCA_WORKTREE_ID"
+
+current=$("$ORCA" worktree show --worktree "$selector" --json 2>/dev/null \
   | sed -n 's/.*"workspaceStatus"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
   | head -1)
 
@@ -48,4 +51,4 @@ if [ "$dry_run" = "--dry-run" ]; then
   exit 0
 fi
 
-"$ORCA" worktree set --worktree active --workspace-status "$target" --json > /dev/null 2>&1 || exit 0
+"$ORCA" worktree set --worktree "$selector" --workspace-status "$target" --json > /dev/null 2>&1 || exit 0

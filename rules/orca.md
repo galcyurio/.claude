@@ -9,12 +9,15 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 | 사용자가 프롬프트를 보낸 순간 | `UserPromptSubmit` | `in-progress` | In progress |
 | `gh pr create`가 성공한 직후 | `PostToolUse` | `in-review` | In review |
 | 세션이 끝난 순간 | `SessionEnd` | `completed` | Done |
+| 탭을 그대로 닫아 세션이 사라진 순간 | `SessionStart`에서 띄운 지킴이 | `completed` | Done |
 
 - 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Done으로 내려가지 않게 하려는 것이다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
 - `todo`로 되돌리는 일은 `clean-merged-session` 스킬의 세션 마감 단계가 담당한다. 그 밖에서 임의로 `todo`로 내리지 않는다.
 
 ## 훅이 닿지 않는 경우
+
+탭을 그대로 닫으면 `SessionEnd`가 오지 않으므로, `~/.claude/hooks/orca-workspace-watchdog.sh`가 `SessionStart`에서 떠 이 세션의 claude 프로세스를 지켜본다. 그 프로세스가 사라지면 지킴이가 대신 `completed`로 넘기며, 종료 신호를 받지 않고 폴링하므로 강제 종료에도 동작한다(반영 지연은 최대 5초).
 
 전이를 수행하는 스크립트는 `~/.claude/hooks/orca-workspace-status.sh`이며, `ORCA_WORKTREE_ID`가 없거나 `orca` 명령을 찾지 못하면 조용히 종료한다. 어떤 이벤트가 스크립트를 깨웠는지는 `$TMPDIR/orca-workspace-status.log`에 남으므로, 카드가 엉뚱한 상태로 넘어가면 이 기록부터 확인한다.
 
