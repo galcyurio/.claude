@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# clean-merged-session.sh
+# release-worktree.sh
 # 머지가 끝난 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 사본으로 되돌린 뒤,
+# 이 worktree에 쌓인 세션 이력을 메인 저장소로 회수하고,
 # Orca 워크스페이스 카드를 Todo로 되돌리고 작업 탭을 닫아 세션을 마감한다.
 #
-# 사용법: clean-merged-session.sh [<branch>] [옵션]
+# 사용법: release-worktree.sh [<branch>] [옵션]
 #   <branch>          정리할 로컬 브랜치. 생략하면 현재 체크아웃된 브랜치.
 #                     현재 브랜치가 base(develop·feature-base/*)면 삭제 없이 최신화만 한다.
 #   --base <name>     PR을 못 찾았거나 접미사 매칭을 건너뛰고 싶을 때 되돌아갈 base 사본을 직접 지정
@@ -73,6 +74,9 @@ case "$branch" in
     sync_only=1 ;;
 esac
 
+common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir)"
+case "$common_dir" in /*) ;; *) common_dir="$PWD/$common_dir" ;; esac
+
 ## 2. 머지 확인과 base 판별
 
 if [ "$sync_only" = 1 ]; then
@@ -96,8 +100,6 @@ else
   info "[1/6] 머지 확인: $branch → $base_ref"
 
   # base 사본 결정 (worktree 디렉토리 접미사 매칭)
-  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir)"
-  case "$common_dir" in /*) ;; *) common_dir="$PWD/$common_dir" ;; esac
   main_name="$(basename "$(dirname "$common_dir")")"
   top_name="$(basename "$top")"
   suffix=""
@@ -114,11 +116,21 @@ else
     if [ -z "$holder" ] || [ "$holder" = "$top" ]; then base_copy="$candidate"; break; fi
   done
   if [ -z "$base_copy" ]; then
-    echo "[오류] 되돌아갈 base 사본을 찾지 못했습니다 (base: $base_ref, 접미사: '${suffix:-없음}')." >&2
-    echo "  후보:" >&2
-    git branch --list "${base_ref}*" >&2
-    echo "  --base <name>으로 직접 지정하세요. 사본을 새로 만들지는 않습니다." >&2
-    exit 1
+    base_copy="${base_ref}${suffix}"
+    if git rev-parse --verify --quiet "refs/heads/$base_copy" > /dev/null; then
+      # 앞선 루프가 base_copy를 비운 채 나왔다면 후보가 전부 다른 worktree에 점유된 것이다.
+      # 여기서 git branch를 부르면 already exists로 죽으므로, 기존 안내를 그대로 살린다.
+      echo "[오류] 되돌아갈 base 사본이 전부 다른 worktree에 점유되어 있습니다 (base: $base_ref)." >&2
+      echo "  후보:" >&2
+      git branch --list "${base_ref}*" >&2
+      echo "  --base <name>으로 비어 있는 사본을 지정하세요." >&2
+      exit 1
+    fi
+    info "base 사본이 없어 새로 만듭니다: $base_copy (upstream: origin/$base_ref)"
+    git rev-parse --verify --quiet "refs/remotes/origin/$base_ref" > /dev/null \
+      || die "원격에 $base_ref 가 없어 사본을 만들 수 없습니다."
+    git branch "$base_copy" "origin/$base_ref"
+    git branch --set-upstream-to="origin/$base_ref" "$base_copy"
   fi
 fi
 
@@ -151,6 +163,27 @@ fi
 holder="$(branch_holder "$branch")"
 if [ -n "$holder" ] && [ "$holder" != "$top" ]; then
   die "$branch 는 $holder 가 체크아웃 중이라 삭제할 수 없습니다. 그 worktree에서 정리하세요."
+fi
+
+## 4-1. 세션 회수
+
+session_project_dir() {
+  printf '%s/.claude/projects/%s' "$HOME" "$(printf '%s' "$1" | sed 's|[/.]|-|g')"
+}
+
+main_worktree="$(dirname "$common_dir")"
+if [ "$main_worktree" != "$top" ]; then
+  from_dir="$(session_project_dir "$top")"
+  to_dir="$(session_project_dir "$main_worktree")"
+  if [ -d "$from_dir" ]; then
+    mkdir -p "$to_dir"
+    n=0
+    for f in "$from_dir"/*.jsonl; do
+      [ -e "$f" ] || continue
+      if cp -n "$f" "$to_dir/"; then n=$((n+1)); fi
+    done
+    info "세션 $n 건을 메인 저장소로 회수했습니다: $to_dir"
+  fi
 fi
 
 ## 5. git 정리
