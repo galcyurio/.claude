@@ -13,17 +13,20 @@ die() { echo "[오류] $*" >&2; exit 1; }
 info() { echo "$*"; }
 ORCA="${ORCA_CLI_COMMAND:-orca}"
 
-# 메인 worktree 옆에 <repo>-<N> 형식으로 비어 있는 다음 경로를 정한다.
-# orca worktree create는 경로를 받지 않고 ~/orca/workspaces/ 아래에 만드는데,
-# 그러면 디렉토리 접미사가 사라져 release-worktree가 base 사본을 찾지 못한다.
+# 메인 worktree 옆에 <repo>-<이슈키>[-N] 형식으로 비어 있는 자리를 정한다.
+# 이름만 보고 어떤 피처의 자리인지 알 수 있게 이슈키를 넣는다.
+# release-worktree는 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽으므로,
+# 이슈키의 숫자 부분(HDA-22644의 22644)과 섞이지 않는다.
 next_worktree_path() {
-  local main_wt parent repo n
+  local key="$1" main_wt parent repo stem n
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
   parent="$(dirname "$main_wt")"
   repo="$(basename "$main_wt")"
+  stem="$parent/$repo-$key"
+  if [ ! -e "$stem" ]; then printf '%s' "$stem"; return; fi
   n=2
-  while [ -e "$parent/$repo-$n" ]; do n=$((n+1)); done
-  printf '%s/%s-%s' "$parent" "$repo" "$n"
+  while [ -e "$stem-$n" ]; do n=$((n+1)); done
+  printf '%s-%s' "$stem" "$n"
 }
 
 # git worktree add로 만든 자리를 orca가 인식할 때까지 기다렸다가 id를 낸다.
@@ -59,6 +62,10 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$base_branch" ] || die "base 브랜치 이름이 필요합니다 (예: feature-base/HDA-12345-car-list)."
 case "$base_branch" in feature-base/*) ;; *) die "base 브랜치는 feature-base/ 로 시작해야 합니다." ;; esac
+
+# worktree 디렉토리 이름에 쓸 에픽 키를 뽑는다 (feature-base/HDA-22644-slug -> HDA-22644).
+epic_key="$(printf '%s' "$base_branch" | sed -E 's|^feature-base/([A-Za-z]+-[0-9]+).*|\1|')"
+[ "$epic_key" != "$base_branch" ] || die "base 브랜치에서 이슈 키를 찾지 못했습니다: $base_branch"
 git rev-parse --verify --quiet "refs/heads/$base_branch" > /dev/null \
   && die "이미 있는 브랜치입니다: $base_branch"
 
@@ -79,7 +86,7 @@ fi
 
 info "[2/3] base worktree 생성"
 base_wt_id=""
-base_path="$(next_worktree_path)"
+base_path="$(next_worktree_path "$epic_key")"
 info "  $base_path  ($base_branch)"
 if [ "$opt_dry_run" = 0 ]; then
   git worktree add "$base_path" "$base_branch" \
@@ -100,10 +107,13 @@ while [ "$i" -lt "$children" ]; do
 
   # 경로를 먼저 정하고 그 디렉토리 접미사로 브랜치 이름을 짓는다.
   # release-worktree가 이 대응으로 되돌아갈 base 사본을 찾으므로 둘이 어긋나면 안 된다.
-  child_path="$(next_worktree_path)"
+  child_path="$(next_worktree_path "$epic_key")"
   suffix="$(basename "$child_path")"
-  suffix="${suffix##*-}"
-  child_branch="${base_branch}-${suffix}"
+  case "$suffix" in
+    *-[0-9]|*-[0-9][0-9]) suffix="${suffix##*-}" ;;
+    *) suffix="" ;;
+  esac
+  child_branch="${base_branch}${suffix:+-$suffix}"
   info "  $child_path  ($child_branch, 부모: $base_branch)"
 
   git worktree add -b "$child_branch" "$child_path" "$base_branch" \

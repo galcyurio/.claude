@@ -52,17 +52,20 @@ session_file_path() {
   find "$HOME/.claude/projects" -maxdepth 2 -name "$1.jsonl" -exec stat -f '%m %N' {} + 2>/dev/null \
     | sort -rn | head -1 | cut -d' ' -f2-
 }
-# 메인 worktree 옆에 <repo>-<N> 형식으로 비어 있는 다음 경로를 정한다.
-# orca worktree create는 경로를 받지 않고 ~/orca/workspaces/ 아래에 만드는데,
-# 그러면 디렉토리 접미사가 사라져 release-worktree가 base 사본을 찾지 못한다.
+# 메인 worktree 옆에 <repo>-<이슈키>[-N] 형식으로 비어 있는 자리를 정한다.
+# 이름만 보고 어떤 피처의 자리인지 알 수 있게 이슈키를 넣는다.
+# release-worktree는 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽으므로,
+# 이슈키의 숫자 부분(HDA-22644의 22644)과 섞이지 않는다.
 next_worktree_path() {
-  local main_wt parent repo n
+  local key="$1" main_wt parent repo stem n
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
   parent="$(dirname "$main_wt")"
   repo="$(basename "$main_wt")"
+  stem="$parent/$repo-$key"
+  if [ ! -e "$stem" ]; then printf '%s' "$stem"; return; fi
   n=2
-  while [ -e "$parent/$repo-$n" ]; do n=$((n+1)); done
-  printf '%s/%s-%s' "$parent" "$repo" "$n"
+  while [ -e "$stem-$n" ]; do n=$((n+1)); done
+  printf '%s-%s' "$stem" "$n"
 }
 
 # git worktree add로 만든 자리를 orca가 인식할 때까지 기다렸다가 id를 낸다.
@@ -183,7 +186,7 @@ else
     info "[dry-run] 새 worktree를 만들 자리까지만 확인했습니다. 이후 단계는 실제 경로가 있어야 진행합니다."
     exit 0
   fi
-  target_worktree="$(next_worktree_path)"
+  target_worktree="$(next_worktree_path "$issue_key")"
   info "  새 자리: $target_worktree"
   git worktree add -b "$work_branch" "$target_worktree" "$base_ref" \
     || die "worktree를 만들지 못했습니다: $target_worktree"

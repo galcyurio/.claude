@@ -100,12 +100,14 @@ else
   info "[1/6] 머지 확인: $branch → $base_ref"
 
   # base 사본 결정 (worktree 디렉토리 접미사 매칭)
-  main_name="$(basename "$(dirname "$common_dir")")"
+  # 디렉토리 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽는다.
+  # heydealer-android-HDA-22644-2 -> "-2", heydealer-android-HDA-22644 -> "" (base 자리),
+  # heydealer-android-2 -> "-2" (옛 규칙도 그대로 걸린다).
+  # 이슈키의 숫자(22644)는 자릿수가 많아 걸리지 않는다.
   top_name="$(basename "$top")"
   suffix=""
   case "$top_name" in
-    "$main_name") suffix="" ;;
-    "$main_name"*) suffix="${top_name#"$main_name"}" ;;
+    *-[0-9]|*-[0-9][0-9]) suffix="-${top_name##*-}" ;;
   esac
 
   base_copy=""
