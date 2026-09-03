@@ -150,7 +150,7 @@ if [ "$is_current" = 1 ] && [ -n "$(tracked_changes)" ]; then
   tracked_changes | head -10 >&2
   if [ "$opt_stash" = 1 ]; then
     info "[2/6] stash 후 진행합니다."
-    git stash push -u -m "clean-merged-session: $branch"
+    git stash push -u -m "release-worktree: $branch"
   else
     die "working tree가 깨끗하지 않습니다. 커밋하거나 --stash로 다시 실행하세요."
   fi

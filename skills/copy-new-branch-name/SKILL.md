@@ -1,7 +1,7 @@
 ---
 name: copy-new-branch-name
 effort: low
-description: 새로 만들 브랜치의 이름이 필요할 때 사용한다. 사용자가 'copy-new-branch-name', '브랜치 이름', '브랜치명', '새 브랜치 이름', '브랜치 이름 만들어', '브랜치명 추천', '브랜치 이름 복사', '브랜치 뭐로 할까' 등을 Jira 이슈와 함께 언급할 때 이 스킬을 사용해야 한다. 브랜치·worktree를 실제로 만드는 요청에는 `create-worktree`, develop 반영 브랜치에는 `merge-develop`을 사용한다.
+description: 새로 만들 브랜치의 이름이 필요할 때 사용한다. 사용자가 'copy-new-branch-name', '브랜치 이름', '브랜치명', '새 브랜치 이름', '브랜치 이름 만들어', '브랜치명 추천', '브랜치 이름 복사', '브랜치 뭐로 할까' 등을 Jira 이슈와 함께 언급할 때 이 스킬을 사용해야 한다. 브랜치·worktree를 실제로 만드는 요청에는 `start-worktree`, develop 반영 브랜치에는 `merge-develop`을 사용한다.
 argument-hint: "[Jira 이슈 키 또는 URL]"
 ---
 
@@ -121,6 +121,6 @@ printf '%s' 'feature/HDA-19432-add-vat-info-dialog' | pbcopy
 
 ## 하지 않는 것
 
-- 브랜치를 만들지 않는다. `git checkout -b`는 사용자가 복사해 쓰도록 문자열로만 낸다. 실제 생성은 `create-worktree`가 맡는다.
+- 브랜치를 만들지 않는다. `git checkout -b`는 사용자가 복사해 쓰도록 문자열로만 낸다. 실제 생성은 `start-worktree`가 맡는다.
 - 어느 base에서 분기할지 안내하지 않는다.
 - `merge/HDA-xxxx`는 다루지 않는다. develop 반영은 `merge-develop`이 맡는다.

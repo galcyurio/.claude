@@ -1,7 +1,7 @@
 ---
 name: remove-worktree
 effort: low
-description: git worktree를 안전하게 제거하는 스킬. 사용자가 'remove-worktree', 'worktree 삭제', 'worktree 정리', 'worktree 제거', '워크트리 삭제', '워크트리 정리', '워크트리 지워', 'worktree prune', 'worktree cleanup' 등 worktree 제거를 요청할 때 이 스킬을 사용해야 한다. worktree 생성 요청에는 `create-worktree`를 사용한다.
+description: git worktree를 안전하게 제거하는 스킬. 사용자가 'remove-worktree', 'worktree 삭제', 'worktree 정리', 'worktree 제거', '워크트리 삭제', '워크트리 정리', '워크트리 지워', 'worktree prune', 'worktree cleanup' 등 worktree 제거를 요청할 때 이 스킬을 사용해야 한다. worktree 생성 요청에는 `start-worktree`를 사용한다.
 argument-hint: "[worktree-path-or-name]"
 ---
 
@@ -173,5 +173,5 @@ stale worktree 메타데이터를 정리한다.
 - **메인 worktree 제거 금지**: 본 스킬은 보조 worktree 제거만 책임.
 - **손실 가능성 있는 동작은 모두 명시적 승인**: 미커밋·미 push는 자동 진행하지 않는다.
 - **원격 브랜치 삭제는 보수적 기본값(유지)**: 협업 영향이 있어 사용자 명시 승인 필요.
-- **base 추정은 `develop` → `main` → `master` 순**: `create-worktree`와 동일 규칙.
+- **base 추정은 `develop` → `main` → `master` 순**: `start-worktree`와 동일 규칙.
 - **`.claude/`의 rules 심볼릭 링크와 settings.local.json은 별도 백업하지 않는다**: rules는 외부 절대 경로 링크라 worktree 제거와 함께 사라져도 정보 손실 없음. settings.local.json은 메인이 정본.
