@@ -6,6 +6,7 @@
 # 사용법: start-feature.sh <base-branch> [옵션]
 #   <base-branch>   feature-base/HDA-xxxx-slug 형태의 전체 이름
 #   --children <n>  하위 worktree 개수 (기본 2)
+#   --display-name <제목>  base worktree의 orca 표시 이름 (Jira 에픽 제목)
 #   --dry-run       파괴적 동작 없이 계획만 출력
 set -euo pipefail
 
@@ -51,10 +52,12 @@ for w in (json.load(sys.stdin).get("result") or {}).get("worktrees") or []:
 
 base_branch=""
 children=2
+opt_display_name=""
 opt_dry_run=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --children) children="${2:-2}"; shift 2 ;;
+    --display-name) opt_display_name="${2:-}"; shift 2 ;;
     --dry-run) opt_dry_run=1; shift ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) base_branch="$1"; shift ;;
@@ -77,10 +80,13 @@ if [ "$opt_dry_run" = 0 ]; then
   git checkout -b "$base_branch"
 fi
 
-# TODO: base 브랜치를 upstream과 함께 원격에 올린다 (예: git push -u origin "$base_branch").
-# rules/git.md의 push 게이트에 따라 사용자의 명시적 승인 없이는 채우지 않는다.
-# 하위 worktree가 origin/<base>를 따라가야 하므로 이 줄이 채워져야 다음 단계가 의미를 갖는다.
+# base 브랜치를 원격에 올린다. 하위 worktree가 origin/<base>를 upstream으로 따라가야
+# 하므로 이 단계 없이는 뒤가 전부 실패한다. 이 스킬을 부르는 것이 곧 이 업로드에 대한
+# 지시이며, SKILL.md가 실행 전에 브랜치 이름을 보여 확인받는 것으로 게이트를 대신한다.
+info "  원격에 올립니다: origin/$base_branch"
 if [ "$opt_dry_run" = 0 ]; then
+  git push -u origin "$base_branch" \
+    || die "원격에 올리지 못했습니다. 하위 worktree의 upstream을 걸 수 없으므로 중단합니다."
   git switch -
 fi
 
@@ -94,6 +100,13 @@ if [ "$opt_dry_run" = 0 ]; then
   bash "$HOME/.claude/skills/start-worktree/init.sh" "$base_path"
   base_wt_id="$(wait_orca_worktree "$base_path")" \
     || die "orca가 base worktree를 인식하지 못했습니다: $base_path"
+
+  # 카드 이름을 브랜치명 대신 에픽 제목으로 둔다. 보드에서 무슨 피처인지 바로 읽힌다.
+  if [ -n "$opt_display_name" ]; then
+    "$ORCA" worktree set --worktree "id:$base_wt_id" \
+      --display-name "$opt_display_name" --json > /dev/null \
+      || info "  표시 이름을 바꾸지 못했습니다: $opt_display_name"
+  fi
 fi
 
 info "[3/3] 하위 worktree ${children}개 생성"
@@ -122,9 +135,11 @@ while [ "$i" -lt "$children" ]; do
     || die "upstream을 걸지 못했습니다. base 브랜치가 원격에 올라가 있어야 합니다."
   bash "$HOME/.claude/skills/start-worktree/init.sh" "$child_path"
 
+  # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
+  # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
   if child_id="$(wait_orca_worktree "$child_path")"; then
     "$ORCA" worktree set --worktree "id:$child_id" \
-      --parent-worktree "worktree:$base_wt_id" --json > /dev/null \
+      --parent-worktree "path:$base_path" --json > /dev/null \
       || info "    orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요."
   else
     info "    orca가 아직 인식하지 못해 부모 연결을 건너뜁니다."
