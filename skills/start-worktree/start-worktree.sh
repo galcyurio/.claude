@@ -158,3 +158,52 @@ else
   [ -n "$target_worktree" ] || die "orca worktree create가 경로를 돌려주지 않았습니다."
   bash "$(dirname "$0")/init.sh" "$target_worktree"
 fi
+
+if [ "$opt_no_move" = 1 ]; then
+  info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree"
+  exit 0
+fi
+
+sid="$(current_session_id)"
+[ -n "$sid" ] || die "현재 세션 id를 찾지 못했습니다. --no-move로 자리만 준비할 수 있습니다."
+
+# 원본은 계산하지 않고 찾는다. 세션의 cwd와 스크립트 실행 위치가 다를 수 있다.
+src="$(session_file_path "$sid")"
+dst_dir="$(session_project_dir "$target_worktree")"
+
+info "[2/3] 세션 이사: $sid"
+info "  ${src:-(찾지 못함)}"
+info "  -> $dst_dir"
+if [ "$opt_dry_run" = 1 ]; then
+  info "[dry-run] 여기서 멈춥니다. 실제로는 jsonl을 복사하고 새 탭을 띄운 뒤 이 탭을 닫습니다."
+  exit 0
+fi
+
+[ -n "$src" ] && [ -f "$src" ] || die "세션 파일을 찾지 못했습니다: $sid"
+mkdir -p "$dst_dir"
+cp "$src" "$dst_dir/"
+
+wt_id="$("$ORCA" worktree list --json | python3 -c '
+import json,sys
+p = sys.argv[1]
+for w in (json.load(sys.stdin).get("result") or {}).get("worktrees") or []:
+    if w.get("path") == p:
+        print(w.get("id","")); break
+' "$target_worktree")"
+[ -n "$wt_id" ] || die "orca에 등록된 worktree를 찾지 못했습니다: $target_worktree"
+
+# 어느 자리를 골랐는지는 이 프롬프트로만 전달된다. 옛 탭의 stdout은 곧 닫혀 사라지고,
+# jsonl 복사는 이 실행 도중에 일어나 이 스크립트의 출력이 새 세션에 실리지 않는다(spec 4.2-4).
+first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason."
+
+"$ORCA" terminal create --worktree "id:$wt_id" --title "$issue_key" \
+  --command "claude --resume $sid \"$first_prompt\"" --json > /dev/null \
+  || die "새 탭을 띄우지 못했습니다. 세션 파일은 이미 복사되어 있으니 그 worktree에서 직접 열 수 있습니다."
+info "[3/3] 새 탭 기동 완료: $target_worktree"
+
+handle="$(orca_terminal_handle)"
+if [ -z "$handle" ]; then
+  warn "터미널 핸들을 찾지 못해 이 탭은 직접 닫아 주세요."
+  exit 0
+fi
+exec "$ORCA" terminal close --terminal "$handle" --tab --json
