@@ -52,6 +52,38 @@ session_file_path() {
   find "$HOME/.claude/projects" -maxdepth 2 -name "$1.jsonl" -exec stat -f '%m %N' {} + 2>/dev/null \
     | sort -rn | head -1 | cut -d' ' -f2-
 }
+# 메인 worktree 옆에 <repo>-<N> 형식으로 비어 있는 다음 경로를 정한다.
+# orca worktree create는 경로를 받지 않고 ~/orca/workspaces/ 아래에 만드는데,
+# 그러면 디렉토리 접미사가 사라져 release-worktree가 base 사본을 찾지 못한다.
+next_worktree_path() {
+  local main_wt parent repo n
+  main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+  parent="$(dirname "$main_wt")"
+  repo="$(basename "$main_wt")"
+  n=2
+  while [ -e "$parent/$repo-$n" ]; do n=$((n+1)); done
+  printf '%s/%s-%s' "$parent" "$repo" "$n"
+}
+
+# git worktree add로 만든 자리를 orca가 인식할 때까지 기다렸다가 id를 낸다.
+# repo 설정의 externalWorktreeVisibility가 show라 외부 생성분도 잡히지만 즉시는 아니다.
+wait_orca_worktree() {
+  local path="$1" i=0 id=""
+  while [ "$i" -lt 20 ]; do
+    id="$("$ORCA" worktree list --json 2>/dev/null | python3 -c '
+import json, sys
+p = sys.argv[1]
+for w in (json.load(sys.stdin).get("result") or {}).get("worktrees") or []:
+    if w.get("path") == p:
+        print(w.get("id", "")); break
+' "$path" 2>/dev/null || true)"
+    if [ -n "$id" ]; then printf '%s' "$id"; return 0; fi
+    sleep 0.5
+    i=$((i + 1))
+  done
+  return 1
+}
+
 
 # 현재 orca 터미널 핸들.
 orca_terminal_handle() {
@@ -151,11 +183,10 @@ else
     info "[dry-run] 새 worktree를 만들 자리까지만 확인했습니다. 이후 단계는 실제 경로가 있어야 진행합니다."
     exit 0
   fi
-  repo_root="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-  target_worktree="$("$ORCA" worktree create --repo "path:$repo_root" \
-    --name "$work_branch" --base-branch "$base_ref" --json \
-    | python3 -c 'import json,sys; print((json.load(sys.stdin).get("result") or {}).get("worktree",{}).get("path",""))')"
-  [ -n "$target_worktree" ] || die "orca worktree create가 경로를 돌려주지 않았습니다."
+  target_worktree="$(next_worktree_path)"
+  info "  새 자리: $target_worktree"
+  git worktree add -b "$work_branch" "$target_worktree" "$base_ref" \
+    || die "worktree를 만들지 못했습니다: $target_worktree"
   bash "$(dirname "$0")/init.sh" "$target_worktree"
 fi
 
@@ -183,14 +214,8 @@ fi
 mkdir -p "$dst_dir"
 cp "$src" "$dst_dir/"
 
-wt_id="$("$ORCA" worktree list --json | python3 -c '
-import json,sys
-p = sys.argv[1]
-for w in (json.load(sys.stdin).get("result") or {}).get("worktrees") or []:
-    if w.get("path") == p:
-        print(w.get("id","")); break
-' "$target_worktree")"
-[ -n "$wt_id" ] || die "orca에 등록된 worktree를 찾지 못했습니다: $target_worktree"
+wt_id="$(wait_orca_worktree "$target_worktree")" \
+  || die "orca가 worktree를 인식하지 못했습니다: $target_worktree"
 
 # 어느 자리를 골랐는지는 이 프롬프트로만 전달된다. 옛 탭의 stdout은 곧 닫혀 사라지고,
 # jsonl 복사는 이 실행 도중에 일어나 이 스크립트의 출력이 새 세션에 실리지 않는다(spec 4.2-4).
