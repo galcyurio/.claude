@@ -4,7 +4,8 @@
 # 브랜치를 끊고, 현재 claude 세션을 그 자리로 옮긴 뒤 원래 탭을 닫는다.
 #
 # 사용법: start-worktree.sh <JIRA-KEY> [옵션]
-#   --base <ref>      base 브랜치를 직접 지정 (기본: 에픽의 feature-base, 없으면 develop)
+#   --base <ref>      작업 브랜치를 끊을 지점 (기본: 에픽의 feature-base, 없으면 develop)
+#   --pool <ref>      유휴 worktree를 찾는 기준 base (기본: --base 값)
 #   --branch <name>   작업 브랜치 이름을 직접 지정
 #   --new             유휴 worktree를 찾지 않고 새로 만든다
 #   --no-move         세션을 옮기지 않는다 (자리만 준비)
@@ -111,6 +112,7 @@ ORCA="${ORCA_CLI_COMMAND:-orca}"
 
 issue_key=""
 opt_base=""
+opt_pool=""
 opt_branch=""
 opt_new=0
 opt_no_move=0
@@ -119,6 +121,7 @@ opt_dry_run=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) opt_base="${2:-}"; shift 2 ;;
+    --pool) opt_pool="${2:-}"; shift 2 ;;
     --branch) opt_branch="${2:-}"; shift 2 ;;
     --new) opt_new=1; shift ;;
     --no-move) opt_no_move=1; shift ;;
@@ -132,11 +135,19 @@ done
 [ -n "$opt_base" ] || die "base 브랜치가 필요합니다. SKILL.md가 --base로 넘깁니다."
 [ -n "$opt_branch" ] || die "작업 브랜치 이름이 필요합니다. SKILL.md가 --branch로 넘깁니다."
 base_ref="$opt_base"
+# 유휴 자리를 찾는 기준. 지정하지 않으면 분기 지점과 같다 — 에픽 base에서 그대로
+# 끊는 통상적인 경우다.
+pool_ref="${opt_pool:-$opt_base}"
 work_branch="$opt_branch"
 
-# base 기준으로 재사용 가능한 worktree 경로를 고른다.
-# 조건: 메인이 아니고, 브랜치가 <base>-<접미사>, upstream이 origin/<base>,
+# 풀 base 기준으로 재사용 가능한 worktree 경로를 고른다.
+# 조건: 메인이 아니고, 브랜치가 <pool>-<접미사>, upstream이 origin/<pool>,
 #       미커밋 변경 없음. 후보가 여럿이면 가장 오래 손대지 않은 것을 고른다.
+#
+# 여기서 쓰는 기준은 작업 브랜치를 끊을 지점(--base)이 아니라 그 자리가 속한 에픽
+# base(--pool)다. 형제 이슈 브랜치 위에 얹으려고 --base를 그 브랜치로 지정하더라도
+# 자리를 찾는 기준은 바뀌지 않아야 한다. 두 개념을 한 값으로 묶으면 에픽의 유휴
+# 자리가 후보에서 빠져 매번 새 worktree가 생긴다.
 #
 # 메인 제외가 핵심이다. heydealer-android와 revolt-android 같은 메인 worktree도
 # develop을 물고 upstream이 origin/develop이며 대개 깨끗해서, 이 조건이 없으면
@@ -147,16 +158,16 @@ work_branch="$opt_branch"
 # 하위 작업용 자리는 <base>-2, <base>-3처럼 접미사를 달고 upstream만 origin/<base>를
 # 가리키므로, 브랜치 이름의 접미사 유무로 상위와 하위가 갈린다.
 find_idle_worktree() {
-  local base="$1" main_wt best="" best_ts="" wt br up ts
+  local pool="$1" main_wt best="" best_ts="" wt br up ts
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
   while IFS= read -r wt; do
     [ -n "$wt" ] || continue
     [ "$wt" != "$main_wt" ] || continue
     br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
     [ -n "$br" ] || continue
-    case "$br" in "$base"-*) ;; *) continue ;; esac
+    case "$br" in "$pool"-*) ;; *) continue ;; esac
     up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
-    [ "$up" = "origin/$base" ] || continue
+    [ "$up" = "origin/$pool" ] || continue
     [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || continue
     # 마지막 커밋 시각은 같은 브랜치를 문 worktree끼리 동일해 변별력이 없다.
     # 디렉토리 mtime은 빌드 산출물 때문에 실제 사용 시점을 따라간다.
@@ -168,17 +179,31 @@ find_idle_worktree() {
 
 target_worktree=""
 if [ "$opt_new" = 0 ]; then
-  target_worktree="$(find_idle_worktree "$base_ref")"
+  target_worktree="$(find_idle_worktree "$pool_ref")"
 fi
 
 if [ -n "$target_worktree" ]; then
   pick_reason="유휴 worktree를 재사용했다"
-  info "[1/3] 유휴 worktree 재사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD))"
+  info "[1/3] 유휴 worktree 재사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
   if [ "$opt_dry_run" = 0 ]; then
-    git -C "$target_worktree" fetch origin "$base_ref"
-    git -C "$target_worktree" pull --ff-only \
-      || die "유휴 브랜치가 원격과 갈라졌습니다. 강제로 맞추지 않고 중단합니다."
-    git -C "$target_worktree" checkout -b "$work_branch"
+    if [ "$base_ref" = "$pool_ref" ]; then
+      # 유휴 브랜치가 곧 분기 지점이므로, 그 브랜치를 최신화한 뒤 거기서 끊는다.
+      git -C "$target_worktree" fetch origin "$base_ref"
+      git -C "$target_worktree" pull --ff-only \
+        || die "유휴 브랜치가 원격과 갈라졌습니다. 강제로 맞추지 않고 중단합니다."
+      git -C "$target_worktree" checkout -b "$work_branch"
+    else
+      # 분기 지점이 유휴 브랜치와 다르다. 유휴 브랜치를 최신화할 이유가 없으므로
+      # 그대로 두고 base의 원격 tip 커밋에서 끊는다. start-point로 커밋 id를 주면
+      # 원격 ref를 붙이지 않으므로 upstream이 자동으로 걸리지 않는다(rules/git.md).
+      git -C "$target_worktree" fetch origin "$base_ref" \
+        || warn "원격에서 $base_ref 를 가져오지 못했습니다. 로컬 ref로 진행합니다."
+      start_commit="$(git -C "$target_worktree" rev-parse --verify --quiet "refs/remotes/origin/$base_ref" || true)"
+      [ -n "$start_commit" ] \
+        || start_commit="$(git -C "$target_worktree" rev-parse --verify --quiet "refs/heads/$base_ref" || true)"
+      [ -n "$start_commit" ] || die "base를 찾지 못했습니다: $base_ref"
+      git -C "$target_worktree" checkout -b "$work_branch" "$start_commit"
+    fi
   fi
 else
   if [ "$opt_new" = 1 ]; then
