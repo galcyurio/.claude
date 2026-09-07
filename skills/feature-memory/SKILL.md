@@ -202,7 +202,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
 
 | 도메인 패턴 | 분류 | 처리 |
 |---|---|---|
-| `*.notion.so`, `*.notion.site` | **Notion** (기획서·회의록) 또는 **API 문서** | `notion-fetch`로 last_edited_time 비교 + 본문 요약. **제목/내용이 API 명세 성격**(제목에 `API`·`명세`·`스펙`·`endpoint`, 또는 엔드포인트·요청/응답 표 포함)이면 아래 **API 문서**로 재분류 |
+| `*.notion.so`, `*.notion.site` | **PRD** · **Notion**(기획서·회의록) · **API 문서** 중 하나 | `notion-fetch`로 last_edited_time 비교 + 본문 요약. **제목이 `PRD`로 시작하거나 본문에 `FR-n`·`UC-n`·`OQ-n` ID 체계가 있으면 PRD**로 분류한다 — PRD는 그 피처의 확정 스펙 원천이므로 기획서보다 우선하는 1급 소스다. **제목/내용이 API 명세 성격**(제목에 `API`·`명세`·`스펙`·`endpoint`, 또는 엔드포인트·요청/응답 표 포함)이면 아래 **API 문서**로 재분류 |
 | `docs.prnd.co.kr/view/...`, 기타 사내 API 문서 호스트 | **API 문서** (1급) | SPA라 view URL을 그대로 fetch하면 빈 응답 → `~/.claude/references/external-links.md`로 view→API URL 변환 후 `WebFetch`. 엔드포인트·필드·enum 인용 |
 | `*.slack.com/archives/...` | **Slack** | `slack_read_thread`로 스레드 읽기 |
 | `figma.com/design/...`, `figma.com/board/...` | **Figma** | `get_design_context` 우선 → 실패 시 `get_screenshot` 폴백. **페이지 단위 노드면 추가로 `get_metadata` 호출 → 임시 파일에서 직계 자식 frame 목록 추출** (jq + grep, token-cheap) |
@@ -232,6 +232,7 @@ Jira 응답(description + 모든 comment + remote links + subtasks의 descriptio
   > 응답 `ts` 값은 여전히 `>= since_ts` 조건으로 한 번 더 검증한다 (API 경계 반올림 여유).
   >
   > **⛔ top-level만 보지 말고 thread 내부까지 전개한다.** `slack_read_channel`은 top-level 메시지만 반환한다 — thread reply 안의 본인 발화는 보이지 않는다. reply ≥1인 스레드 중 **(a) parent author가 본인, (b) parent에 본인 멘션, (c) 최신 reply ts ≥ since** 중 하나라도 해당하면 `slack_read_thread`로 전개해 내부 reply까지 검사한다. 특히 **본인 발화(author=self)가 스레드 마지막이고 멘션을 포함하는데 이후 reply 0 + reaction에 타인 없음 → 미응답 TODO 후보**(STEP 2.5). top-level만 보면 이 케이스를 통째로 놓친다 (실제 누락 사례 있었음).
+- **PRD (1급 소스)**: 분류된 PRD URL에 `notion-fetch` 호출. PRD는 그 피처의 **확정 스펙 원천**이므로 `since` 무관 **항상 수집**하고, FR·UC·OQ의 현재 상태를 Reference에 요약 인용한다. `last_edited_time >= since`면 변경분(신설·개정된 FR, Resolved로 닫힌 OQ)을 추출해 **⚠️(B-1 확정 결정)로 격상**하고 `## 변경 이력`에 prepend한다. **아직 가정 라벨이 붙어 있거나 미해결 상태인 OQ 중 본인이 확정해야 할 것은 `## 🎯`의 TODO 후보**다. PRD가 있으면 기획서 본문이 비어 있어도 결함으로 보지 않는다
 - **Notion 기획서/회의록**: 분류된 Notion URL(기획 성격) 각각에 `notion-fetch` 병렬 호출. `last_edited_time >= since`만 채택, 변경됐으면 본문 요약 추출
 - **API 문서 (1급 참고 문서)**: Notion API 문서는 `notion-fetch`, 외부 API 문서(`docs.prnd.co.kr` 등)는 `~/.claude/references/external-links.md`로 view→API URL 변환 후 `WebFetch` 병렬 호출. **API 문서는 이 피처의 핵심 계약**이므로 `since` 무관 **항상 수집·인용**한다(변경 없어도 Reference에 전문 유지). `last_edited`/내용 변경이 감지되면 엔드포인트·필드·enum 변경을 추출해 **⚠️(B-1 확정 결정)로 격상**하고 `## 변경 이력`에 prepend. Reference `API 명세` toggle에 전문 인용. 인식된 API 문서 URL이 0개여도 데이터 소스 상태에 `⚪ API 문서 (링크 없음)`로 명시.
 - **GitHub PR**: 에픽 키 + 하위 이슈 키를 **2-pass로 검색**하고 dedup.
@@ -612,7 +613,7 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
    - 모든 소스 정상: `last_run_at = now`, `last_error = ""`
    - 일부 소스 실패: `last_run_at = now` (부분 성공도 갱신), `last_error = "Slack: token expired"` 같은 1줄 사유 (여러 실패 시 ` | `로 합침)
    - **`epic_key` 추가**: STEP 2.1의 재해석에서 **새 하위 에픽 키**가 나왔으면 `epic_key` 끝에 쉼표로 덧붙인다. 기존 키는 제거하지 않는다 (위 `## 키 체계`). 새 키가 없으면 건드리지 않는다.
-   - **URL 미러**: STEP 2.2에서 추출·분류한 핵심 소스 URL을 동명 property(`기획서`·`API 문서`·`Figma`·`Slack`)에 기록. 여러 개면 대표 1개(기획서·API 문서 = 주요/최근 문서, Figma = 메인 파일, Slack = 채널). 추출값이 없으면 공란 유지(빈 값으로 덮어쓰지 않음).
+   - **URL 미러**: STEP 2.2에서 추출·분류한 핵심 소스 URL을 동명 property(`PRD`·`기획서`·`API 문서`·`Figma`·`Slack`)에 기록. 여러 개면 대표 1개(기획서·API 문서 = 주요/최근 문서, Figma = 메인 파일, Slack = 채널). 추출값이 없으면 공란 유지(빈 값으로 덮어쓰지 않음).
 2. **일부 소스 실패가 있었다면** 알림 채널로 1줄 메시지 송신:
    ```
    ⚠️ feature-memory {epic_key}: 일부 소스 실패 — {failed sources}
@@ -697,12 +698,13 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 | `last_error` | rich text | 마지막 실행 실패 사유 (없으면 빈 값) |
 | `registered_at` | date | 등록일 |
 | `figma_frame_hashes` | rich text | Figma frame별 디자인 컨텍스트 hash JSON. `{"488:2586": "sha256...", ...}` 형식. STEP 2.3 Figma ②단계의 incremental 변경 감지용. **`SKIP`** 으로 설정하면 ②단계(frame별 `get_design_context`+hash)만 skip(①frame 목록 추출은 항상 수행). 빈 값(`""`)이면 첫 갱신 시 `{}`로 초기화. **⛔ 센티넬에 `_`·`*`로 감싼 값(`__skip__` 등)을 쓰지 않는다** — Notion이 마크다운 강조로 파싱해 저장 값이 `**skip**`으로 깨지고 다음 갱신의 문자열 비교가 실패한다(실제 발생). **판정은 문자열 일치가 아니라 "JSON 객체로 파싱되는가"로 한다** — 파싱 실패 시 무조건 ② skip으로 간주해 깨진 값에도 안전하게 동작한다 |
+| `PRD` | url | PRD 문서 URL(제목이 `PRD`로 시작하거나 `FR-n`·`UC-n`·`OQ-n` 체계를 쓰는 Notion 페이지). 그 피처의 **확정 스펙 원천**이라 기획서보다 우선한다. 미러 |
 | `기획서` | url | Notion 기획 문서 URL. **Jira 추출값의 미러**(파생 캐시) — STEP 5에서 매 갱신 시 갱신 |
 | `API 문서` | url | API 명세 문서 URL (Notion 또는 외부 `docs.prnd.co.kr` 등). 미러. 없으면 공란 |
 | `Figma` | url | 디자인 파일 URL. 미러 |
 | `Slack` | url | 피처 Slack 채널 URL. 미러 |
 
-> **미러 property 운영**: 위 4개 URL property는 STEP 2.2에서 Jira로부터 추출·분류한 URL을 STEP 5에서 동명 property에 기록한다. 여러 개면 대표 1개(기획서·API 문서는 가장 최근/주요 문서, Figma는 메인 파일, Slack은 채널). 추출값이 없으면 공란(덮어쓰지 않음). DB 테이블 뷰에서 피처별 핵심 문서를 바로 연다.
+> **미러 property 운영**: 위 5개 URL property는 STEP 2.2에서 Jira로부터 추출·분류한 URL을 STEP 5에서 동명 property에 기록한다. 여러 개면 대표 1개(PRD·기획서·API 문서는 가장 최근/주요 문서, Figma는 메인 파일, Slack은 채널). 추출값이 없으면 공란(덮어쓰지 않음). DB 테이블 뷰에서 피처별 핵심 문서를 바로 연다.
 
 ## URL 파싱 규칙
 
@@ -815,7 +817,7 @@ bootstrap + 첫 register + 첫 수동 갱신을 검증한 후 등록한다.
 ## 주의사항
 
 - **`## 한눈에 보기`~`## 데이터 소스 상태` 4개 섹션은 매 실행 재생성**된다 (STEP 4.5 부분 패치로 해당 섹션만 교체). 사람이 이 섹션들을 손으로 편집해도 덮어써진다. 단 🎯/⚠️·✅ 완료·변경 이력은 sweep·prepend로 **보존·누적**되므로 덮어쓰지 않는다. **자동 갱신 대상 목록에 없는 섹션(사람이 직접 추가한 설계 메모·구현 계획 등)도 그대로 보존된다** — STEP 4.4 참조. 따라서 자유 메모는 child page를 만들지 않고 본문에 별도 `##` 섹션으로 둬도 안전하다.
-- **URL이 잘못되어 fetch 실패하면** `last_error`에 기록된다. SSOT 원칙상 수정은 **Jira 이슈에서** 한다 (`기획서`·`API 문서`·`Figma`·`Slack` property URL은 Jira 추출값의 미러라 매 갱신 시 덮어쓰임 — 직접 편집해도 다음 갱신에 복원됨).
+- **URL이 잘못되어 fetch 실패하면** `last_error`에 기록된다. SSOT 원칙상 수정은 **Jira 이슈에서** 한다 (`PRD`·`기획서`·`API 문서`·`Figma`·`Slack` property URL은 Jira 추출값의 미러라 매 갱신 시 덮어쓰임 — 직접 편집해도 다음 갱신에 복원됨).
 - **routine은 사용자 Claude 계정에 묶여 있다**. 휴가/퇴사 등 장기 부재 시 service account + GitHub Actions로 마이그레이션 (디자인 문서 Open Question 8).
 - **변경 이력 누적이 길어지면** 200개 초과분이 `<details>` 블록으로 접힌다. 이 동작이 마음에 안 들면 STEP 3의 "변경 이력" 섹션 로직을 조정.
 - **READ-ONLY 데이터 소스**: Jira/Slack/Notion 소스 자체의 상태(이슈 상태 전환, 메시지 추가 등)는 절대 수정하지 않는다. 보고서만 갱신한다.
