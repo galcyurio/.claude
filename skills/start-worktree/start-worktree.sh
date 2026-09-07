@@ -135,12 +135,17 @@ base_ref="$opt_base"
 work_branch="$opt_branch"
 
 # base 기준으로 재사용 가능한 worktree 경로를 고른다.
-# 조건: 메인이 아니고, 브랜치가 <base> 또는 <base>-<접미사>, upstream이 origin/<base>,
+# 조건: 메인이 아니고, 브랜치가 <base>-<접미사>, upstream이 origin/<base>,
 #       미커밋 변경 없음. 후보가 여럿이면 가장 오래 손대지 않은 것을 고른다.
 #
 # 메인 제외가 핵심이다. heydealer-android와 revolt-android 같은 메인 worktree도
 # develop을 물고 upstream이 origin/develop이며 대개 깨끗해서, 이 조건이 없으면
 # 메인이 후보로 잡혀 그 위에 작업 브랜치가 만들어진다(spec 3절).
+#
+# 접미사가 없는 <base> 자체도 같은 이유로 뺀다. 그 자리는 start-feature가 만든 상위
+# base worktree여서, 재사용하면 에픽의 기준 자리가 작업 브랜치로 덮여 사라진다.
+# 하위 작업용 자리는 <base>-2, <base>-3처럼 접미사를 달고 upstream만 origin/<base>를
+# 가리키므로, 브랜치 이름의 접미사 유무로 상위와 하위가 갈린다.
 find_idle_worktree() {
   local base="$1" main_wt best="" best_ts="" wt br up ts
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
@@ -149,7 +154,7 @@ find_idle_worktree() {
     [ "$wt" != "$main_wt" ] || continue
     br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
     [ -n "$br" ] || continue
-    case "$br" in "$base"|"$base"-*) ;; *) continue ;; esac
+    case "$br" in "$base"-*) ;; *) continue ;; esac
     up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
     [ "$up" = "origin/$base" ] || continue
     [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || continue
