@@ -1,13 +1,15 @@
 ---
 name: feature-memory
-description: 피처(Jira Epic 단위) 진행 현황을 Jira·Slack·Notion·GitHub에서 자동 수집해 Notion 페이지에 markdown 보고서로 갱신하는 스킬. 사용자가 'feature-memory', '피처 현황', '피처 진행 상황', '피처 상태', '진행 현황 갱신', '진행 상황 업데이트', '피처 보고서', '피처 트래킹', '피처 추적' 등 피처 진행 현황 보고서 생성/갱신/조회를 요청할 때 이 스킬을 사용해야 한다. 매일 새벽 Claude Code의 /schedule routine으로 자동 호출되며, 수동 호출도 동일하게 동작한다. 단순 Jira 이슈 작업(create-jira-issue)이나 일일 업무 기록(snippet)에는 사용하지 않는다.
+description: 피처(Jira Epic 단위) 진행 현황을 Jira·Slack·Notion·GitHub에서 자동 수집해 Notion 페이지에 markdown 보고서로 갱신하는 스킬. 사용자가 'feature-memory', '피처 현황', '피처 진행 상황', '피처 상태', '진행 현황 갱신', '진행 상황 업데이트', '피처 보고서', '피처 트래킹', '피처 추적' 등 피처 진행 현황 보고서 생성/갱신/조회를 요청할 때 이 스킬을 사용해야 한다. 단순 Jira 이슈 작업(create-jira-issue)이나 일일 업무 기록(snippet)에는 사용하지 않는다.
 argument-hint: "[bootstrap | register <epic-key>... | <epic-key> | batch | list [--all] | unregister <epic-key> | reactivate <epic-key>]"
 model: sonnet
 ---
 
-# feature-memory — 피처 진행 현황 자동 추적
+# feature-memory — 피처 진행 현황 추적
 
-피처(Jira Epic) 단위로 Jira·Slack·Notion·GitHub의 정보를 한 페이지로 모아 Notion에 markdown 보고서로 갱신한다. Claude Code의 `/schedule` routine과 결합하면 매일 새벽 무인으로 돌아가서, 출근 전에 모든 피처의 최신 진행이 정리되어 있다.
+피처(Jira Epic) 단위로 Jira·Slack·Notion·GitHub의 정보를 한 페이지로 모아 Notion에 markdown 보고서로 갱신한다.
+
+> **이 스킬은 로컬 환경에서 사용자가 직접 호출해야만 동작한다.** 무인 실행은 지원하지 않으므로, 갱신이 필요한 시점에 사용자가 서브커맨드를 호출한다.
 
 ## 기본 정보
 
@@ -54,12 +56,6 @@ model: sonnet
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ /schedule routine  (매일 06:00 KST)                          │
-│   prompt: "/feature-memory batch"                            │
-└────────────────┬─────────────────────────────────────────────┘
-                 │
-                 ▼
-┌──────────────────────────────────────────────────────────────┐
 │ batch (STEP 6)                                                │
 │   Notion DB의 모든 페이지 조회 → 각 epic_key 추출            │
 │   각 피처에 대해 STEP 2~5 순차 실행 (cascade-free)            │
@@ -89,7 +85,7 @@ model: sonnet
 | `bootstrap` | Notion DB와 알림 채널을 처음 셋업한다 (1회만 호출) |
 | `register <epic-key>...` | 새 피처를 등록한다 (Notion DB에 빈 페이지 생성, `status = active`). 플랫폼별로 에픽이 갈렸으면 **부모 Feature 키 1개**를 주면 된다 (하위 에픽 자동 해석). 키를 여러 개 주면 한 페이지로 묶어 등록한다 |
 | `<epic-key>` | 단일 피처의 보고서를 갱신한다 (보관된 피처는 자동 skip) |
-| `batch` | `status = active`인 모든 피처의 보고서를 순차 갱신한다 (routine 진입점) |
+| `batch` | `status = active`인 모든 피처의 보고서를 순차 갱신한다 |
 | `list [--all]` | 등록된 피처 목록을 표시한다. 기본은 `status = active`만, `--all`이면 보관 포함 |
 | `unregister <epic-key>` | 피처를 보관 처리한다 (`status = archived`, 페이지는 그대로 유지·batch 대상 제외) |
 | `reactivate <epic-key>` | 보관된 피처를 다시 활성화한다 (`status = active`) |
@@ -624,7 +620,7 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
    - 성공: `✅ {epic_key} 갱신 완료 (변경 이력 N건 추가)`
    - 부분 성공: `⚠️ {epic_key} 갱신 (실패 소스: {sources})`
 
-## STEP 6: batch (routine 진입점)
+## STEP 6: batch
 
 0. **1회성 backfill (멱등)**:
    - DB 스키마에 `status` property 자체가 없으면 1회 안내 후 batch 중단: "Notion DB에 `status` select property (`active` · `archived`)를 추가하세요. DB 상단의 `+ Add a property` → `Select` → 옵션 `active`, `archived` 등록. 이후 batch 재실행." (Notion API `notion-update-data-source`로 자동 추가는 시도하지 않는다 — 사용자가 직접 옵션 색상까지 결정할 수 있게 둠.)
@@ -649,7 +645,6 @@ STEP 2.5 신규 후보를 기존 미체크 + ✅ 완료 항목과 비교 (정규
    ⚠️ 부분 성공: 1건 (HDA-12345)
    🟥 실패: 0건
    ```
-8. **routine timeout 대비**: 등록 피처가 8개 이상이고 누적 실행 시간이 길어지면 (예: 5분 초과 예상), 미처리 피처를 다음 routine 실행에 위임할지 사용자가 결정. 1차에는 모두 순차 처리.
 
 ## STEP 7: list
 
@@ -752,10 +747,10 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 # 부모 키로 갱신 (하위 에픽은 매 갱신 시 재해석)
 /feature-memory HD-676
 
-# 단일 피처 갱신 (수동)
+# 단일 피처 갱신
 /feature-memory HDA-12345
 
-# 모든 피처 갱신 (routine이 호출)
+# 모든 피처 갱신
 /feature-memory batch
 
 # 활성 피처 조회
@@ -770,21 +765,6 @@ bootstrap이 자동 생성한다. 수동 생성 시 아래 스키마 그대로 �
 # 보관된 피처 재활성화
 /feature-memory reactivate HDA-12345
 ```
-
-## 원격 자동 실행 (`/schedule` routine)
-
-bootstrap + 첫 register + 첫 수동 갱신을 검증한 후 등록한다.
-
-```
-/schedule create
-  name: feature-memory-daily
-  cron: 0 21 * * *           # UTC 21:00 = KST 06:00 익일
-  prompt: /feature-memory batch
-```
-
-- routine prompt는 **단일 줄**. LLM에 iteration·dispatch를 맡기지 않는다 — 결정적 동작은 `batch` 서브커맨드 내부 명세된 단계에서 처리.
-- 사용자 머신이 꺼져 있어도 동작한다.
-- 매 실행마다 batch 완료 요약이 알림 채널로 송신되므로, 사용자는 알림만 봐도 어제 batch가 정상 돌았는지 알 수 있다.
 
 ## 검증 체크리스트 (첫 dry-run)
 
@@ -812,12 +792,10 @@ bootstrap + 첫 register + 첫 수동 갱신을 검증한 후 등록한다.
 - [ ] `unregister`한 epic_key를 `/feature-memory {epic_key}`로 갱신 시도 → "보관된 피처" 안내 후 중단
 - [ ] `unregister`한 epic_key가 `batch` 대상에서 제외되는지 확인 (요약에 카운트되지 않음)
 - [ ] `reactivate HDA-XXX` → `status = active`로 복귀 + 다음 갱신부터 다시 batch 대상
-- [ ] `/schedule run feature-memory-daily` → batch 1회 즉시 실행 + 알림 채널에 batch 요약 도착
 
 ## 주의사항
 
 - **`## 한눈에 보기`~`## 데이터 소스 상태` 4개 섹션은 매 실행 재생성**된다 (STEP 4.5 부분 패치로 해당 섹션만 교체). 사람이 이 섹션들을 손으로 편집해도 덮어써진다. 단 🎯/⚠️·✅ 완료·변경 이력은 sweep·prepend로 **보존·누적**되므로 덮어쓰지 않는다. **자동 갱신 대상 목록에 없는 섹션(사람이 직접 추가한 설계 메모·구현 계획 등)도 그대로 보존된다** — STEP 4.4 참조. 따라서 자유 메모는 child page를 만들지 않고 본문에 별도 `##` 섹션으로 둬도 안전하다.
 - **URL이 잘못되어 fetch 실패하면** `last_error`에 기록된다. SSOT 원칙상 수정은 **Jira 이슈에서** 한다 (`PRD`·`기획서`·`API 문서`·`Figma`·`Slack` property URL은 Jira 추출값의 미러라 매 갱신 시 덮어쓰임 — 직접 편집해도 다음 갱신에 복원됨).
-- **routine은 사용자 Claude 계정에 묶여 있다**. 휴가/퇴사 등 장기 부재 시 service account + GitHub Actions로 마이그레이션 (디자인 문서 Open Question 8).
 - **변경 이력 누적이 길어지면** 200개 초과분이 `<details>` 블록으로 접힌다. 이 동작이 마음에 안 들면 STEP 3의 "변경 이력" 섹션 로직을 조정.
 - **READ-ONLY 데이터 소스**: Jira/Slack/Notion 소스 자체의 상태(이슈 상태 전환, 메시지 추가 등)는 절대 수정하지 않는다. 보고서만 갱신한다.
