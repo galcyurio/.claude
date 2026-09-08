@@ -110,15 +110,29 @@ else
     *-[0-9]|*-[0-9][0-9]) suffix="-${top_name##*-}" ;;
   esac
 
+  # 이름 슬롯 자리(heydealer-android-AGP-10-migration[-N])는 끝의 숫자만 읽으면 develop
+  # 이나 develop-2로 되돌아가려 해서 메인·다른 슬롯과 충돌한다. 디렉토리에서 저장소
+  # 이름을 뗀 나머지를 계열 이름으로 보고 <base>-<나머지>를 첫 후보로 둔다. 존재하지
+  # 않는 후보는 아래 루프가 건너뛰므로, 에픽 자리(-<에픽키>-N)에서는 이 후보가 걸리지
+  # 않고 기존 숫자 접미사 매칭이 그대로 동작한다.
+  slot_candidate=""
+  rest="${top_name#"$(basename "$(dirname "$common_dir")")"}"
+  rest="${rest#-}"
+  case "$rest" in
+    ""|[0-9]|[0-9][0-9]) ;;
+    *) slot_candidate="${base_ref}-${rest}" ;;
+  esac
+
   base_copy=""
-  for candidate in "${base_ref}${suffix}" "$base_ref"; do
+  for candidate in "$slot_candidate" "${base_ref}${suffix}" "$base_ref"; do
     [ -n "$candidate" ] || continue
     git rev-parse --verify --quiet "refs/heads/$candidate" > /dev/null || continue
     holder="$(branch_holder "$candidate")"
     if [ -z "$holder" ] || [ "$holder" = "$top" ]; then base_copy="$candidate"; break; fi
   done
   if [ -z "$base_copy" ]; then
-    base_copy="${base_ref}${suffix}"
+    # 계열 사본이 아직 없는 이름 슬롯 자리라면 develop이 아니라 그 계열 사본을 만든다.
+    base_copy="${slot_candidate:-${base_ref}${suffix}}"
     if git rev-parse --verify --quiet "refs/heads/$base_copy" > /dev/null; then
       # 앞선 루프가 base_copy를 비운 채 나왔다면 후보가 전부 다른 worktree에 점유된 것이다.
       # 여기서 git branch를 부르면 already exists로 죽으므로, 기존 안내를 그대로 살린다.

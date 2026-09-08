@@ -37,7 +37,7 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 
 1. 대상 브랜치 확정 (detached HEAD·미존재는 중단). 보호 브랜치는 **인자로 지정했을 때만** 중단하고, 현재 브랜치가 보호 브랜치면 최신화 전용 모드로 전환한다
 2. `gh pr list --state merged`로 머지 확인, `baseRefName`으로 base 판별
-3. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인. 맞는 사본이 없으면 `origin/<base>`로 새로 만들고 upstream을 건다
+3. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인. 디렉토리 이름에서 저장소 이름을 뗀 나머지가 숫자가 아니면 그 이름을 계열로 보고 `<base>-<계열>`을 먼저 시도하므로, 이름 슬롯 자리는 `develop`이 아니라 자기 계열 사본으로 되돌아간다. 맞는 사본이 없으면 `origin/<base>`로 새로 만들고 upstream을 건다
 4. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch`(이미 그 브랜치면 생략) → `git pull --ff-only` → `git submodule update`
 5. 이 worktree에 쌓인 세션 이력(`.claude/projects/`)을 메인 저장소로 회수 (`cp -n`, 기존 파일은 덮어쓰지 않음)
 6. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제. 최신화 전용 모드에서는 삭제를 건너뛴다
@@ -50,6 +50,8 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 | `heydealer-android-3` | `feature-base/HDA-22279-...` | `feature-base/HDA-22279-...-3` |
 | `heydealer-android` (메인) | `develop` | `develop` |
 | `heydealer-android-2` | `develop` | `develop-2` (없으면 `develop`) |
+| `heydealer-android-AGP-10-migration` | `develop` | `develop-AGP-10-migration` |
+| `heydealer-android-AGP-10-migration-2` | `develop` | `develop-AGP-10-migration-2` |
 
 ## 스크립트가 중단했을 때 (exit 1)
 
