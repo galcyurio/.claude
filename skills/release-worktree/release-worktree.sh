@@ -8,6 +8,8 @@
 #   <branch>          정리할 로컬 브랜치. 생략하면 현재 체크아웃된 브랜치.
 #                     현재 브랜치가 base(develop·feature-base/*)면 삭제 없이 최신화만 한다.
 #   --base <name>     PR을 못 찾았거나 접미사 매칭을 건너뛰고 싶을 때 되돌아갈 base 사본을 직접 지정
+#   --force           PR이 없거나 머지되지 않았어도 해제한다. 머지 확인·미커밋 변경·
+#                     서브모듈 되돌리기 실패를 모두 넘기고 브랜치를 -D 로 지운다.
 #   --stash           working tree가 깨끗하지 않으면 stash하고 진행 (기본은 중단)
 #   --force-delete    git branch -D 로 삭제 (기본은 -d)
 #   --sweep           같은 base에 이미 머지된 다른 로컬 브랜치도 삭제
@@ -25,6 +27,7 @@ branch=""
 explicit_branch=0
 sync_only=0
 opt_base=""
+opt_force=0
 opt_stash=0
 opt_force_delete=0
 opt_sweep=0
@@ -33,11 +36,12 @@ opt_no_close=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) shift; [ $# -gt 0 ] || die "--base 뒤에 브랜치 이름이 필요합니다."; opt_base="$1" ;;
+    --force) opt_force=1 ;;
     --stash) opt_stash=1 ;;
     --force-delete) opt_force_delete=1 ;;
     --sweep) opt_sweep=1 ;;
     --no-close) opt_no_close=1 ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) [ -z "$branch" ] || die "브랜치는 하나만 지정할 수 있습니다: $branch, $1"; branch="$1"; explicit_branch=1 ;;
   esac
@@ -77,6 +81,31 @@ esac
 common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || git rev-parse --git-common-dir)"
 case "$common_dir" in /*) ;; *) common_dir="$PWD/$common_dir" ;; esac
 
+# worktree 디렉토리 이름에서 저장소 이름을 뗀 나머지.
+# heydealer-android-AGP-10-migration-2 -> AGP-10-migration-2, heydealer-android-2 -> 2
+worktree_rest() {
+  local rest
+  rest="$(basename "$top")"
+  rest="${rest#"$(basename "$(dirname "$common_dir")")"}"
+  printf '%s' "${rest#-}"
+}
+
+# 되돌아갈 base 사본에서 base_ref를 역으로 얻는다. 이름이 -<나머지>로 끝나고 upstream이
+# 걸린 로컬 브랜치가 정확히 하나일 때만 성공한다. 여러 개면 어느 것이 이 자리의 사본인지
+# 알 수 없으므로 실패로 둔다 — 나머지가 "2"면 develop-2 와 feature-base/...-2 가 함께 걸린다.
+resolve_base_from_slot() {
+  local rest="$1" found="" n=0 br up
+  [ -n "$rest" ] || return 1
+  while IFS=$'\t' read -r br up; do
+    [ -n "$up" ] || continue
+    case "$br" in *-"$rest") ;; *) continue ;; esac
+    found="${up#origin/}"
+    n=$((n + 1))
+  done < <(git for-each-ref --format='%(refname:short)%09%(upstream:short)' refs/heads/)
+  [ "$n" = 1 ] || return 1
+  printf '%s' "$found"
+}
+
 ## 2. 머지 확인과 base 판별
 
 if [ "$sync_only" = 1 ]; then
@@ -88,16 +117,34 @@ elif [ -n "$opt_base" ]; then
   base_ref="$opt_base"
   info "[1/6] base를 직접 지정했습니다: $base_copy (머지 확인 생략)"
 else
-  command -v gh > /dev/null || die "gh CLI가 필요합니다. --base <name>으로 직접 지정할 수도 있습니다."
-  base_ref="$(gh pr list --state merged --head "$branch" --limit 1 \
-    --json baseRefName --jq '.[0].baseRefName // empty' 2>/dev/null || true)"
-  if [ -z "$base_ref" ]; then
-    echo "[오류] $branch 로 머지된 PR을 찾지 못했습니다." >&2
-    echo "  upstream이 gone인 것은 머지 근거가 아닙니다. 사람이 머지 여부를 확인하거나," >&2
-    echo "  base를 알고 있다면 --base <name>으로 다시 실행하세요." >&2
-    exit 1
+  if [ "$opt_force" = 1 ]; then
+    # 머지 여부를 묻지 않는다. PR이 있으면 머지 상태와 무관하게 그 base를 쓰고, PR이
+    # 아예 없으면 이 자리가 물고 있던 base 사본에서 역으로 얻는다. 둘 다 실패하면
+    # base를 추정하지 않고 --base 를 요구한다.
+    base_ref=""
+    if command -v gh > /dev/null; then
+      base_ref="$(gh pr list --state all --head "$branch" --limit 1 \
+        --json baseRefName --jq '.[0].baseRefName // empty' 2>/dev/null || true)"
+    fi
+    if [ -z "$base_ref" ]; then
+      base_ref="$(resolve_base_from_slot "$(worktree_rest)")" || base_ref=""
+    fi
+    [ -n "$base_ref" ] \
+      || die "--force 로도 base를 특정하지 못했습니다. --base <name>을 함께 지정하세요."
+    info "[1/6] --force: 머지 확인을 건너뜁니다 (base: $base_ref)"
+  else
+    command -v gh > /dev/null || die "gh CLI가 필요합니다. --base <name>으로 직접 지정할 수도 있습니다."
+    base_ref="$(gh pr list --state merged --head "$branch" --limit 1 \
+      --json baseRefName --jq '.[0].baseRefName // empty' 2>/dev/null || true)"
+    if [ -z "$base_ref" ]; then
+      echo "[오류] $branch 로 머지된 PR을 찾지 못했습니다." >&2
+      echo "  upstream이 gone인 것은 머지 근거가 아닙니다. 사람이 머지 여부를 확인하거나," >&2
+      echo "  base를 알고 있다면 --base <name>으로 다시 실행하세요." >&2
+      echo "  머지 여부와 무관하게 자리를 비우려면 --force 로 실행하세요." >&2
+      exit 1
+    fi
+    info "[1/6] 머지 확인: $branch → $base_ref"
   fi
-  info "[1/6] 머지 확인: $branch → $base_ref"
 
   # base 사본 결정 (worktree 디렉토리 접미사 매칭)
   # 디렉토리 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽는다.
@@ -116,8 +163,7 @@ else
   # 않는 후보는 아래 루프가 건너뛰므로, 에픽 자리(-<에픽키>-N)에서는 이 후보가 걸리지
   # 않고 기존 숫자 접미사 매칭이 그대로 동작한다.
   slot_candidate=""
-  rest="${top_name#"$(basename "$(dirname "$common_dir")")"}"
-  rest="${rest#-}"
+  rest="$(worktree_rest)"
   case "$rest" in
     ""|[0-9]|[0-9][0-9]) ;;
     *) slot_candidate="${base_ref}-${rest}" ;;
@@ -167,8 +213,19 @@ if [ "$is_current" = 1 ] && [ -n "$(tracked_changes)" ]; then
   if [ "$opt_stash" = 1 ]; then
     info "[2/6] stash 후 진행합니다."
     git stash push -u -m "release-worktree: $branch"
+  elif [ "$opt_force" = 1 ]; then
+    # --force 는 미커밋 변경으로 멈추지 않는다. 다만 그냥 버리면 되찾을 수 없으므로
+    # 태그를 붙여 stash로 치워 둔다. 자리를 비우는 목적은 그대로 달성되고, 필요하면
+    # git stash list 에서 이 태그를 찾아 apply 할 수 있다.
+    force_stash_tag="release-worktree-force: $branch @ $(date '+%Y%m%d-%H%M%S')"
+    info "[2/6] --force: 미커밋 변경을 stash로 치우고 진행합니다."
+    if git stash push -u -m "$force_stash_tag"; then
+      warn "치워 둔 변경은 stash에 있습니다 — $force_stash_tag"
+    else
+      warn "stash에 실패했습니다. 변경을 그대로 둔 채 진행합니다."
+    fi
   else
-    die "working tree가 깨끗하지 않습니다. 커밋하거나 --stash로 다시 실행하세요."
+    die "working tree가 깨끗하지 않습니다. 커밋하거나 --stash·--force로 다시 실행하세요."
   fi
 else
   info "[2/6] working tree 확인 완료"
@@ -212,7 +269,13 @@ if [ "$is_current" = 1 ]; then
     info "[4/6] 이미 $base_copy 에 있어 전환을 건너뜁니다"
   else
     info "[4/6] base 사본으로 전환: $base_copy"
-    git switch "$base_copy"
+    if ! git switch "$base_copy"; then
+      # stash가 실패했는데도 --force 로 여기까지 온 경우다. 자리를 비우는 것이 목적이므로
+      # 남은 변경을 버리고 전환한다.
+      [ "$opt_force" = 1 ] || die "base 사본으로 전환하지 못했습니다: $base_copy"
+      warn "--force: 전환이 막혀 남은 로컬 변경을 버리고 전환합니다."
+      git switch --discard-changes "$base_copy"
+    fi
   fi
 
   if git rev-parse --verify --quiet "@{upstream}" > /dev/null; then
@@ -230,16 +293,25 @@ if [ "$is_current" = 1 ]; then
       warn "서브모듈 $sub 이 $branch_before($head_before) 를 가리키고 있어 base 기준으로 되돌립니다."
     done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
     if ! git submodule update; then
-      echo "[오류] 서브모듈을 base 기준으로 되돌리지 못했습니다." >&2
-      while IFS= read -r sub; do
-        [ -n "$sub" ] || continue
-        dirty="$(git -C "$top/$sub" status --short 2>/dev/null || true)"
-        [ -n "$dirty" ] || continue
-        echo "  $sub 에 정리되지 않은 변경이 있습니다:" >&2
-        echo "$dirty" | head -10 >&2
-      done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
-      echo "  서브모듈 안에서 커밋·push하거나 stash한 뒤 다시 실행하세요. 임의로 버리지 않습니다." >&2
-      exit 1
+      if [ "$opt_force" = 1 ]; then
+        # --force 는 서브모듈 때문에 멈추지 않는다. --force 로 다시 시도해 base가 기록한
+        # 커밋으로 강제 체크아웃하며, 그래도 되돌리지 못하면 경고만 남기고 계속한다.
+        warn "--force: 서브모듈을 되돌리지 못해 강제로 다시 시도합니다. 서브모듈의 로컬 변경은 버려집니다."
+        git submodule update --force \
+          || warn "--force: 서브모듈을 끝내 되돌리지 못했지만 자리 해제는 계속합니다."
+      else
+        echo "[오류] 서브모듈을 base 기준으로 되돌리지 못했습니다." >&2
+        while IFS= read -r sub; do
+          [ -n "$sub" ] || continue
+          dirty="$(git -C "$top/$sub" status --short 2>/dev/null || true)"
+          [ -n "$dirty" ] || continue
+          echo "  $sub 에 정리되지 않은 변경이 있습니다:" >&2
+          echo "$dirty" | head -10 >&2
+        done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+        echo "  서브모듈 안에서 커밋·push하거나 stash한 뒤 다시 실행하세요. 임의로 버리지 않습니다." >&2
+        echo "  자리를 비우는 것이 목적이면 --force 로 실행하세요 (서브모듈 로컬 변경은 버려집니다)." >&2
+        exit 1
+      fi
     fi
   fi
 else
@@ -248,12 +320,15 @@ fi
 
 if [ "$sync_only" = 1 ]; then
   info "[5/6] 삭제할 작업 브랜치가 없습니다"
-elif [ "$opt_force_delete" = 1 ]; then
+elif [ "$opt_force_delete" = 1 ] || [ "$opt_force" = 1 ]; then
+  ahead="$(git rev-list --count "$base_copy..$branch" 2>/dev/null || echo 0)"
+  [ "$ahead" = 0 ] \
+    || warn "$branch 에 $base_copy 로 들어가지 않은 커밋이 $ahead 개 있습니다. 강제 삭제하면 이 커밋들은 reflog에만 남습니다."
   info "[5/6] 브랜치 강제 삭제: git branch -D $branch"
   git branch -D "$branch"
 else
   info "[5/6] 브랜치 삭제: git branch -d $branch"
-  git branch -d "$branch" || die "base에 포함되지 않은 커밋이 있습니다. 위 메시지를 확인하세요 (강제 삭제는 --force-delete)."
+  git branch -d "$branch" || die "base에 포함되지 않은 커밋이 있습니다. 위 메시지를 확인하세요 (강제 삭제는 --force-delete 또는 --force)."
 fi
 
 ## 6. 남은 머지 브랜치
