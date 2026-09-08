@@ -6,6 +6,7 @@
 # 사용법: start-worktree.sh <JIRA-KEY> [옵션]
 #   --base <ref>      작업 브랜치를 끊을 지점 (기본: 에픽의 feature-base, 없으면 develop)
 #   --pool <ref>      유휴 worktree를 찾는 기준 base (기본: --base 값)
+#   --slot <접미사>   유휴 자리를 찾을 슬롯 계열 (기본: 숫자 접미사 슬롯만)
 #   --branch <name>   작업 브랜치 이름을 직접 지정
 #   --new             유휴 worktree를 찾지 않고 새로 만든다
 #   --no-move         세션을 옮기지 않는다 (자리만 준비)
@@ -113,6 +114,7 @@ ORCA="${ORCA_CLI_COMMAND:-orca}"
 issue_key=""
 opt_base=""
 opt_pool=""
+opt_slot=""
 opt_branch=""
 opt_new=0
 opt_no_move=0
@@ -122,6 +124,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --base) opt_base="${2:-}"; shift 2 ;;
     --pool) opt_pool="${2:-}"; shift 2 ;;
+    --slot) opt_slot="${2:-}"; shift 2 ;;
     --branch) opt_branch="${2:-}"; shift 2 ;;
     --new) opt_new=1; shift ;;
     --no-move) opt_no_move=1; shift ;;
@@ -138,6 +141,7 @@ base_ref="$opt_base"
 # 유휴 자리를 찾는 기준. 지정하지 않으면 분기 지점과 같다 — 에픽 base에서 그대로
 # 끊는 통상적인 경우다.
 pool_ref="${opt_pool:-$opt_base}"
+slot_name="$opt_slot"
 work_branch="$opt_branch"
 
 # 풀 base 기준으로 재사용 가능한 worktree 경로를 고른다.
@@ -157,8 +161,20 @@ work_branch="$opt_branch"
 # base worktree여서, 재사용하면 에픽의 기준 자리가 작업 브랜치로 덮여 사라진다.
 # 하위 작업용 자리는 <base>-2, <base>-3처럼 접미사를 달고 upstream만 origin/<base>를
 # 가리키므로, 브랜치 이름의 접미사 유무로 상위와 하위가 갈린다.
+#
+# 접미사는 두 성격으로 갈리며 섞이면 안 된다. 숫자 접미사(develop-2, develop-3)는 어느
+# 이슈나 받는 범용 슬롯이고, 이름 접미사(develop-AGP-10-migration)는 특정 에픽 전용으로
+# 만들어 둔 슬롯이다. 두 번째 인자로 계열 이름을 받아 후보를 그 계열로 한정하며, 비어
+# 있으면 범용 슬롯만 후보가 된다. 이 구분이 없으면 원격 feature-base가 없는 에픽에서
+# 풀 base가 develop으로 내려가는 순간 두 성격이 한 후보군에 섞이고, 최종 선택이 디렉토리
+# mtime 1초 차이에 좌우된다(2026-09-08 실측: 후보 4자리의 mtime이 2초 안에 몰려 있었다).
+#
+# 계열 안에서도 상위와 하위가 갈린다. develop-AGP-10-migration 자리는 그 계열의 상위 base
+# worktree이므로 접미사 없는 <base> 자리와 똑같이 후보에서 빼고, develop-AGP-10-migration-2
+# 처럼 숫자 사본을 문 자리만 받는다. 상위 자리를 작업 브랜치로 덮으면 그 계열의 기준
+# 자리가 사라지고 release-worktree가 되돌아갈 사본도 없어진다.
 find_idle_worktree() {
-  local pool="$1" main_wt best="" best_ts="" wt br up ts
+  local pool="$1" slot="${2:-}" main_wt best="" best_ts="" wt br up ts suffix
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
   while IFS= read -r wt; do
     [ -n "$wt" ] || continue
@@ -166,6 +182,20 @@ find_idle_worktree() {
     br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
     [ -n "$br" ] || continue
     case "$br" in "$pool"-*) ;; *) continue ;; esac
+    suffix="${br#"$pool"-}"
+    if [ -n "$slot" ]; then
+      # 지목받은 계열의 숫자 사본만 받는다. 접미사가 계열 이름뿐인 자리는 상위 base다.
+      case "$suffix" in
+        "$slot"-[0-9]|"$slot"-[0-9][0-9]) ;;
+        *) continue ;;
+      esac
+    else
+      # 범용 슬롯만 받는다. 이름 접미사 자리는 지목받을 때만 쓴다.
+      case "$suffix" in
+        [0-9]|[0-9][0-9]) ;;
+        *) continue ;;
+      esac
+    fi
     up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
     [ "$up" = "origin/$pool" ] || continue
     [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || continue
@@ -179,7 +209,7 @@ find_idle_worktree() {
 
 target_worktree=""
 if [ "$opt_new" = 0 ]; then
-  target_worktree="$(find_idle_worktree "$pool_ref")"
+  target_worktree="$(find_idle_worktree "$pool_ref" "$slot_name")"
 fi
 
 if [ -n "$target_worktree" ]; then
@@ -206,6 +236,17 @@ if [ -n "$target_worktree" ]; then
     fi
   fi
 else
+  # 계열을 지목받았는데 그 안에 빈 자리가 없으면 새 자리를 만들지 않고 멈춘다. 새로
+  # 만들면 이름이 <repo>-<이슈키>가 되어 지목받은 계열에서 벗어나므로, 계열을 넓힐지는
+  # 사용자가 결정할 일이다.
+  if [ -n "$slot_name" ] && [ "$opt_new" = 0 ]; then
+    echo "[오류] $slot_name 계열에 유휴 자리가 없습니다 (풀 base: $pool_ref)." >&2
+    echo "  계열 브랜치와 점유 상태:" >&2
+    git branch --list "$pool_ref-$slot_name" "$pool_ref-$slot_name-*" >&2
+    git worktree list >&2
+    echo "  자리를 새로 만들려면 --new, 범용 슬롯을 쓰려면 --slot 없이 다시 실행하세요." >&2
+    exit 1
+  fi
   if [ "$opt_new" = 1 ]; then
     pick_reason="--new 지시에 따라 새로 만들었다"
   else
