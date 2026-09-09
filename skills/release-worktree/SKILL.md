@@ -2,7 +2,7 @@
 name: release-worktree
 effort: low
 description: PR이 원격에서 머지된 뒤 남은 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 브랜치로 되돌린 다음, 이 worktree의 세션 이력을 메인 저장소로 회수하고 orca 워크스페이스 카드를 Done으로 넘기고 작업 탭을 닫아 세션을 마감하는 스킬. 사용자가 'release-worktree', '자리 반납', '작업 끝났어 정리해줘', '머지된 브랜치 정리', '브랜치 정리해줘', '브랜치 지우고 base로 돌아가', 'PR 머지됐어 정리해줘', '작업 브랜치 삭제', '머지 끝났으니 정리', '로컬 브랜치 청소', '세션 정리', '작업 끝났으니 정리하고 탭 닫아' 등을 요청할 때 이 스킬을 사용해야 한다. worktree 디렉토리 자체를 없애는 요청에는 `remove-worktree`를 사용한다 — 이 스킬은 worktree를 유지한 채 브랜치만 정리한다.
-argument-hint: "[branch-name]"
+argument-hint: "[branch-name] [--base <name>] [--force] [--stash] [--force-delete] [--sweep] [--no-close]"
 allowed-tools: Bash
 ---
 
