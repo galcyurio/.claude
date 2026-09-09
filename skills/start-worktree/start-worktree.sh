@@ -2,6 +2,8 @@
 # start-worktree.sh
 # Jira 이슈 하나를 worktree에서 착수한다. 유휴 worktree를 재사용하거나 새로 만들고,
 # 브랜치를 끊고, 현재 claude 세션을 그 자리로 옮긴 뒤 원래 탭을 닫는다.
+# 스크립트를 부른 자리 자체가 유휴 조건을 만족하면 거기서 브랜치만 끊고, 세션 이사와
+# 탭 닫기를 건너뛴 채 탭 제목만 이슈 키로 바꾼다.
 #
 # 사용법: start-worktree.sh <JIRA-KEY> [옵션]
 #   --base <ref>      작업 브랜치를 끊을 지점 (기본: 에픽의 feature-base, 없으면 develop)
@@ -54,6 +56,19 @@ session_file_path() {
   find "$HOME/.claude/projects" -maxdepth 2 -name "$1.jsonl" -exec stat -f '%m %N' {} + 2>/dev/null \
     | sort -rn | head -1 | cut -d' ' -f2-
 }
+# 이 스크립트가 실행된 자리의 worktree 경로. git worktree list가 내는 표기를 그대로
+# 돌려주므로 다른 경로 값과 문자열로 비교할 수 있다. 심볼릭 링크 때문에 표기가 달라질
+# 수 있어 -ef 로 같은 디렉토리인지 확인한 뒤 목록 쪽 표기를 택한다.
+current_worktree_path() {
+  local top wt
+  top="$(git rev-parse --path-format=absolute --show-toplevel 2>/dev/null || true)"
+  [ -n "$top" ] || return 0
+  while IFS= read -r wt; do
+    [ -n "$wt" ] || continue
+    if [ "$wt" -ef "$top" ]; then printf '%s' "$wt"; return 0; fi
+  done < <(git worktree list --porcelain | awk '/^worktree /{print $2}')
+}
+
 # 메인 worktree 옆에 <repo>-<이슈키>[-N] 형식으로 비어 있는 자리를 정한다.
 # 이름만 보고 어떤 피처의 자리인지 알 수 있게 이슈키를 넣는다.
 # release-worktree는 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽으므로,
@@ -144,9 +159,9 @@ pool_ref="${opt_pool:-$opt_base}"
 slot_name="$opt_slot"
 work_branch="$opt_branch"
 
-# 풀 base 기준으로 재사용 가능한 worktree 경로를 고른다.
+# 재사용할 수 있는 자리인지 판정하는 조건을 여기에 모아 둔다.
 # 조건: 메인이 아니고, 브랜치가 <pool>-<접미사>, upstream이 origin/<pool>,
-#       미커밋 변경 없음. 후보가 여럿이면 가장 오래 손대지 않은 것을 고른다.
+#       미커밋 변경 없음.
 #
 # 여기서 쓰는 기준은 작업 브랜치를 끊을 지점(--base)이 아니라 그 자리가 속한 에픽
 # base(--pool)다. 형제 이슈 브랜치 위에 얹으려고 --base를 그 브랜치로 지정하더라도
@@ -173,32 +188,51 @@ work_branch="$opt_branch"
 # worktree이므로 접미사 없는 <base> 자리와 똑같이 후보에서 빼고, develop-AGP-10-migration-2
 # 처럼 숫자 사본을 문 자리만 받는다. 상위 자리를 작업 브랜치로 덮으면 그 계열의 기준
 # 자리가 사라지고 release-worktree가 되돌아갈 사본도 없어진다.
+#
+# 순회로 고르는 자리와 "지금 서 있는 자리"가 같은 기준으로 걸러져야 하므로 이 조건을
+# 함수 하나로 묶고 두 경로에서 함께 쓴다.
+is_idle_candidate() {
+  local wt="$1" pool="$2" slot="${3:-}" main_wt="$4" br up suffix
+  [ -n "$wt" ] || return 1
+  [ "$wt" != "$main_wt" ] || return 1
+  br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  [ -n "$br" ] || return 1
+  case "$br" in "$pool"-*) ;; *) return 1 ;; esac
+  suffix="${br#"$pool"-}"
+  if [ -n "$slot" ]; then
+    # 지목받은 계열의 숫자 사본만 받는다. 접미사가 계열 이름뿐인 자리는 상위 base다.
+    case "$suffix" in
+      "$slot"-[0-9]|"$slot"-[0-9][0-9]) ;;
+      *) return 1 ;;
+    esac
+  else
+    # 범용 슬롯만 받는다. 이름 접미사 자리는 지목받을 때만 쓴다.
+    case "$suffix" in
+      [0-9]|[0-9][0-9]) ;;
+      *) return 1 ;;
+    esac
+  fi
+  up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
+  [ "$up" = "origin/$pool" ] || return 1
+  [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || return 1
+  return 0
+}
+
 find_idle_worktree() {
-  local pool="$1" slot="${2:-}" main_wt best="" best_ts="" wt br up ts suffix
+  local pool="$1" slot="${2:-}" main_wt best="" best_ts="" wt ts cur
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+
+  # 스킬을 부른 자리가 그대로 후보 자격을 갖추면 다른 후보를 보지 않고 그 자리를 쓴다.
+  # 하위 worktree에서 착수하는 경우인데, 이미 서 있는 자리를 두고 옆자리로 세션을 옮기면
+  # 지금 자리가 유휴로 남고 사람만 이동하게 된다. 자격 판정 기준은 순회와 완전히 같으므로
+  # 조건이 하나라도 어긋나면 아래 순회로 내려가 상위에서 부른 것과 똑같이 동작한다.
+  cur="$(current_worktree_path)"
+  if is_idle_candidate "$cur" "$pool" "$slot" "$main_wt"; then
+    printf '%s' "$cur"; return
+  fi
+
   while IFS= read -r wt; do
-    [ -n "$wt" ] || continue
-    [ "$wt" != "$main_wt" ] || continue
-    br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-    [ -n "$br" ] || continue
-    case "$br" in "$pool"-*) ;; *) continue ;; esac
-    suffix="${br#"$pool"-}"
-    if [ -n "$slot" ]; then
-      # 지목받은 계열의 숫자 사본만 받는다. 접미사가 계열 이름뿐인 자리는 상위 base다.
-      case "$suffix" in
-        "$slot"-[0-9]|"$slot"-[0-9][0-9]) ;;
-        *) continue ;;
-      esac
-    else
-      # 범용 슬롯만 받는다. 이름 접미사 자리는 지목받을 때만 쓴다.
-      case "$suffix" in
-        [0-9]|[0-9][0-9]) ;;
-        *) continue ;;
-      esac
-    fi
-    up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
-    [ "$up" = "origin/$pool" ] || continue
-    [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || continue
+    is_idle_candidate "$wt" "$pool" "$slot" "$main_wt" || continue
     # 마지막 커밋 시각은 같은 브랜치를 문 worktree끼리 동일해 변별력이 없다.
     # 디렉토리 mtime은 빌드 산출물 때문에 실제 사용 시점을 따라간다.
     ts="$(stat -f %m "$wt" 2>/dev/null || echo 0)"
@@ -208,13 +242,23 @@ find_idle_worktree() {
 }
 
 target_worktree=""
+# 고른 자리가 지금 서 있는 자리와 같은지를 뒤의 세션 이사 단계까지 들고 간다.
+reused_current=0
 if [ "$opt_new" = 0 ]; then
   target_worktree="$(find_idle_worktree "$pool_ref" "$slot_name")"
+  if [ -n "$target_worktree" ] && [ "$target_worktree" = "$(current_worktree_path)" ]; then
+    reused_current=1
+  fi
 fi
 
 if [ -n "$target_worktree" ]; then
-  pick_reason="유휴 worktree를 재사용했다"
-  info "[1/3] 유휴 worktree 재사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
+  if [ "$reused_current" = 1 ]; then
+    pick_reason="스킬을 부른 자리가 유휴여서 그대로 썼다"
+    info "[1/3] 지금 서 있는 자리를 그대로 사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
+  else
+    pick_reason="유휴 worktree를 재사용했다"
+    info "[1/3] 유휴 worktree 재사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
+  fi
   if [ "$opt_dry_run" = 0 ]; then
     if [ "$base_ref" = "$pool_ref" ]; then
       # 유휴 브랜치가 곧 분기 지점이므로, 그 브랜치를 최신화한 뒤 거기서 끊는다.
@@ -266,6 +310,26 @@ fi
 
 if [ "$opt_no_move" = 1 ]; then
   info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree"
+  exit 0
+fi
+
+# 이미 목적지에 서 있으면 옮길 세션도, 닫을 탭도 없다. 같은 자리로 이사하면 세션
+# jsonl을 자기 자신 위에 복사하게 되고, 새 탭을 띄운 뒤 이 탭을 닫는 절차도 탭만 한 번
+# 갈아 끼우는 헛일이 된다. 탭 제목만 이슈 키로 맞추고 끝낸다.
+if [ "$reused_current" = 1 ]; then
+  info "[2/3] 이미 이 자리에 있으므로 세션을 옮기지 않습니다."
+  if [ "$opt_dry_run" = 1 ]; then
+    info "[dry-run] 실제로는 탭 제목을 $issue_key 로 바꾸고 여기서 끝냅니다."
+    exit 0
+  fi
+  handle="$(orca_terminal_handle)"
+  if [ -n "$handle" ]; then
+    "$ORCA" terminal rename --terminal "$handle" --title "$issue_key" --json > /dev/null \
+      || warn "탭 제목을 바꾸지 못했습니다. 직접 바꿔 주세요."
+  else
+    warn "터미널 핸들을 찾지 못해 탭 제목은 그대로 둡니다."
+  fi
+  info "[3/3] 착수 준비 완료, 탭을 닫지 않습니다: $target_worktree ($work_branch, base $base_ref)"
   exit 0
 fi
 
