@@ -1,7 +1,7 @@
 ---
 name: create-pr
 effort: medium
-allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, AskUserQuestion
+allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, AskUserQuestion
 description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그램). 사용자가 'create-pr', 'PR 생성', 'PR 만들어', 'PR 만들어줘', 'PR 작성', 'PR 올려줘', 'PR 올려', 'pull request 생성', 'pull request 만들어', '풀리퀘 생성', '풀리퀘 만들어' 등 PR 생성을 요청할 때 이 스킬을 사용해야 한다. PR 리뷰/조회 요청에는 사용하지 않는다.
 ---
 
@@ -60,33 +60,51 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 - **구어체로 작성**: PR 본문 문장은 `~합니다` 체로 작성한다. `~한다` 같은 평서형 문어체는 사용하지 않는다.
    - 예: `~ 문제를 해결한다.` → `~ 문제를 해결합니다.`
 - **작업사항·mermaid는 예외일 때만 추가한다.** 기본은 생략. 추가 기준은 아래 "작업사항·mermaid 추가 기준" 참고. 애매하면 생략한다.
-- **반영화면은 스냅샷이 있으면 채운다.** 스냅샷 이미지가 이번 브랜치에 커밋돼 있으면 그것을 `## 반영화면`에 넣는다. 작성 방법은 아래 "반영화면 작성 기준" 참고.
+- **반영화면은 스냅샷이 있으면 채운다.** 스냅샷 이미지가 이번 브랜치에 커밋돼 있으면 그것을 `## 반영화면`에 넣고, 이미 있던 스냅샷이 변경된 경우에는 Before/After 표로 넣는다. 작성 방법은 아래 "반영화면 작성 기준" 참고.
 
 #### 반영화면 작성 기준
 
 이번 브랜치가 **스냅샷 이미지를 추가·변경했으면** 그 이미지를 `## 반영화면`에 넣는다. 캡처를 새로 요청하거나 실기기 스크린샷을 대신 올리지 않는다 — 스냅샷은 이미 커밋에 들어 있어 코드와 함께 갱신되므로 PR 본문이 낡지 않는다.
 
-1. 대상 이미지를 찾는다.
+1. 대상 이미지와 변경 유형을 함께 찾는다. `A`는 이번에 새로 추가된 스냅샷이고, `M`은 이미 있던 스냅샷이 변경된 경우다.
 
    ```bash
-   git diff --name-only --diff-filter=AM {base}...HEAD -- '*/src/test/screenshots/*'
+   git diff --name-status --diff-filter=AM {base}...HEAD -- '*/src/test/screenshots/*'
    ```
 
-2. 각 이미지 URL은 **HEAD 커밋 SHA로 고정**한다. 브랜치 이름을 ref로 쓰면 이름 안의 슬래시가 경로와 섞여 링크가 깨지고, 이후 force push로 그림이 바뀐다.
+2. 각 이미지 URL은 **커밋 SHA로 고정**한다. 브랜치 이름을 ref로 쓰면 이름 안의 슬래시가 경로와 섞여 링크가 깨지고, 이후 force push로 그림이 바뀐다.
 
    ```
-   https://github.com/{owner}/{repo}/raw/{git rev-parse HEAD}/{경로}
+   https://github.com/{owner}/{repo}/raw/{SHA}/{경로}
    ```
 
-   이 링크는 push된 커밋에만 유효하다. 0번 단계에서 push를 먼저 하므로 순서는 어긋나지 않는다.
-
-3. 상태가 여러 개면 표 한 줄로 나열한다. 열 제목은 Preview 함수명을 그대로 쓰지 않고 **사람이 읽을 상태 이름**으로 적는다 (`Preview` → 입력 전, `PreviewUsed` → 사용 완료).
-
-   ```markdown
-   | 입력 전 | 사용 완료 |
+   | 이미지 | SHA를 구하는 명령 |
    | --- | --- |
-   | <img width="280" src="..."> | <img width="280" src="..."> |
-   ```
+   | After (변경 후) | `git rev-parse HEAD` |
+   | Before (변경 전) | `git merge-base {base} HEAD` |
+
+   Before에 merge-base 커밋을 쓰는 이유는, 1번의 3점 diff가 바로 이 커밋을 기준으로 비교하기 때문이다. 이 링크는 push된 커밋에만 유효한데, After는 0번 단계에서 push를 먼저 하므로 순서가 어긋나지 않고 Before는 base 브랜치에 이미 올라가 있는 커밋이다.
+
+3. 표의 모양은 **기존 스냅샷이 변경됐는지(`M`)** 에 따라 달라진다. 열 제목이나 행 제목으로 쓰는 상태 이름은 두 경우 모두 Preview 함수명을 그대로 쓰지 않고 **사람이 읽을 이름**으로 적는다 (`Preview` → 입력 전, `PreviewUsed` → 사용 완료).
+
+   - **`A`만 있는 경우** (스냅샷이 이번 브랜치에서 처음 생겼다): 비교할 이전 상태가 없으므로 상태를 한 줄로 나열한다.
+
+     ```markdown
+     | 입력 전 | 사용 완료 |
+     | --- | --- |
+     | <img width="280" src="{HEAD SHA}/..."> | <img width="280" src="{HEAD SHA}/..."> |
+     ```
+
+   - **`M`이 하나라도 있는 경우**: Before/After를 열로 두고 상태를 행으로 나열해서, 리뷰어가 같은 상태의 변경 전후를 나란히 볼 수 있게 한다. 상태를 열로 두면 한 행에 이미지가 4개 이상 들어가 본문 폭을 넘기므로 이 방향을 뒤집지 않는다.
+
+     ```markdown
+     | 상태 | Before | After |
+     | --- | --- | --- |
+     | 입력 전 | <img width="280" src="{merge-base SHA}/..."> | <img width="280" src="{HEAD SHA}/..."> |
+     | 사용 완료 | (신규) | <img width="280" src="{HEAD SHA}/..."> |
+     ```
+
+     같은 표에 `A` 이미지가 섞여 있으면 그 행의 Before 칸에는 `(신규)`라고 적는다. 존재하지 않는 변경 전 이미지를 임의로 채워 넣거나, 그 행을 표에서 빼지 않는다.
 
 4. 폭은 `width="280"`을 기본으로 둔다. 원본 크기로 넣으면 본문이 화면을 넘긴다.
 
