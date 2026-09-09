@@ -378,8 +378,8 @@ if ! command -v "$ORCA" > /dev/null; then
   exit 0
 fi
 
-if "$ORCA" worktree set --worktree active --workspace-status todo --json > /dev/null 2>&1; then
-  info "Orca 카드 상태를 todo로 되돌렸습니다."
+if "$ORCA" worktree set --worktree active --workspace-status completed --json > /dev/null 2>&1; then
+  info "Orca 카드 상태를 completed로 넘겼습니다."
 else
   warn "Orca 카드 상태 전환에 실패했습니다. git 정리 결과는 그대로입니다."
 fi

@@ -14,7 +14,7 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 - 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Done으로 내려가지 않게 하려는 것이다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
-- 세션을 새로 열면 카드는 `todo`로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. 세션 마감 시점의 `todo` 복귀는 `release-worktree` 스킬이 담당하며, 그 밖에서 내가 임의로 `todo`로 내리지 않는다.
+- 세션을 새로 열면 카드는 `todo`로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. `release-worktree` 스킬은 자리를 반납할 때 카드를 `completed`로 넘기며, 내가 임의로 `todo`로 내리지 않는다.
 
 ## 훅이 닿지 않는 경우
 
