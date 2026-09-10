@@ -15,8 +15,13 @@ import subprocess
 import sys
 import unicodedata
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+
+import jira_rest
 
 SUMMARY_MAX = 40  # 그래프 정렬이 깨지지 않게 제목을 자르는 표시 폭
+DESC_MAX = 600    # 설명 부록에서 이슈당 싣는 길이. 판단에 필요한 앞부분만 남긴다
+MAX_WORKERS = 8   # acli 는 호출마다 프로세스를 새로 띄운다. 순차로 돌리면 이슈 수에 비례해 느려진다
 
 
 def run(cmd):
@@ -27,17 +32,32 @@ def run(cmd):
 
 
 def fetch_keys(jql):
-    """--csv 로 키를 받는다. --json 은 응답이 커서 잘리고, --fields 'key' 는 null 만 준다."""
-    out = run(["acli", "jira", "workitem", "search", "--jql", jql, "--csv"])
+    """--csv 로 키를 받는다.
+
+    --json 은 응답이 커서 잘리고, --fields 'key' 는 null 만 준다. --limit 을 빼면
+    30 건에서 끊긴다.
+    """
+    out = run(["acli", "jira", "workitem", "search",
+               "--jql", jql, "--limit", "200", "--csv"])
     rows = list(csv.DictReader(io.StringIO(out)))
     return [r["Key"] for r in rows if r.get("Key")]
+
+
+def adf_text(node):
+    """Jira 설명은 ADF 트리로 온다. text 노드만 모으고 블록 사이에 줄을 바꾼다."""
+    if not isinstance(node, dict):
+        return ""
+    if node.get("type") == "text":
+        return node.get("text", "")
+    sep = "\n" if node.get("type") in ("doc", "bulletList", "orderedList") else ""
+    return sep.join(adf_text(c) for c in node.get("content") or [])
 
 
 def fetch_issue(key):
     """view 서브커맨드만 issuelinks 를 준다. search --fields issuelinks 는 거부당한다."""
     out = run([
         "acli", "jira", "workitem", "view", key,
-        "--fields", "key,summary,status,issuelinks", "--json",
+        "--fields", "key,summary,status,issuelinks,description", "--json",
     ])
     f = json.loads(out)["fields"]
     blocks, blocked_by = [], []
@@ -49,15 +69,63 @@ def fetch_issue(key):
         if "inwardIssue" in link:
             blocked_by.append(link["inwardIssue"]["key"])
     status = f["status"]
+    desc = " ".join(adf_text(f.get("description")).split("\n\n"))
     return {
         "key": key,
         "summary": f["summary"].split("] ")[-1],
+        "full_summary": f["summary"],  # 그래프는 제목을 자르므로 부록에는 원본을 싣는다
+        "desc": desc.strip(),
         "status": status["name"],
         "done": status["statusCategory"]["key"] == "done",
         "active": status["statusCategory"]["key"] == "indeterminate",
         "blocks": sorted(set(blocks)),
         "blocked_by": sorted(set(blocked_by)),
     }
+
+
+def fetch_issues(keys):
+    """키 순서를 지키면서 병렬로 받는다. 조회에 실패하면 그대로 올려보낸다."""
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        return dict(zip(keys, ex.map(fetch_issue, keys)))
+
+
+def strip_mark(title):
+    """그래프에는 📎 마커가 붙으므로 저장된 접두사(⛔·✅)는 걷어낸다."""
+    return title.lstrip("⛔✅ ")
+
+
+def fetch_extdeps(keys):
+    """이슈별 외부 의존(remote link)을 병렬로 받는다."""
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        return dict(zip(keys, ex.map(jira_rest.ext_deps, keys)))
+
+
+def attach_extdeps(issues, keys):
+    """미해소 외부 의존을 가상 노드로 세우고 막힌 이슈의 blocked_by 에 잇는다.
+
+    서버 API 전달·디자인 에셋·기획 결정처럼 Jira 이슈가 아닌 blocker 를 순서
+    계산에 넣기 위한 것이다. extdep.py 가 건 링크(globalId 가 extdep:)만 본다.
+    """
+    open_keys = [k for k in keys if not issues[k]["done"]]
+    for key, links in fetch_extdeps(open_keys).items():
+        for l in links:
+            if (l["object"].get("status") or {}).get("resolved"):
+                continue  # 전달이 끝난 것은 순서 판단에 쓰지 않는다
+            gid = l["globalId"]
+            node = issues.setdefault(gid, {
+                "key": gid,
+                "summary": strip_mark(l["object"]["title"]),
+                "status": "외부 대기",
+                "done": False,
+                "active": False,
+                "blocks": [],
+                "blocked_by": [],
+                "extdep": True,
+            })
+            if key not in node["blocks"]:
+                node["blocks"].append(key)
+            if gid not in issues[key]["blocked_by"]:
+                issues[key]["blocked_by"].append(gid)
 
 
 def longest_path(issues):
@@ -149,6 +217,10 @@ def render_graph(issues, keys, crit):
         i = issues[k]
         # 마커는 East Asian Wide 글리프만 쓴다. ○ ▶ ✔ 는 폭이 터미널마다 1~2 로
         # 달라져서 뒤따르는 화살표 열이 어긋난다.
+        if i.get("extdep"):
+            # 외부 의존은 키가 없다. 키 자리를 제목에 내준다.
+            s = f"📎 {trunc(i['summary'], SUMMARY_MAX + 12)}"
+            return s + " *" if k in crit else s
         if open_blockers(k):
             mark = "⛔"
         elif i["active"]:
@@ -171,15 +243,20 @@ def render_graph(issues, keys, crit):
     labels = {k: label(k) for k in shown}
     col = max((dwidth(v) for v in labels.values()), default=0) + 4
 
+    def name(k):
+        """외부 의존은 키가 아니라 제목으로 가리킨다."""
+        i = issues.get(k)
+        return i["summary"] if i and i.get("extdep") else k
+
     def block(k):
         rows = []
         head = "  " + labels[k]
-        outs = [t if t in issues else t + "(?)"
+        outs = [name(t) if t in issues else t + "(?)"
                 for t in issues[k]["blocks"]
                 if not (t in issues and issues[t]["done"])]
         # 조회 못 한 blocker 도 그린다. 안 그리면 그래프가 실제보다 낙관적으로 보인다.
-        ins = open_blockers(k) + [b + "(?)" for b in issues[k]["blocked_by"]
-                                  if b not in issues]
+        ins = [name(b) for b in open_blockers(k)] + [
+            b + "(?)" for b in issues[k]["blocked_by"] if b not in issues]
         lone = not outs and not issues[k]["blocked_by"] and not issues[k]["done"]
         if not outs:
             rows.append(head + ("  (고립)" if lone else ""))
@@ -213,7 +290,7 @@ def render_graph(issues, keys, crit):
         print("\n순환 ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다")
         for k in cyclic:
             print(block(k))
-    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘  * 임계 경로"
+    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘  📎 외부 의존  * 임계 경로"
           "  ───▶ blocks  ▲ 남은 blocker  (?) 조회 실패")
 
 
@@ -231,16 +308,24 @@ def main():
     if not keys:
         print("대상 이슈가 없다.")
         return
-    issues = {k: fetch_issue(k) for k in keys}
+    issues = fetch_issues(keys)
 
     # 에픽 밖 이슈가 blocker 로 걸린 경우도 상태를 알아야 한다.
-    outside = {r for i in issues.values() for r in i["blocked_by"] + i["blocks"]} - set(issues)
-    for k in sorted(outside):
-        try:
-            issues[k] = fetch_issue(k)
-            issues[k]["outside"] = True
-        except RuntimeError:
-            pass
+    outside = sorted({r for i in issues.values()
+                      for r in i["blocked_by"] + i["blocks"]} - set(issues))
+    if outside:
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+            pending = [(k, ex.submit(fetch_issue, k)) for k in outside]
+        for k, fut in pending:
+            try:
+                issues[k] = fut.result()
+                issues[k]["outside"] = True
+            except RuntimeError:
+                pass
+
+    # 외부 의존은 에픽 밖 이슈 조회가 끝난 뒤에 붙인다. 먼저 붙이면 가상 노드의
+    # globalId 가 에픽 밖 키로 잡혀 acli 조회를 시도한다.
+    attach_extdeps(issues, keys)
 
     inside = [issues[k] for k in keys]
     open_issues = [i for i in inside if not i["done"]]
@@ -249,7 +334,8 @@ def main():
 
     print(f"# {args.epic or 'JQL'} — 열린 {len(open_issues)}건 / 전체 {len(inside)}건\n")
 
-    render_graph(issues, keys, set(path) if len(path) > 1 else set())
+    crit = set(path) if len(path) > 1 else set()
+    render_graph(issues, keys, crit)
 
     if len(path) > 1:
         print("\n## 임계 경로")
@@ -272,11 +358,28 @@ def main():
                              f"권한이나 키를 확인한다")
             elif issues[b].get("outside"):
                 notes.append(f"- {i['key']} 은 에픽 밖 {b}({issues[b]['status']}) 에 막혀 있다")
+    for i in inside:
+        # 임계 경로가 외부 의존에 걸리면 내가 서둘러 앞당길 수 있는 지점이 아니다.
+        ext = [issues[b]["summary"] for b in i["blocked_by"]
+               if b in issues and issues[b].get("extdep")]
+        if i["key"] in crit and ext:
+            notes.append(f"- 임계 경로의 {i['key']} 이 외부 의존에 막혀 있다 — "
+                         f"{', '.join(ext)}")
     if not path and open_issues:
         notes.append("- blocks 링크에 순환이 있다 — 임계 경로를 계산할 수 없다")
     if notes:
         print("\n## 이상 징후")
         print("\n".join(notes))
+
+    # 3단계 판단 재료를 여기서 다 준다. 브랜치가 아직 없는 이슈는 코드로 확인할 것이
+    # 없으므로, 무엇을 건드리는 작업인지 알 원천은 이 설명뿐이다.
+    described = [i for i in open_issues if i["desc"]]
+    if described:
+        print("\n## 설명 — 열린 이슈")
+        for i in described:
+            print(f"\n### {i['key']}  {i['full_summary']}")
+            d = i["desc"]
+            print(d[:DESC_MAX] + (" …" if len(d) > DESC_MAX else ""))
 
 if __name__ == "__main__":
     try:
