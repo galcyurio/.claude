@@ -85,6 +85,22 @@ next_worktree_path() {
   printf '%s-%s' "$stem" "$n"
 }
 
+# 새로 만든 자리를 orca 보드에서 어느 자리 밑에 붙일지 정한다.
+# 기준은 풀 base(계열을 지목받았으면 <풀 base>-<계열>) 브랜치를 그대로 물고 있는 자리다.
+# start-feature가 만든 상위 base worktree가 여기 해당하고, 풀 base가 develop으로
+# 내려가면 develop을 문 메인 worktree가 부모가 된다. 실제 등록 상태도 그렇게 되어 있어
+# develop-2·develop-3 자리는 메인을, develop-AGP-10-migration-2 자리는 계열의 상위 자리를
+# 부모로 물고 있다(2026-09-09 실측).
+parent_worktree_path() {
+  local pool="$1" slot="${2:-}" ref wt br
+  ref="$pool${slot:+-$slot}"
+  while IFS= read -r wt; do
+    [ -n "$wt" ] || continue
+    br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    if [ "$br" = "$ref" ]; then printf '%s' "$wt"; return 0; fi
+  done < <(git worktree list --porcelain | awk '/^worktree /{print $2}')
+}
+
 # git worktree add로 만든 자리를 orca가 인식할 때까지 기다렸다가 id를 낸다.
 # repo 설정의 externalWorktreeVisibility가 show라 외부 생성분도 잡히지만 즉시는 아니다.
 wait_orca_worktree() {
@@ -306,6 +322,25 @@ else
   git worktree add -b "$work_branch" "$target_worktree" "$base_ref" \
     || die "worktree를 만들지 못했습니다: $target_worktree"
   bash "$(dirname "$0")/init.sh" "$target_worktree"
+
+  # orca 보드에서 새 자리를 상위 base 자리 밑에 붙인다. 연결하지 않으면 카드가 최상위로
+  # 떠서 어느 피처의 자리인지 보드에서 읽히지 않는다. 상위 자리가 없으면(풀 base를 문
+  # 자리가 하나도 없는 경우) 연결하지 않고 넘어간다.
+  # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
+  # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
+  parent_path="$(parent_worktree_path "$pool_ref" "$slot_name")"
+  if [ -n "$parent_path" ]; then
+    if new_wt_id="$(wait_orca_worktree "$target_worktree")"; then
+      info "  상위 worktree 연결: $parent_path"
+      "$ORCA" worktree set --worktree "id:$new_wt_id" \
+        --parent-worktree "path:$parent_path" --json > /dev/null \
+        || warn "orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요: $parent_path"
+    else
+      warn "orca가 아직 인식하지 못해 부모 연결을 건너뜁니다: $target_worktree"
+    fi
+  else
+    info "  상위 worktree가 없어 부모 연결을 건너뜁니다 (풀 base: $pool_ref${slot_name:+-$slot_name})"
+  fi
 fi
 
 if [ "$opt_no_move" = 1 ]; then
