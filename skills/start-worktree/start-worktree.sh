@@ -70,20 +70,73 @@ current_worktree_path() {
   done < <(git worktree list --porcelain | awk '/^worktree /{print $2}')
 }
 
-# 메인 worktree 옆에 <repo>-<이슈키>[-N] 형식으로 비어 있는 자리를 정한다.
-# 이름만 보고 어떤 피처의 자리인지 알 수 있게 이슈키를 넣는다.
-# release-worktree는 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽으므로,
-# 이슈키의 숫자 부분(HDA-22644의 22644)과 섞이지 않는다.
+# 브랜치를 물고 있는 worktree 경로. 비어 있으면 어느 자리도 물고 있지 않다.
+branch_holder() {
+  git worktree list --porcelain | awk -v b="branch refs/heads/$1" '
+    /^worktree /{p=substr($0,10)}
+    $0==b{print p}'
+}
+
+# 새 자리 이름의 stem. 자리 이름 끝의 번호와 그 자리가 물 base 사본의 접미사가 짝을
+# 이뤄야 하므로(release-worktree가 그 대응으로 되돌아갈 사본을 찾는다), 풀 base를 그대로
+# 물고 있는 상위 자리 이름을 stem으로 쓴다. 풀 base가 develop이면 메인 worktree가 그
+# 자리다. 상위 자리가 없으면 이름만으로 짓는다 — 계열을 지목받았으면 <repo>-<계열>,
+# 에픽 base면 <repo>-<에픽키>, 그 외에는 <repo> 자체다.
+#
+# 이슈키를 stem으로 쓰면 안 된다. <repo>-<이슈키> 자리는 에픽 슬롯 계열에서 벗어나
+# 다음 착수의 유휴 후보에서 빠지고, 접미사에 짝이 될 base 사본이 없어 release-worktree가
+# 되돌아갈 자리를 찾지 못한다. 2026-09-10 HDA-22895에서 이 자리가 반납될 때
+# feature-base/HDA-22882-activity-reward-HDA-22895 라는 엉뚱한 사본이 만들어졌다.
+worktree_stem() {
+  local pool="$1" slot="${2:-}" parent_wt="${3:-}" repo key rest
+  if [ -n "$parent_wt" ]; then basename "$parent_wt"; return; fi
+  repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  if [ -n "$slot" ]; then printf '%s' "$repo-$slot"; return; fi
+  case "$pool" in
+    feature-base/*)
+      key="${pool#feature-base/}"
+      rest="${key#*-}"
+      printf '%s' "$repo-${key%%-*}-${rest%%-*}"
+      ;;
+    *) printf '%s' "$repo" ;;
+  esac
+}
+
+# 메인 worktree 옆에 <stem>-N 형식으로 비어 있는 자리를 정한다. stem 자리(메인이거나
+# start-feature가 만든 상위 base 자리)는 이미 있거나 그 스킬이 만들 몫이므로, 여기서
+# 만드는 자리에는 항상 번호가 붙는다.
+# 번호는 자리 디렉토리와 base 사본 브랜치가 함께 비어 있는 값을 고른다. 둘이 어긋나면
+# 자리 이름으로 사본을 찾을 수 없다.
 next_worktree_path() {
-  local key="$1" main_wt parent repo stem n
-  main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-  parent="$(dirname "$main_wt")"
-  repo="$(basename "$main_wt")"
-  stem="$parent/$repo-$key"
-  if [ ! -e "$stem" ]; then printf '%s' "$stem"; return; fi
-  n=2
-  while [ -e "$stem-$n" ]; do n=$((n+1)); done
+  local stem_name="$1" pool_base="$2" parent stem n=2
+  parent="$(dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  stem="$parent/$stem_name"
+  while [ -e "$stem-$n" ] || [ -n "$(branch_holder "$pool_base-$n")" ]; do
+    n=$((n+1))
+  done
   printf '%s-%s' "$stem" "$n"
+}
+
+# 자리에서 작업 브랜치를 끊는다. 분기 지점이 그 자리가 물고 있는 풀 base와 같으면 그
+# 브랜치를 최신화한 뒤 끊고, 다르면(형제 이슈 브랜치 위에 얹는 경우) 자리가 문 브랜치는
+# 그대로 두고 base의 원격 tip 커밋에서 끊는다. start-point로 커밋 id를 주면 원격 ref를
+# 붙이지 않으므로 upstream이 자동으로 걸리지 않는다(rules/git.md).
+cut_work_branch() {
+  local wt="$1" base="$2" branch="$3" pool="$4" start_commit
+  if [ "$base" = "$pool" ]; then
+    git -C "$wt" fetch origin "$base"
+    git -C "$wt" pull --ff-only \
+      || die "자리가 물고 있는 브랜치가 원격과 갈라졌습니다. 강제로 맞추지 않고 중단합니다."
+    git -C "$wt" checkout -b "$branch"
+    return
+  fi
+  git -C "$wt" fetch origin "$base" \
+    || warn "원격에서 $base 를 가져오지 못했습니다. 로컬 ref로 진행합니다."
+  start_commit="$(git -C "$wt" rev-parse --verify --quiet "refs/remotes/origin/$base" || true)"
+  [ -n "$start_commit" ] \
+    || start_commit="$(git -C "$wt" rev-parse --verify --quiet "refs/heads/$base" || true)"
+  [ -n "$start_commit" ] || die "base를 찾지 못했습니다: $base"
+  git -C "$wt" checkout -b "$branch" "$start_commit"
 }
 
 # 새로 만든 자리를 orca 보드에서 어느 자리 밑에 붙일지 정한다.
@@ -282,24 +335,7 @@ if [ -n "$target_worktree" ]; then
     info "[1/3] 유휴 worktree 재사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
   fi
   if [ "$opt_dry_run" = 0 ]; then
-    if [ "$base_ref" = "$pool_ref" ]; then
-      # 유휴 브랜치가 곧 분기 지점이므로, 그 브랜치를 최신화한 뒤 거기서 끊는다.
-      git -C "$target_worktree" fetch origin "$base_ref"
-      git -C "$target_worktree" pull --ff-only \
-        || die "유휴 브랜치가 원격과 갈라졌습니다. 강제로 맞추지 않고 중단합니다."
-      git -C "$target_worktree" checkout -b "$work_branch"
-    else
-      # 분기 지점이 유휴 브랜치와 다르다. 유휴 브랜치를 최신화할 이유가 없으므로
-      # 그대로 두고 base의 원격 tip 커밋에서 끊는다. start-point로 커밋 id를 주면
-      # 원격 ref를 붙이지 않으므로 upstream이 자동으로 걸리지 않는다(rules/git.md).
-      git -C "$target_worktree" fetch origin "$base_ref" \
-        || warn "원격에서 $base_ref 를 가져오지 못했습니다. 로컬 ref로 진행합니다."
-      start_commit="$(git -C "$target_worktree" rev-parse --verify --quiet "refs/remotes/origin/$base_ref" || true)"
-      [ -n "$start_commit" ] \
-        || start_commit="$(git -C "$target_worktree" rev-parse --verify --quiet "refs/heads/$base_ref" || true)"
-      [ -n "$start_commit" ] || die "base를 찾지 못했습니다: $base_ref"
-      git -C "$target_worktree" checkout -b "$work_branch" "$start_commit"
-    fi
+    cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
   fi
 else
   # 계열을 지목받았는데 그 안에 빈 자리가 없으면 새 자리를 만들지 않고 멈춘다. 새로
@@ -319,14 +355,33 @@ else
     pick_reason="재사용할 자리가 없어 새로 만들었다"
   fi
   info "[1/3] 재사용할 자리가 없어 새로 만듭니다 (base: $base_ref)"
+  # 자리 이름 끝의 번호와 그 자리가 물 base 사본의 접미사를 짝지어 만든다. 사본 없이
+  # 자리만 만들면 그 자리는 슬롯 계열에 편입되지 않아 다음 착수의 유휴 후보에서 빠지고,
+  # release-worktree가 되돌아갈 사본도 찾지 못한다.
+  pool_base="$pool_ref${slot_name:+-$slot_name}"
+  parent_path="$(parent_worktree_path "$pool_ref" "$slot_name")"
+  target_worktree="$(next_worktree_path \
+    "$(worktree_stem "$pool_ref" "$slot_name" "$parent_path")" "$pool_base")"
+  pool_copy="$pool_base-${target_worktree##*-}"
+  info "  새 자리: $target_worktree (base 사본: $pool_copy)"
   if [ "$opt_dry_run" = 1 ]; then
-    info "[dry-run] 새 worktree를 만들 자리까지만 확인했습니다. 이후 단계는 실제 경로가 있어야 진행합니다."
+    info "[dry-run] 자리 이름까지만 확인했습니다. 이후 단계는 실제 경로가 있어야 진행합니다."
     exit 0
   fi
-  target_worktree="$(next_worktree_path "$issue_key")"
-  info "  새 자리: $target_worktree"
-  git worktree add -b "$work_branch" "$target_worktree" "$base_ref" \
-    || die "worktree를 만들지 못했습니다: $target_worktree"
+  git fetch origin "$pool_ref" \
+    || warn "원격에서 $pool_ref 를 가져오지 못했습니다. 로컬 ref로 진행합니다."
+  if git rev-parse --verify --quiet "refs/heads/$pool_copy" > /dev/null; then
+    # 자리는 지워졌는데 사본 브랜치만 남아 있던 경우다. 그 사본을 그대로 다시 문다.
+    git worktree add "$target_worktree" "$pool_copy" \
+      || die "worktree를 만들지 못했습니다: $target_worktree"
+  else
+    git worktree add -b "$pool_copy" "$target_worktree" "origin/$pool_ref" \
+      || die "worktree를 만들지 못했습니다: $target_worktree"
+  fi
+  # upstream은 사본이 아니라 풀 base를 가리켜야 한다. 유휴 자리 판정이 이 값을 본다.
+  git -C "$target_worktree" branch --set-upstream-to="origin/$pool_ref" "$pool_copy" \
+    || die "upstream을 걸지 못했습니다. 풀 base가 원격에 올라가 있어야 합니다."
+  cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
   bash "$(dirname "$0")/init.sh" "$target_worktree"
 
   # orca 보드에서 새 자리를 상위 base 자리 밑에 붙인다. 연결하지 않으면 카드가 최상위로
@@ -334,7 +389,6 @@ else
   # 자리가 하나도 없는 경우) 연결하지 않고 넘어간다.
   # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
   # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
-  parent_path="$(parent_worktree_path "$pool_ref" "$slot_name")"
   if [ -n "$parent_path" ]; then
     if new_wt_id="$(wait_orca_worktree "$target_worktree")"; then
       info "  상위 worktree 연결: $parent_path"
