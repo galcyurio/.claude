@@ -398,7 +398,9 @@ wt_id="$(wait_orca_worktree "$target_worktree")" \
 
 # 어느 자리를 골랐는지는 이 프롬프트로만 전달된다. 옛 탭의 stdout은 곧 닫혀 사라지고,
 # jsonl 복사는 이 실행 도중에 일어나 이 스크립트의 출력이 새 세션에 실리지 않는다(spec 4.2-4).
-first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason."
+# 마지막 문장은 새 세션이 착수 여부를 되묻지 않게 하려고 넣는다. 이 문장이 없으면 이사한 세션이
+# 대화 이력을 읽고 나서 시작할지 다시 확인하는데, 자리 이동 자체가 이미 착수 지시다.
+first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason. 착수 여부나 진행 방향을 다시 묻지 말고, 이전 대화에서 합의된 내용대로 곧바로 작업에 들어간다."
 
 "$ORCA" terminal create --worktree "id:$wt_id" --title "$tab_title" \
   --command "claude --resume $sid \"$first_prompt\"" --json > /dev/null \
