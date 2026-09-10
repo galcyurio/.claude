@@ -90,7 +90,7 @@ def fetch_issues(keys):
 
 
 def strip_mark(title):
-    """그래프에는 📎 마커가 붙으므로 저장된 접두사(⛔·✅)는 걷어낸다."""
+    """그래프가 노드 앞에 마커를 다시 붙이므로 저장된 접두사(⛔·✅)는 걷어낸다."""
     return title.lstrip("⛔✅ ")
 
 
@@ -218,8 +218,9 @@ def render_graph(issues, keys, crit):
         # 마커는 East Asian Wide 글리프만 쓴다. ○ ▶ ✔ 는 폭이 터미널마다 1~2 로
         # 달라져서 뒤따르는 화살표 열이 어긋난다.
         if i.get("extdep"):
-            # 외부 의존은 키가 없다. 키 자리를 제목에 내준다.
-            s = f"📎 {trunc(i['summary'], SUMMARY_MAX + 12)}"
+            # 외부 의존은 키가 없다. 키 자리를 제목에 내주고 마커는 막힌 이슈와
+            # 같은 ⛔ 를 쓴다 — 읽는 쪽에서는 둘 다 "지금 못 하는 이유"다.
+            s = f"⛔ {trunc(i['summary'], SUMMARY_MAX + 12)}"
             return s + " *" if k in crit else s
         if open_blockers(k):
             mark = "⛔"
@@ -271,9 +272,17 @@ def render_graph(issues, keys, crit):
             rows.append(" " * 7 + "▲ " + ", ".join(ins))
         return "\n".join(rows)
 
+    # 외부 의존은 Wave 에 섞지 않고 따로 낸다. 내가 지금 잡을 수 있는 것과
+    # 다른 팀에서 와야 풀리는 것은 읽는 목적이 다르다.
+    ext_nodes = [k for lv in sorted(waves) for k in waves[lv]
+                 if issues[k].get("extdep")]
+
     print("## 그래프")
     for lv in sorted(waves):
-        mine = [k for k in waves[lv] if k in inside]  # 에픽 밖 노드는 세지 않는다
+        layer = [k for k in waves[lv] if not issues[k].get("extdep")]
+        if not layer:
+            continue
+        mine = [k for k in layer if k in inside]  # 에픽 밖 노드는 세지 않는다
         n = len(mine)
         if lv == 1:
             # Wave 1 은 "미완료 blocker 가 없다"는 뜻일 뿐이다. 이미 누가 잡고 있는
@@ -284,13 +293,18 @@ def render_graph(issues, keys, crit):
         else:
             head = f"Wave {lv} ─ Wave {lv - 1} 이후 ({n}건)"
         print(f"\n{head}")
-        for k in waves[lv]:
+        for k in layer:
+            print(block(k))
+
+    if ext_nodes:
+        print(f"\n외부 대기 ─ 다른 팀에서 와야 풀린다 ({len(ext_nodes)}건)")
+        for k in ext_nodes:
             print(block(k))
     if cyclic:
         print("\n순환 ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다")
         for k in cyclic:
             print(block(k))
-    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘  📎 외부 의존  * 임계 경로"
+    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘·외부 대기  * 임계 경로"
           "  ───▶ blocks  ▲ 남은 blocker  (?) 조회 실패")
 
 
@@ -371,8 +385,8 @@ def main():
         print("\n## 이상 징후")
         print("\n".join(notes))
 
-    # 3단계 판단 재료를 여기서 다 준다. 브랜치가 아직 없는 이슈는 코드로 확인할 것이
-    # 없으므로, 무엇을 건드리는 작업인지 알 원천은 이 설명뿐이다.
+    # 착수 대상을 고를 때 쓰는 재료다. 스킬은 소스 코드를 열지 않으므로, 무엇을
+    # 건드리는 작업인지 알 원천은 이 설명뿐이다.
     described = [i for i in open_issues if i["desc"]]
     if described:
         print("\n## 설명 — 열린 이슈")
