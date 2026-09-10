@@ -37,7 +37,9 @@ ICONS = {
     "notion.site": "https://www.notion.so/images/favicon.ico",
 }
 
-BLOCKED, RESOLVED = "⛔", "✅"
+BLOCKED, RESOLVED = "🔴", "✅"
+# 이전에 쓰던 접두사다. 그때 걸어 둔 링크도 제목을 걷을 수 있게 남긴다.
+LEGACY_BLOCKED = "⛔"
 MAX_WORKERS = 8
 
 
@@ -59,7 +61,7 @@ def build_title(source, title, resolved):
 
 def strip_title(title, source):
     """저장된 제목에서 접두사와 라벨을 걷어 원래 제목만 남긴다."""
-    t = title.lstrip(BLOCKED + RESOLVED + " ")
+    t = title.lstrip(BLOCKED + LEGACY_BLOCKED + RESOLVED + " ")
     label = f"[{SOURCES.get(source, '외부')}] "
     return t[len(label):] if t.startswith(label) else t
 

@@ -90,8 +90,11 @@ def fetch_issues(keys):
 
 
 def strip_mark(title):
-    """그래프가 노드 앞에 마커를 다시 붙이므로 저장된 접두사(⛔·✅)는 걷어낸다."""
-    return title.lstrip("⛔✅ ")
+    """그래프가 노드 앞에 마커를 다시 붙이므로 저장된 접두사(🔴·✅)는 걷어낸다.
+
+    이전에 쓰던 ⛔ 접두사가 남아 있는 링크도 함께 걷는다.
+    """
+    return title.lstrip("🔴⛔✅ ")
 
 
 def fetch_extdeps(keys):
@@ -219,11 +222,11 @@ def render_graph(issues, keys, crit):
         # 달라져서 뒤따르는 화살표 열이 어긋난다.
         if i.get("extdep"):
             # 외부 의존은 키가 없다. 키 자리를 제목에 내주고 마커는 막힌 이슈와
-            # 같은 ⛔ 를 쓴다 — 읽는 쪽에서는 둘 다 "지금 못 하는 이유"다.
-            s = f"⛔ {trunc(i['summary'], SUMMARY_MAX + 12)}"
+            # 같은 🔴 를 쓴다 — 읽는 쪽에서는 둘 다 "지금 못 하는 이유"다.
+            s = f"🔴 {trunc(i['summary'], SUMMARY_MAX + 12)}"
             return s + " *" if k in crit else s
         if open_blockers(k):
-            mark = "⛔"
+            mark = "🔴"
         elif i["active"]:
             mark = "🟠"
         else:
@@ -304,7 +307,7 @@ def render_graph(issues, keys, crit):
         print("\n순환 ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다")
         for k in cyclic:
             print(block(k))
-    print("\n범례  🟢 착수 가능  🟠 진행 중  ⛔ 막힘·외부 대기  * 임계 경로"
+    print("\n범례  🟢 착수 가능  🟠 진행 중  🔴 막힘·외부 대기  * 임계 경로"
           "  ───▶ blocks  ▲ 남은 blocker  (?) 조회 실패")
 
 
