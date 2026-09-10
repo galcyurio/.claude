@@ -10,6 +10,7 @@
 #   --pool <ref>      유휴 worktree를 찾는 기준 base (기본: --base 값)
 #   --slot <접미사>   유휴 자리를 찾을 슬롯 계열 (기본: 숫자 접미사 슬롯만)
 #   --branch <name>   작업 브랜치 이름을 직접 지정
+#   --summary <제목>  탭 제목에 붙일 이슈 제목 (대괄호 prefix를 뗀 핵심 제목)
 #   --new             유휴 worktree를 찾지 않고 새로 만든다
 #   --no-move         세션을 옮기지 않는다 (자리만 준비)
 #   --dry-run         파괴적 동작 없이 계획만 출력
@@ -147,6 +148,7 @@ opt_base=""
 opt_pool=""
 opt_slot=""
 opt_branch=""
+opt_summary=""
 opt_new=0
 opt_no_move=0
 opt_dry_run=0
@@ -157,6 +159,7 @@ while [ $# -gt 0 ]; do
     --pool) opt_pool="${2:-}"; shift 2 ;;
     --slot) opt_slot="${2:-}"; shift 2 ;;
     --branch) opt_branch="${2:-}"; shift 2 ;;
+    --summary) opt_summary="${2:-}"; shift 2 ;;
     --new) opt_new=1; shift ;;
     --no-move) opt_no_move=1; shift ;;
     --dry-run) opt_dry_run=1; shift ;;
@@ -174,6 +177,9 @@ base_ref="$opt_base"
 pool_ref="${opt_pool:-$opt_base}"
 slot_name="$opt_slot"
 work_branch="$opt_branch"
+# 탭 제목. 이슈 키만 있으면 보드와 탭 목록에서 어떤 작업인지 읽히지 않으므로 제목을
+# 함께 붙인다. 제목을 넘겨받지 못하면 키만 쓴다 — 스킬 밖에서 손으로 부르는 경우다.
+tab_title="$issue_key${opt_summary:+ $opt_summary}"
 
 # 재사용할 수 있는 자리인지 판정하는 조건을 여기에 모아 둔다.
 # 조건: 메인이 아니고, 브랜치가 <pool>-<접미사>, upstream이 origin/<pool>,
@@ -354,12 +360,12 @@ fi
 if [ "$reused_current" = 1 ]; then
   info "[2/3] 이미 이 자리에 있으므로 세션을 옮기지 않습니다."
   if [ "$opt_dry_run" = 1 ]; then
-    info "[dry-run] 실제로는 탭 제목을 $issue_key 로 바꾸고 여기서 끝냅니다."
+    info "[dry-run] 실제로는 탭 제목을 $tab_title 로 바꾸고 여기서 끝냅니다."
     exit 0
   fi
   handle="$(orca_terminal_handle)"
   if [ -n "$handle" ]; then
-    "$ORCA" terminal rename --terminal "$handle" --title "$issue_key" --json > /dev/null \
+    "$ORCA" terminal rename --terminal "$handle" --title "$tab_title" --json > /dev/null \
       || warn "탭 제목을 바꾸지 못했습니다. 직접 바꿔 주세요."
   else
     warn "터미널 핸들을 찾지 못해 탭 제목은 그대로 둡니다."
@@ -394,7 +400,7 @@ wt_id="$(wait_orca_worktree "$target_worktree")" \
 # jsonl 복사는 이 실행 도중에 일어나 이 스크립트의 출력이 새 세션에 실리지 않는다(spec 4.2-4).
 first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason."
 
-"$ORCA" terminal create --worktree "id:$wt_id" --title "$issue_key" \
+"$ORCA" terminal create --worktree "id:$wt_id" --title "$tab_title" \
   --command "claude --resume $sid \"$first_prompt\"" --json > /dev/null \
   || die "새 탭을 띄우지 못했습니다. 세션 파일은 이미 복사되어 있으니 그 worktree에서 직접 열 수 있습니다."
 info "[3/3] 새 탭 기동 완료: $target_worktree"
