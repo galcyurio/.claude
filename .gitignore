@@ -32,6 +32,7 @@ daemon/
 jobs/
 
 # 캐시
+__pycache__/
 cache/
 paste-cache/
 plugins/
