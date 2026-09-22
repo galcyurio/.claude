@@ -15,17 +15,22 @@ effort: low
 
 ## 리뷰 대상 선택
 
-사용자가 무엇을 리뷰하려는지에 따라 대상을 고른다:
+아래 표에서 **한 줄을 골라 그대로 쓴다.** `<target> [compare-with]` 꼴로 직접 조립하지 않는다 — 조립하면 인자 순서가 뒤집히거나 `--merge-base`가 빠진다.
 
-- 커밋 전 미커밋 변경 리뷰: `<difit-command> .`
-- HEAD 커밋 리뷰: `<difit-command>`
-- 스테이징 영역 변경 리뷰: `<difit-command> staged`
-- 미스테이징 변경만 리뷰: `<difit-command> working`
+| 리뷰 대상 | 대상 인자 |
+|---|---|
+| 작업 브랜치에 쌓은 커밋 전부 (base와 비교) | `HEAD <base 브랜치> --merge-base` |
+| 커밋 전 미커밋 변경 | `.` |
+| HEAD 커밋 하나 | (인자 없음) |
+| 스테이징 영역 변경 | `staged` |
+| 미스테이징 변경만 | `working` |
+| 특정 커밋 하나 | `<커밋 SHA>` |
 
-```bash
-<difit-command> <target>                    # 단일 커밋 diff 보기. 예: difit 6f4a9b7
-<difit-command> <target> [compare-with]     # 두 커밋/브랜치 비교. 예: difit feature main
-```
+**작업을 마치고 "리뷰해줘"라고 하면 첫 줄이 기본값이다.** 작업 트리가 깨끗하고 브랜치에 커밋이 쌓여 있으면 HEAD 커밋 하나가 아니라 base부터의 전체를 띄운다. base 브랜치를 알 수 없으면 사용자에게 묻는다.
+
+두 인자를 쓸 때 **앞이 리뷰할 쪽(HEAD·작업 브랜치), 뒤가 비교 기준(base)이다.** `git diff <기준> <새것>`과 순서가 반대라서, 그 습관대로 `difit <base> HEAD`라고 쓰면 diff가 뒤집혀 **추가한 코드가 전부 삭제로 렌더된다** (2026-09-22 실측: `difit <base> HEAD` → `GetRewardUseCase.kt +0/-51` · `difit HEAD <base>` → `+51/-0`). 뒤집힌 채로 띄워도 런치 로그에서 잡아낼 수 있다 — 계약의 "실행" 참고.
+
+`--merge-base`는 base가 fork 이후 앞으로 이동해도 그 사이 base에 병합된 남의 커밋이 섞이지 않게 한다(three-dot 기준). 상세 근거는 `review-by-agents` SKILL.md 6-A의 "`--merge-base` 필수" 항목에 있다. Git revision 모드 전용이라 stdin으로 diff를 넣는 모드에는 붙이지 않는다.
 
 미커밋 변경에서 아직 git에 추가되지 않은 파일도 diff에 보이게 하려면 `--include-untracked`를 추가한다 (`<difit-command> . --include-untracked`).
 
