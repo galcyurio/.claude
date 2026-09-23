@@ -93,7 +93,7 @@ class XxxViewModelTest : ViewModelTest() {
 
 ## 스냅샷 테스트
 
-디자인 시스템 컴포넌트는 스냅샷 테스트로 시각 회귀를 잡는다. 주로 `revolt-android`의 `design` 모듈에서 사용.
+스냅샷 테스트는 **디자인 시스템 컴포넌트에만 작성한다.** 화면·피처 모듈의 `@Preview`에는 `@PreviewSnapshotTest`를 붙이지 않는다 — 컴포넌트 하나가 바뀌면 그것을 쓰는 화면 골든이 전부 갱신되어 리뷰가 불가능해지고 열린 PR이 바이너리 충돌을 일으킨다.
 
 ```kotlin
 class RevoltChipTest : RevoltSnapshotTest("Chip") {
@@ -118,6 +118,7 @@ class RevoltChipTest : RevoltSnapshotTest("Chip") {
 - `capture { ... }` DSL로 Compose 트리를 캡처.
 - **스냅샷 테스트 함수명은 영문**(상태/케이스 이름): `default`, `selected`, `focused`, `longText` 등.
 - 상태마다 별도 테스트 함수로 쪼갠다.
+- 화면 고유의 배치와 상태별 렌더링 회귀는 ViewModel·State 단위 테스트와 실기기 확인이 맡는다.
 - 스냅샷 이미지는 tinypng 적용하지 않으며, lint exclude 경로에 등록.
 
 ## 테스트 데이터 패턴
