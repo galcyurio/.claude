@@ -172,6 +172,36 @@ private const val MAX_COUNT = 10
 private fun Preview() { ... }
 ```
 
+## UseCase와 Repository는 suspend fun을 우선한다
+
+한 번 조회하거나 저장하고 끝나는 작업은 **Repository부터** `suspend fun`으로 선언하고 결과 값을 바로 반환한다. UseCase도 `suspend operator fun invoke`로 그 값을 그대로 넘긴다. 목표는 새 코드에서 `flowDataResource { }`를 쓰지 않는 것이다. Repository가 `Flow<DataResource<T>>`를 반환하고 UseCase에서 `awaitOrThrow()`로 푸는 형태도 새로 만들지 않는다. 값이 계속 바뀌어 구독해야 하는 경우(DB 관찰, 상태 스트림 등)에만 `Flow`를 반환한다.
+
+```kotlin
+// 이렇게
+interface MarketRepository {
+    suspend fun getMarketCar(hashId: String): MarketCar
+}
+
+internal class MarketRepositoryImpl @Inject constructor(
+    private val marketRemoteDataSource: MarketRemoteDataSource,
+) : MarketRepository {
+    override suspend fun getMarketCar(hashId: String): MarketCar =
+        marketRemoteDataSource.getMarketCar(hashId).toDomain()
+}
+
+class GetMarketCarUseCase @Inject constructor(
+    private val marketRepository: MarketRepository,
+) {
+    suspend operator fun invoke(hashId: String): MarketCar =
+        marketRepository.getMarketCar(hashId)
+}
+
+// 이렇게 하지 않는다 (단발 조회인데 Repository가 flowDataResource로 Flow를 만든다)
+override fun getMarketCar(hashId: String): Flow<DataResource<MarketCar>> = flowDataResource {
+    marketRemoteDataSource.getMarketCar(hashId)
+}
+```
+
 ## 패키지 배치
 
 Clean Architecture 레이어 안에서 다음 구조를 사용한다.
