@@ -1,7 +1,7 @@
 ---
-name: copy-new-branch-name
+name: create-new-branch-name
 effort: low
-description: 새로 만들 브랜치의 이름이 필요할 때 사용한다. 사용자가 'copy-new-branch-name', '브랜치 이름', '브랜치명', '새 브랜치 이름', '브랜치 이름 만들어', '브랜치명 추천', '브랜치 뭐로 할까' 등을 Jira 이슈와 함께 언급할 때 이 스킬을 사용해야 한다. 브랜치·worktree를 실제로 만드는 요청에는 `start-worktree`, develop 반영 브랜치에는 `merge-develop`을 사용한다.
+description: 새로 만들 브랜치의 이름이 필요할 때 사용한다. 사용자가 'create-new-branch-name', '브랜치 이름', '브랜치명', '새 브랜치 이름', '브랜치 이름 만들어', '브랜치명 추천', '브랜치 뭐로 할까' 등을 Jira 이슈와 함께 언급할 때 이 스킬을 사용해야 한다. 브랜치·worktree를 실제로 만드는 요청에는 `start-worktree`, develop 반영 브랜치에는 `merge-develop`을 사용한다.
 argument-hint: "[Jira 이슈 키 또는 URL]"
 ---
 
