@@ -12,6 +12,7 @@ allowed-tools: Bash
 
 - 스크립트는 `PRNDcompany` 의 열린 PR 중 나에게 개인으로 리뷰를 요청한 것을 10분마다 확인한다
 - 새 요청이 오면 `~/dev/{repo}` 원본 클론에서 새 탭(`🔍 리뷰 · {repo}#{n}`)을 열어 `claude '/review-by-agents {PR 링크}'` 를 실행한다
+- 같은 PR 에 리뷰 요청이 다시 오면 그 PR 의 세션 탭에 `/review-by-agents` 를 보낸다. 탭이 닫혔으면 같은 claude 대화를 `--resume` 으로 이어 새 탭을 연다
 - 상태 파일은 `~/.claude/state/watch-review-requests/` 에 쌓인다. 실행 기록은 그 안의 `watch.log` 에 있다
 
 ## 1. 실행 중인지 확인

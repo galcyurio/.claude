@@ -19,7 +19,7 @@ ORG=PRNDcompany
 WORKSPACE=~/dev
 STATE=~/.claude/state/watch-review-requests
 DISPATCHED=$STATE/dispatched   # 세션에 보낸 PR. 줄마다 "repo#n"
-SESSIONS=$STATE/sessions       # PR → 리뷰 세션. 줄마다 "repo#n handle"
+SESSIONS=$STATE/sessions       # PR → 리뷰 세션. 줄마다 "repo#n<TAB>ptyId<TAB>claude 세션 id"
 LOG=$STATE/watch.log
 DEFERRED=$STATE/deferred       # 이번 확인에서 못 보낸 PR 과 사유. 줄마다 "repo#n<TAB>사유"
 TAB_TITLE="📡 리뷰 모니터"
@@ -83,47 +83,61 @@ ticket_of() {  # $1 title, $2 fallback
   printf '%s' "${k:-$2}"
 }
 
+# handle 은 PTY 가 다시 붙을 때마다 새로 발급되므로, 세션 탭은 바뀌지 않는 ptyId 로 찾는다
+# claude 가 떠 있는 터미널만. 줄마다 "ptyId<TAB>handle<TAB>lastOutputAt"
 live_terminals() {
   orca terminal list --json 2>/dev/null \
-    | jq -r '.result.terminals[] | select(.connected) | [.handle, (.lastOutputAt // 0 | tostring)] | @tsv'
+    | jq -r '.result.terminals[] | select(.connected and .agentIdentity == "claude")
+        | [.ptyId, .handle, (.lastOutputAt // 0 | tostring)] | @tsv'
 }
 
-session_of() { awk -v k="$1" '$1==k {print $2}' "$SESSIONS" | tail -1; }
+session_of() { awk -F'\t' -v k="$1" '$1==k {print $2"\t"$3}' "$SESSIONS" | tail -1; }
 
-set_session() {
-  { grep -v "^$1 " "$SESSIONS"; echo "$1 $2"; } > "$SESSIONS.tmp"; mv "$SESSIONS.tmp" "$SESSIONS"
+set_session() {  # $1 repo#n, $2 ptyId, $3 claude 세션 id
+  { awk -F'\t' -v k="$1" '$1!=k' "$SESSIONS"; printf '%s\t%s\t%s\n' "$1" "$2" "$3"; } > "$SESSIONS.tmp"
+  mv "$SESSIONS.tmp" "$SESSIONS"
 }
 
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 
 # review-by-agents 는 PR 하나를 받고 실행 위치의 레포에서 gh pr diff 를 돌리므로, PR 마다 그 레포 클론에서 세션을 띄운다
+# 재요청이면 그 PR 의 세션 탭에 보내고, 탭이 닫혔으면 같은 claude 대화를 이어 새 탭을 연다
 # $1 repo#n, $2 url. 성공하면 0
 dispatch() {
-  local key=$1 urls=$2 prompt handle last now repo dir
+  local key=$1 urls=$2 prompt pty sid live handle last now repo dir claude_args kind
   prompt="/review-by-agents $urls"
   repo=${key%#*}; dir=$WORKSPACE/${repo#*/}
   [ -d "$dir/.git" ] || [ -f "$dir/.git" ] || { DEFER_REASON="레포 클론 없음 실패"; log "  $key $dir 클론이 없음"; return 1; }
-  handle=$(session_of "$key")
-  if [ -n "$handle" ]; then
-    last=$(printf '%s\n' "$LIVE" | awk -v h="$handle" '$1==h {print $2}')
-    if [ -n "$last" ]; then
-      now=$(( $(date +%s) * 1000 ))
-      if [ $(( now - last )) -lt $BUSY_MS ]; then
-        DEFER_REASON="세션 응답 중"; log "  $key 세션이 응답 중이라 다음 확인으로 미룸"; return 1
-      fi
-      orca terminal send --terminal "$handle" --text "$prompt" --enter --json >/dev/null 2>&1 \
-        || { DEFER_REASON="기존 세션에 보내기 실패"; log "  $key 기존 세션에 보내기 실패"; return 1; }
-      log "  $key → 기존 세션 $urls"; return 0
+  IFS=$'\t' read -r pty sid <<< "$(session_of "$key")"
+  live=$([ -n "$pty" ] && printf '%s\n' "$LIVE" | awk -F'\t' -v p="$pty" '$1==p {print $2"\t"$3}' | head -1)
+  if [ -n "$live" ]; then
+    IFS=$'\t' read -r handle last <<< "$live"
+    now=$(( $(date +%s) * 1000 ))
+    if [ $(( now - last )) -lt $BUSY_MS ]; then
+      DEFER_REASON="세션 응답 중"; log "  $key 세션이 응답 중이라 다음 확인으로 미룸"; return 1
     fi
+    orca terminal send --terminal "$handle" --text "$prompt" --enter --json >/dev/null 2>&1 \
+      || { DEFER_REASON="기존 세션에 보내기 실패"; log "  $key 기존 세션에 보내기 실패"; return 1; }
+    log "  $key → 기존 세션 $urls"; return 0
+  fi
+  # 탭은 못 찾았는데 대화가 아직 떠 있으면, 같은 대화를 두 곳에서 이어 쓰지 않도록 기다린다
+  if [ -n "$sid" ] && pgrep -f -- "$sid" >/dev/null; then
+    DEFER_REASON="기존 세션 탭을 찾지 못함"; log "  $key 세션 $sid 은 떠 있지만 탭을 찾지 못해 다음 확인으로 미룸"; return 1
+  fi
+  if [ -n "$sid" ] && [ -n "$(find ~/.claude/projects -name "$sid.jsonl" -print -quit 2>/dev/null)" ]; then
+    claude_args="--resume $sid"; kind="이어 받은 세션"
+  else
+    sid=$(uuidgen | tr '[:upper:]' '[:lower:]'); claude_args="--session-id $sid"; kind="새 세션"
   fi
   handle=$(orca terminal create --worktree "$WORKTREE_SELECTOR" --title "🔍 리뷰 · ${key#*/}" \
-      --command "cd $(quote "$dir") && claude $(quote "$prompt")" --json 2>&1 \
+      --command "cd $(quote "$dir") && claude $claude_args $(quote "$prompt")" --json 2>&1 \
     | grep -oE 'term_[0-9a-f-]+' | head -1)
   [ -n "$handle" ] || { DEFER_REASON="세션 띄우기 실패"; log "  $key 세션 띄우기 실패"; return 1; }
-  set_session "$key" "$handle"
+  pty=$(orca terminal show --terminal "$handle" --json 2>/dev/null | jq -r '.result.terminal.ptyId // empty')
+  set_session "$key" "${pty:--}" "$sid"   # ptyId 를 못 얻어도 칸이 밀리지 않게 자리를 채운다
   command -v terminal-notifier >/dev/null && terminal-notifier -title "🔍 리뷰 세션 시작" \
     -subtitle "$key" -message "$urls" -sound Glass >/dev/null 2>&1 &
-  log "  $key → 새 세션 $urls"
+  log "  $key → $kind $urls"
 }
 
 check() {
