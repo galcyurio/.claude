@@ -33,6 +33,33 @@ if [ -f "$marker" ]; then
   exit 0
 fi
 
+# /auto-apply-ai-review 루프 승인(approve-push.sh 가 만든 세션 마커). 마커에 적힌 브랜치로
+# SHA 를 지정한 --force-with-lease push 만 통과시킨다. 다른 브랜치·SHA 없는 lease·PR 생성은
+# 위 프롬프트 단위 승인이 없으면 그대로 막힌다. 스킬이 마커를 못 지웠을 때를 대비해 12시간 뒤 무효다.
+sid=$(printf '%s' "$input" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get("session_id") or "")
+except Exception: print("")' 2>/dev/null || printf '')
+loop="$HOME/.claude/cache/push-gate/loop-$sid"
+if [ -n "$sid" ] && [ -f "$loop" ] && [ -z "$(find "$loop" -mmin +720 2>/dev/null)" ]; then
+  if CMD="$cmd" BRANCH="$(head -n 1 "$loop")" python3 - <<'PY'
+import os, re, sys
+cmd, branch = os.environ["CMD"], os.environ["BRANCH"]
+if not branch:
+    sys.exit(1)
+b = re.escape(branch)
+segs = [s.strip() for s in re.split(r"&&|\|\||;|\||\n", cmd) if s.strip()]
+if any(re.search(r"(^|\s)gh\s+pr\s+create(\s|$)", s) for s in segs):
+    sys.exit(1)
+pushes = [s for s in segs if re.search(r"(^|\s)git(\s+\S+)*\s+push(\s|$)", s)]
+allowed = re.compile(
+    rf"^git push --force-with-lease={b}:[0-9a-f]{{7,40}} origin (HEAD:)?(refs/heads/)?{b}(\s+2>&1)?$")
+sys.exit(0 if pushes and all(allowed.match(s) for s in pushes) else 1)
+PY
+  then
+    exit 0
+  fi
+fi
+
 python3 - <<'PY'
 import json, sys
 reason = ("원격으로 나가는 액션은 사용자가 직접 통제한다. 이 프롬프트에 push·PR 생성 지시가 "

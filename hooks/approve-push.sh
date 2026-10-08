@@ -13,6 +13,28 @@ except Exception: print(""); raise SystemExit
 print(d.get("prompt") or "")' 2>/dev/null || printf '')
 [ -z "$prompt" ] && exit 0
 
+# /auto-apply-ai-review 호출은 그 세션에서, 호출 시점 브랜치에 한해 루프가 끝날 때까지의
+# force push 승인이다(스킬의 "push 승인 범위"). Monitor 알림·예약 점검으로 깨어난 턴에는
+# 사용자 프롬프트가 없어 prompt_id 마커로는 승인할 수 없으므로 세션 단위 마커를 따로 둔다.
+# 허용하는 명령 형태는 guard-push.sh 가 좁히고, 마커는 스킬이 루프를 끝낼 때 지운다.
+if printf '%s' "$prompt" | grep -Eq '^[[:space:]]*/auto-apply-ai-review([[:space:]]|$)'; then
+  ids=$(printf '%s' "$input" | python3 -c 'import json,sys
+try: d=json.load(sys.stdin)
+except Exception: d={}
+print(d.get("session_id") or "")
+print(d.get("cwd") or "")' 2>/dev/null || printf '\n\n')
+  sid=$(printf '%s\n' "$ids" | sed -n 1p)
+  cwd=$(printf '%s\n' "$ids" | sed -n 2p)
+  branch=""
+  [ -n "$cwd" ] && branch=$(git -C "$cwd" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+  if [ -n "$sid" ] && [ -n "$branch" ] && [ "$branch" != "HEAD" ]; then
+    dir="$HOME/.claude/cache/push-gate"
+    mkdir -p "$dir"
+    printf '%s\n' "$branch" > "$dir/loop-$sid"
+  fi
+  exit 0
+fi
+
 # 부정·유보 표현이 있으면 승인하지 않는다 ("push 하지 마", "푸시 없이", "PR은 나중에")
 if printf '%s' "$prompt" | grep -Eiq '(push|푸시|PR)[^.!?]{0,12}(하지|안 |안하|말고|말아|없이|금지|보류|전에|빼고|제외|나중에|다음에|이따|할지|할까)'; then
   exit 0

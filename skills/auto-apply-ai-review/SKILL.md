@@ -12,6 +12,8 @@ PR 하나를 지정받아 "감시 → 반영 판단 → 커밋 → autosquash �
 
 사용자가 이 스킬을 호출한 것은 **그 PR의 head 브랜치에, 이 루프가 끝날 때까지** 반복 force push 하는 것을 승인한 것으로 본다. 다른 브랜치·서브모듈 push, PR 답글, resolve, re-request review는 이 승인에 들어가지 않는다. 루프가 끝나면(종료 조건·중단·보고 후 대기) 승인도 끝난다. 다시 push하려면 스킬을 다시 호출받아야 한다.
 
+이 승인은 훅이 집행한다. `hooks/approve-push.sh`가 `/auto-apply-ai-review` 호출을 보면 세션 마커 `~/.claude/cache/push-gate/loop-<session_id>`에 호출 시점 브랜치를 적고, `hooks/guard-push.sh`는 그 브랜치로 SHA를 지정한 `git push --force-with-lease=<head>:<sha> origin HEAD:<head>`만 통과시킨다. 그래서 head 브랜치에 체크아웃된 상태에서 호출받아야 하고, push는 5단계 명령 형태를 그대로 쓴다.
+
 ## 0. 시작 점검
 
 ```bash
@@ -108,7 +110,11 @@ LEASE=$(git rev-parse HEAD)
 
 ## 7. 종료
 
-아래 중 하나에 닿으면 Monitor를 TaskStop하고 `ScheduleWakeup(stop: true)`로 예비 점검을 끈 뒤 보고한다.
+아래 중 하나에 닿으면 Monitor를 TaskStop하고 `ScheduleWakeup(stop: true)`로 예비 점검을 끈 뒤, push 승인 마커를 지우고 보고한다.
+
+```bash
+grep -lx '<head>' ~/.claude/cache/push-gate/loop-* 2>/dev/null | xargs rm -f
+```
 
 - 현재 head의 CI가 pass이고 새 스레드가 없는 점검이 **연속 2회**다.
 - 반영한 지점(같은 파일의 겹치는 줄 범위)에 봇 지적이 반영 뒤에도 **2회 이상** 다시 온다. 세 번째 지적은 반영하지 않는다.
