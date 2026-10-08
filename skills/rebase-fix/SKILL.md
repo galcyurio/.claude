@@ -14,9 +14,10 @@ allowed-tools: Bash(git:*), Read, Edit, Grep, Glob, AskUserQuestion
 - AI가 작업한 결과(현재 브랜치의 커밋들)를 리뷰하다가 기존 커밋 내부의 코드를 고쳐야 할 때
 - "여기 별로네", "이 부분 다시 해줘", "마음에 안 들어", "이 함수 이름 바꿔줘" 같은 피드백
 - 한 번에 여러 곳을 고쳐야 할 때(피드백 모아서 일괄 처리)
+- 피드백에 기존 커밋 수정과 새 커밋감이 섞여 있을 때(3단계에서 나눠 처리)
 
 **사용하지 않는다**
-- 새 기능을 추가할 때(정상적인 새 커밋이 맞다)
+- 새 기능을 추가할 때(정상적인 새 커밋이 맞다). 피드백 전부가 새 커밋감이면 스킬에 진입하지 않는다
 - working tree에 아직 커밋되지 않은 변경만 있을 때(그냥 수정하면 됨)
 - main/master/develop 등 보호 브랜치 위에서 직접 작업 중일 때
 - 분기점(base) 이전의 history를 건드려야 할 때
@@ -56,20 +57,28 @@ git merge-base HEAD origin/main 2>/dev/null \
 
 ### 3. 피드백 정리
 
-사용자의 피드백을 항목별로 재진술. 여러 항목이면 리스트로 보여주고 한 번만 확인한다.
+사용자의 피드백을 항목별로 재진술하고, 항목마다 처리 방식을 **fixup**과 **새 커밋** 중 하나로 분류한다.
+
+| 분류 | 판정 기준 |
+|------|----------|
+| **fixup** | base 이후 커밋이 만든 코드를 고친다(이름 변경, 로직 수정, 잘못 구현한 부분 교정). 고친 결과가 target 커밋 메시지의 의도 안에 들어간다 |
+| **새 커밋** | 기존 커밋 어디에도 속하지 않는 변경이다. 새 기능·새 파일·새 테스트 케이스 추가처럼 target 커밋 메시지가 설명하지 않는 의도를 더하거나, 여러 커밋에 걸친 별도 정리(공용 추출 등)다 |
+
+- 판정이 애매한 항목은 추측하지 않고 `AskUserQuestion`으로 묻는다
+- 분류 결과를 리스트로 보여주고 한 번만 확인한다
 
 ```
 받은 피드백:
-1. src/login.ts: 에러 메시지를 사용자 친화적으로
-2. src/utils/format.ts: 함수명 formatDate -> toIsoString
-3. test/login.spec.ts: 케이스 1개 추가
+1. [fixup → a1b2c3d] src/login.ts: 에러 메시지를 사용자 친화적으로
+2. [fixup → d4e5f6a] src/utils/format.ts: 함수명 formatDate -> toIsoString
+3. [새 커밋] test/login.spec.ts: 케이스 1개 추가
 
-위 항목을 fixup 커밋으로 처리한 후 한 번에 autosquash 합니다. 진행할까요?
+fixup 항목을 기존 커밋에 autosquash한 뒤, 새 커밋 항목을 그 위에 별도 커밋으로 쌓습니다. 진행할까요?
 ```
 
-### 4. 각 피드백을 fixup 커밋으로 (반복)
+### 4. fixup 항목을 fixup 커밋으로 (반복)
 
-피드백마다 다음을 수행:
+새 커밋 항목은 이 단계에서 건드리지 않는다. fixup 항목마다 다음을 수행:
 
 ```bash
 # target 커밋 찾기 — 둘 다 활용
@@ -99,13 +108,20 @@ GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash <base>
 - `GIT_SEQUENCE_EDITOR=:`로 에디터를 띄우지 않고 자동 진행
 - 충돌 발생 시: `git rebase --abort`로 즉시 원복하고 사용자에게 보고(자동 해결 금지)
 
-### 6. 종료 안내
+### 6. 새 커밋 항목을 별도 커밋으로
+
+새 커밋 항목이 없으면 건너뛴다. autosquash가 끝난 history 위에서 작업한다. fixup 커밋과 섞어 만들면 autosquash가 순서를 바꾸면서 충돌이 날 수 있기 때문이다.
+
+- 커밋 메시지를 쓰기 전에 `~/.claude/references/commit-rules.md`를 Read한다
+- 항목마다 변경한 파일만 `git add`하고 일반 커밋을 만든다. 서로 다른 의도의 항목을 한 커밋에 묶지 않는다
+
+### 7. 종료 안내
 
 ```bash
 git log --oneline <base>..HEAD               # 최종 history 확인
 ```
 
-다음 메시지를 출력하고 종료:
+다음 메시지를 출력하고 종료한다. 새 커밋을 만들었다면 첫 줄 대신 흡수한 커밋과 새로 만든 커밋을 각각 나열한다:
 
 ```
 완료. 새 커밋을 쌓지 않고 기존 커밋에 흡수했습니다.
@@ -131,6 +147,7 @@ push는 직접 실행해 주세요.
 - **target SHA 잘못 잡기**: 같은 파일을 여러 커밋이 건드렸을 때 단순 last-touch만 보면 틀린다. `git blame -L <start>,<end>`로 라인 단위로 확인.
 - **base를 hard-code**: `main`이 없는 저장소(예: `master`만 있는 곳)에서 깨진다. 자동 탐지 + 모호하면 묻기.
 - **분기점 이전 커밋 건드리기**: 이미 합쳐진 history를 건드리면 다른 사람의 작업에 영향이 간다. target이 base보다 오래되면 즉시 중단.
+- **새 커밋감을 fixup으로 흡수**: 새 테스트·새 기능을 기존 커밋에 합치면 그 커밋이 메시지와 다른 일을 하게 된다. 3단계에서 분류하고, 애매하면 묻는다.
 - **`git rebase -i`를 editor 열린 채로 호출**: 대화형 에디터가 열리면 흐름이 멈춘다. 반드시 `GIT_SEQUENCE_EDITOR=:`와 `--autosquash` 조합 사용.
 
 ## 핵심 명령 요약
@@ -140,7 +157,7 @@ push는 직접 실행해 주세요.
 git status --porcelain
 BASE=$(git merge-base HEAD origin/main)      # 또는 master/develop
 
-# 피드백마다
+# fixup 항목마다
 git log --oneline $BASE..HEAD -- <file>
 git blame -L <start>,<end> <file>
 # ... 코드 수정 ...
@@ -149,6 +166,10 @@ git commit --fixup=<targetSha>
 
 # 일괄 squash
 GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash $BASE
+
+# 새 커밋 항목마다 (autosquash 이후)
+git add <file>
+git commit -m "<commit-rules.md 형식의 메시지>"
 
 # 결과
 git log --oneline $BASE..HEAD
