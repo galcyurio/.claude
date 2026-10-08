@@ -53,10 +53,12 @@ downloads/
 
 # .android-ai-prompts symlink (별도 repo에서 관리)
 skills/apply-pr-feedback
+skills/capture-preview-screenshot
 skills/merge-develop
 skills/prd-ask-oq
 skills/prd-create
 skills/prd-update
+skills/upload-pr-image
 
 # ~/.agents/skills symlink (Orca에서 관리)
 skills/computer-use
