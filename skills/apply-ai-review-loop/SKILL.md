@@ -105,7 +105,7 @@ LEASE=$(git rev-parse HEAD)
 ```
 
 - 원격이 LEASE와 다르면 다른 사람이 push한 것이다. push하지 않고, 그 커밋을 rebase해 넣지도 않고 멈춘다.
-- `--force-with-lease`를 SHA 없이 쓰지 않는다. fetch한 뒤에는 SHA 없는 lease가 남의 커밋을 덮어쓴다.
+- `--force-with-lease`를 SHA 없이 쓰지 않는다. fetch한 뒤에는 SHA 없는 lease가 남의 커밋을 덮어쓴다. SHA는 `$LEASE`·`$(git rev-parse …)` 같은 치환 없이 40자 값을 그대로 적는다. 훅은 명령 문자열에서 `--force-with-lease=<head>:<SHA>` 형태를 확인하므로 치환을 쓰면 막힌다.
 - push 뒤에는 떠 있는 Monitor의 다음 이벤트를 기다린다. Monitor를 새로 띄우는 것은 만료됐을 때뿐이다. 두 개가 함께 돌면 같은 이벤트가 두 번 온다.
 
 ## 6. CI 실패
