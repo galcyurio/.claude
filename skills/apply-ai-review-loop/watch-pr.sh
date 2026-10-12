@@ -4,7 +4,7 @@
 #
 #   watch-pr.sh <owner/repo> <PR 번호> [--interval 60]
 #
-# 기준값: ~/.claude/state/auto-apply-ai-review/<owner>_<repo>_<n>/seen (줄마다 스레드 URL)
+# 기준값: ~/.claude/state/apply-ai-review-loop/<owner>_<repo>_<n>/seen (줄마다 스레드 URL)
 #   파일이 없으면 지금 보이는 미해결 스레드를 전부 기준값으로 저장하고 출력하지 않는다.
 #   파일이 있으면(감시 재시작) 그대로 쓴다. 한 번 출력한 스레드는 seen 에 추가해 다시 내보내지 않는다.
 #
@@ -27,7 +27,7 @@ done
 
 OWNER=${REPO%%/*}
 NAME=${REPO##*/}
-STATE=~/.claude/state/auto-apply-ai-review/${OWNER}_${NAME}_${NUMBER}
+STATE=~/.claude/state/apply-ai-review-loop/${OWNER}_${NAME}_${NUMBER}
 SEEN=$STATE/seen
 mkdir -p "$STATE"
 

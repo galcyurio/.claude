@@ -33,7 +33,7 @@ if [ -f "$marker" ]; then
   exit 0
 fi
 
-# /auto-apply-ai-review 루프 승인(approve-push.sh 가 만든 세션 마커). 마커에 적힌 브랜치로
+# /apply-ai-review-loop 루프 승인(approve-push.sh 가 만든 세션 마커). 마커에 적힌 브랜치로
 # SHA 를 지정한 --force-with-lease push 만 통과시킨다. 다른 브랜치·SHA 없는 lease·PR 생성은
 # 위 프롬프트 단위 승인이 없으면 그대로 막힌다. 스킬이 마커를 못 지웠을 때를 대비해 12시간 뒤 무효다.
 sid=$(printf '%s' "$input" | python3 -c 'import json,sys

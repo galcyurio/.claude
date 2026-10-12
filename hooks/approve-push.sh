@@ -13,11 +13,11 @@ except Exception: print(""); raise SystemExit
 print(d.get("prompt") or "")' 2>/dev/null || printf '')
 [ -z "$prompt" ] && exit 0
 
-# /auto-apply-ai-review 호출은 그 세션에서, 호출 시점 브랜치에 한해 루프가 끝날 때까지의
+# /apply-ai-review-loop 호출은 그 세션에서, 호출 시점 브랜치에 한해 루프가 끝날 때까지의
 # force push 승인이다(스킬의 "push 승인 범위"). Monitor 알림·예약 점검으로 깨어난 턴에는
 # 사용자 프롬프트가 없어 prompt_id 마커로는 승인할 수 없으므로 세션 단위 마커를 따로 둔다.
 # 허용하는 명령 형태는 guard-push.sh 가 좁히고, 마커는 스킬이 루프를 끝낼 때 지운다.
-if printf '%s' "$prompt" | grep -Eq '^[[:space:]]*/auto-apply-ai-review([[:space:]]|$)'; then
+if printf '%s' "$prompt" | grep -Eq '^[[:space:]]*/apply-ai-review-loop([[:space:]]|$)'; then
   ids=$(printf '%s' "$input" | python3 -c 'import json,sys
 try: d=json.load(sys.stdin)
 except Exception: d={}

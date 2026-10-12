@@ -1,10 +1,10 @@
 ---
-name: auto-apply-ai-review
-description: PR 하나에 달리는 AI 리뷰 봇(`tester-prnd`) 코멘트를 사용자 대신 반복해서 반영해야 할 때 사용한다. 사용자가 'auto-apply-ai-review', 'AI 리뷰 자동 반영', '봇 리뷰 알아서 반영해', 'tester-prnd 코멘트 계속 반영해', 'AI 리뷰 루프 돌려' 등을 PR 링크와 함께 요청하면 이 스킬을 사용한다. 사람 리뷰어 코멘트를 골라 반영하는 요청에는 `apply-pr-feedback`, 직접 준 피드백을 기존 커밋에 흡수하는 요청에는 `rebase-fix`를 사용한다.
+name: apply-ai-review-loop
+description: PR 하나에 달리는 AI 리뷰 봇(`tester-prnd`) 코멘트를 사용자 대신 반복해서 반영해야 할 때 사용한다. 사용자가 'apply-ai-review-loop', 'AI 리뷰 자동 반영', '봇 리뷰 알아서 반영해', 'tester-prnd 코멘트 계속 반영해', 'AI 리뷰 루프 돌려' 등을 PR 링크와 함께 요청하면 이 스킬을 사용한다. 사람 리뷰어 코멘트를 골라 반영하는 요청에는 `apply-pr-feedback`, 직접 준 피드백을 기존 커밋에 흡수하는 요청에는 `rebase-fix`를 사용한다.
 argument-hint: <PR 링크>
 ---
 
-# auto-apply-ai-review
+# apply-ai-review-loop
 
 PR 하나를 지정받아 "감시 → 반영 판단 → 커밋 → autosquash → force push → 재리뷰 대기"를 종료 조건에 닿을 때까지 반복한다. 코멘트 반영은 `rebase-fix` 절차를 따르고, 이 스킬은 루프·판단·push 안전장치·보고만 더한다.
 
@@ -12,7 +12,7 @@ PR 하나를 지정받아 "감시 → 반영 판단 → 커밋 → autosquash �
 
 사용자가 이 스킬을 호출한 것은 **그 PR의 head 브랜치에, 이 루프가 끝날 때까지** 반복 force push 하는 것을 승인한 것으로 본다. 다른 브랜치·서브모듈 push, PR 답글, resolve, re-request review는 이 승인에 들어가지 않는다. 루프가 끝나면(종료 조건·중단·보고 후 대기) 승인도 끝난다. 다시 push하려면 스킬을 다시 호출받아야 한다.
 
-이 승인은 훅이 집행한다. `hooks/approve-push.sh`가 `/auto-apply-ai-review` 호출을 보면 세션 마커 `~/.claude/cache/push-gate/loop-<session_id>`에 호출 시점 브랜치를 적고, `hooks/guard-push.sh`는 그 브랜치로 SHA를 지정한 `git push --force-with-lease=<head>:<sha> origin HEAD:<head>`만 통과시킨다. 그래서 head 브랜치에 체크아웃된 상태에서 호출받아야 하고, push는 5단계 명령 형태를 그대로 쓴다.
+이 승인은 훅이 집행한다. `hooks/approve-push.sh`가 `/apply-ai-review-loop` 호출을 보면 세션 마커 `~/.claude/cache/push-gate/loop-<session_id>`에 호출 시점 브랜치를 적고, `hooks/guard-push.sh`는 그 브랜치로 SHA를 지정한 `git push --force-with-lease=<head>:<sha> origin HEAD:<head>`만 통과시킨다. 그래서 head 브랜치에 체크아웃된 상태에서 호출받아야 하고, push는 5단계 명령 형태를 그대로 쓴다.
 
 ## 0. 시작 점검
 
@@ -27,16 +27,16 @@ git rev-parse HEAD                      # headRefOid 와 같아야 한다
 - 어긋나면 시작하지 않고 보고한다. 로컬과 원격이 다르면 어느 쪽이 맞는지 추측하지 않는다.
 - `LEASE=<headRefOid>`, `BASE=$(git merge-base HEAD origin/<base>)`를 기억한다. `rebase-fix`의 base 자동 탐지 대신 이 BASE를 쓴다.
 - 이슈 ID는 브랜치명의 `[A-Z]+-[0-9]+`에서 얻는다. 없으면 커밋 메시지에 넣지 않는다.
-- 상태 디렉터리 `~/.claude/state/auto-apply-ai-review/<owner>_<repo>_<n>/`에 `ledger.tsv`(스레드 URL, 위치, 판정, 대상 커밋 제목, 사유)를 둔다. 이미 있으면 재개한 것이므로 이어서 쓴다.
+- 상태 디렉터리 `~/.claude/state/apply-ai-review-loop/<owner>_<repo>_<n>/`에 `ledger.tsv`(스레드 URL, 위치, 판정, 대상 커밋 제목, 사유)를 둔다. 이미 있으면 재개한 것이므로 이어서 쓴다.
 
 ## 1. 감시
 
 처음 시작할 때는 지금 미해결인 `tester-prnd` 스레드를 2~5단계로 먼저 처리한다. 그다음 감시를 띄운다.
 
 ```
-Monitor(command: "bash ~/.claude/skills/auto-apply-ai-review/watch-pr.sh <owner/repo> <n>",
+Monitor(command: "bash ~/.claude/skills/apply-ai-review-loop/watch-pr.sh <owner/repo> <n>",
         description: "<repo>#<n> CI·새 리뷰 스레드", timeout_ms: 1800000)
-ScheduleWakeup(delaySeconds: 1800, prompt: "/auto-apply-ai-review <PR 링크>", reason: "Monitor 가 멈췄을 때를 대비한 예비 점검")
+ScheduleWakeup(delaySeconds: 1800, prompt: "/apply-ai-review-loop <PR 링크>", reason: "Monitor 가 멈췄을 때를 대비한 예비 점검")
 ```
 
 스크립트는 처음 띄울 때 그 시점의 미해결 스레드를 기준값(`seen`)으로 저장하고, 그 뒤에 생긴 스레드만 내보낸다. 이 스킬은 스레드를 resolve하지 않으므로 처리한 스레드는 계속 미해결로 남는다. 기준값 파일이 이를 걸러 주니, 감시를 다시 띄울 때 `seen`을 지우지 않는다.
