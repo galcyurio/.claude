@@ -44,6 +44,7 @@ gh-pr-status-cache.json
 remote-settings.json
 state/
 skills/synced/
+skills/.trash/
 settings.json.bak
 
 # 디버그 / 텔레메트리
