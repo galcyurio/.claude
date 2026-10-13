@@ -173,5 +173,5 @@ stale worktree 메타데이터를 정리한다.
 - **메인 worktree 제거 금지**: 본 스킬은 보조 worktree 제거만 책임.
 - **손실 가능성 있는 동작은 모두 명시적 승인**: 미커밋·미 push는 자동 진행하지 않는다.
 - **원격 브랜치 삭제는 보수적 기본값(유지)**: 협업 영향이 있어 사용자 명시 승인 필요.
-- **base 추정은 `develop` → `main` → `master` 순**: `start-worktree`와 동일 규칙.
+- **merged 판정 base는 `develop` → `main` → `master` 순**: feature-base에서 분기한 브랜치는 merged로 판정되지 않을 수 있으므로 그때는 '유지'를 기본값으로 둔다.
 - **`.claude/`의 rules 심볼릭 링크와 settings.local.json은 별도 백업하지 않는다**: rules는 외부 절대 경로 링크라 worktree 제거와 함께 사라져도 정보 손실 없음. settings.local.json은 메인이 정본.
