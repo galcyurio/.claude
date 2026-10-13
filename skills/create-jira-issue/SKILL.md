@@ -92,11 +92,11 @@ description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명�
       - 5단계에서 생성한 상위 이슈 1개만 유지한다.
       - 하위 이슈 생성 단계는 건너뛴다.
     - `parent-with-subtasks` 모드:
-      - 각 하위 이슈를 `--type "작업" --parent <상위키>`로 생성한다. type은 `하위 작업`이 아니라 `작업`을 사용한다.
+      - 각 하위 이슈를 `--parent <상위키>`로 생성한다. 부모가 에픽이면 `--type "작업"`, 부모가 `작업`이면 `--type "하위 작업"`을 쓴다(같은 계층끼리는 parent로 연결할 수 없다).
       - 기본 생성 명령:
-      - `acli jira workitem create --project HDA --type "작업" --summary "..." --parent HDA-XXXX --json`
+      - `acli jira workitem create --project HDA --type "하위 작업" --summary "..." --parent HDA-XXXX --json`
       - 하위 이슈 summary는 `<하위 제목>`으로만 생성한다(상위 제목 결합은 Jira Automation이 처리).
-      - **Why:** 형제 type은 부모 에픽의 자식 다수 type을 따라야 한다. 한국 안드로이드 프로젝트(HDA) 에픽 표준은 `작업` type이다. `하위 작업`은 일부 시리즈에서만 사용되며 default가 아니다.
+      - **Why:** 에픽 바로 아래 형제 type은 에픽 표준인 `작업`을 따른다. 5단계 상위 이슈가 `작업`이므로 그 아래는 한 단계 낮은 `하위 작업`이어야 한다.
 
 7. **설명 정리**
     - **구현 방법·접근(어떤 파일/함수/기술을 어떻게 바꿀지)은 적지 않는다.** 접근은 구현 중 바뀔 수 있으므로, 설명에는 *무엇을·왜*(배경·문제, 목표)만 기술한다.
