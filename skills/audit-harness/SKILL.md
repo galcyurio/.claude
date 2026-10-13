@@ -12,7 +12,6 @@ description: "오케스트레이션 규칙·에이전트 정의·스킬 정의�
 - **Rules 전체**: `~/.claude/rules/*.md` (orchestration, intent-gate, git, references 등)
 - **에이전트 정의**: `~/.claude/agents/*.md`
 - **스킬 정의**: `~/.claude/skills/*/SKILL.md`
-- **팀 설정**: `~/.claude/teams/*/config.json`
 
 ## 기술적 전제
 
@@ -30,7 +29,6 @@ description: "오케스트레이션 규칙·에이전트 정의·스킬 정의�
 1. `~/.claude/rules/*.md` 전체 읽기 (Glob → Read)
 2. `~/.claude/agents/*.md` 전체 읽기 (Glob → Read)
 3. `~/.claude/skills/*/SKILL.md` 전체 읽기 (Glob → Read)
-4. `~/.claude/teams/*/config.json` 읽기 (존재하는 경우)
 
 ### 2단계: 검사 항목 실행
 
@@ -50,7 +48,7 @@ orchestration.md의 에이전트 테이블과 실제 `~/.claude/agents/` 파일�
 탐지 패턴:
 - `{에이전트명} 에이전트로`, `{에이전트명} 에이전트에게`, `{에이전트명} 에이전트:`
 - `Agent 도구`, `Agent tool`
-- 에이전트명 목록: Explore, Librarian, Oracle, Momus 및 agents/ 디렉토리의 모든 에이전트
+- 에이전트명 목록: Explore와 `agents/` 디렉토리의 모든 에이전트
 
 판정은 그 에이전트의 도구 목록을 먼저 확인하고 내린다:
 
@@ -79,7 +77,6 @@ orchestration.md의 에이전트 테이블과 실제 `~/.claude/agents/` 파일�
 #### 검사 5: orchestration.md 내부 정합성
 
 - 라우팅 테이블의 처리 방식과 핵심 원칙 간 모순
-- 프롬프트 템플릿의 지시와 핵심 원칙 간 모순
 - 라우팅 예시가 라우팅 테이블 규칙과 불일치
 
 #### 검사 6: rules 간 교차 참조 및 일관성
@@ -113,7 +110,7 @@ orchestration.md의 에이전트 테이블과 실제 `~/.claude/agents/` 파일�
 스킬이 참조하는 대상이 실제로 존재하는지 확인한다.
 
 - 참조한 다른 스킬이 `~/.claude/skills/`에 존재하는가
-- 참조한 **레지스트리 에이전트**(Oracle, Designer, Momus, Librarian)가 `~/.claude/agents/`에 존재하는가 — 역할 프롬프트로만 쓰는 임시 에이전트(예: 리뷰어 역할 분담)는 대상에서 제외
+- 참조한 **레지스트리 에이전트**(`~/.claude/agents/*.md`에 정의된 모든 에이전트)가 존재하는가 — 정의 파일 없이 역할 프롬프트로만 쓰는 임시 에이전트는 대상에서 제외
 - 참조한 rules 파일이 `~/.claude/rules/`에 존재하는가
 - 참조한 도구명이 검사 3의 사용 가능 도구 목록에 있는가
 
