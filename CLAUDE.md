@@ -30,7 +30,7 @@
 # PR 제목 규칙
 - PR 제목은 Jira issue 제목과 동일하게 작성한다.
 
-# Superpowers 문서 위치
+# 설계·계획 문서 위치
 - spec: `.agent/specs/`에 저장
 - plan: `.agent/plans/`에 저장
 
