@@ -11,7 +11,7 @@ import kr.co.prnd.ui.ActivityTemplate
 import kr.co.prnd.ui.LibraryComposeActivity
 
 @AndroidEntryPoint
-class ${NAME}Activity : LibraryComposeActivity<${NAME}ViewModel, Event>(
+internal class ${NAME}Activity : LibraryComposeActivity<${NAME}ViewModel, Event>(
     Screen.${SCREEN_CONST},
 ) {
     override val viewModel: ${NAME}ViewModel by viewModels()
