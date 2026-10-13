@@ -2,7 +2,7 @@
 # release-worktree.sh
 # 머지가 끝난 로컬 작업 브랜치를 삭제하고 현재 worktree를 base 사본으로 되돌린 뒤,
 # 이 worktree에 쌓인 세션 이력을 메인 저장소로 회수하고,
-# Orca 워크스페이스 카드를 Todo로 되돌리고 작업 탭을 닫아 세션을 마감한다.
+# Orca 워크스페이스 카드를 Done(completed)으로 넘기고 작업 탭을 닫아 세션을 마감한다.
 #
 # 사용법: release-worktree.sh [<branch>] [옵션]
 #   <branch>          정리할 로컬 브랜치. 생략하면 현재 체크아웃된 브랜치.
@@ -13,7 +13,7 @@
 #   --stash           working tree가 깨끗하지 않으면 stash하고 진행 (기본은 중단)
 #   --force-delete    git branch -D 로 삭제 (기본은 -d)
 #   --sweep           같은 base에 이미 머지된 다른 로컬 브랜치도 삭제
-#   --no-close        카드는 Todo로 되돌리되 탭은 닫지 않는다
+#   --no-close        카드는 Done으로 넘기되 탭은 닫지 않는다
 #
 # 종료 코드: 0 정상 / 1 사전 검증 실패·중단 (이 경우 카드와 탭은 건드리지 않는다)
 
