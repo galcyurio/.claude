@@ -157,7 +157,7 @@ model: sonnet
      - `registered_at` = 현재 시각
      - `last_run_at` = empty
      - `last_error` = ""
-     - `figma_frame_hashes` = "" (첫 갱신 시 `{}`로 초기화됨)
+     - `figma_frame_hashes` = "" (Notion 도구가 JSON 값을 거부해 저장되지 않는다. 파싱 실패로 ②단계는 생략된다)
    - 본문 블록은 비워둠 (첫 갱신 시 채워짐)
 5. 생성된 페이지 URL을 표시하고 첫 갱신 안내: "`/feature-memory {epic_key}`로 첫 갱신을 실행하세요. URL은 Jira 이슈에서 자동 추출됩니다."
 
