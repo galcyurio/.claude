@@ -84,7 +84,7 @@
 - `feat(DTO):` — DTO 코드를 변경하는 경우
 - `feat(API):` — UseCase, Repository, DataSource에서 API 요청을 위한 코드를 작성하는 경우
 
-> 정의 자체와 layer 간 매핑 규칙은 `~/.android-ai-prompts/rules/common/model-mapping.md`를 따른다. 이 섹션은 **커밋 분리 단위**만 다룬다.
+> 정의 자체와 layer 간 매핑 규칙은 `~/.android-ai-prompts-olaf/rules/common/model-mapping.md`를 따른다. 이 섹션은 **커밋 분리 단위**만 다룬다.
 
 ### 사용할 태그
 

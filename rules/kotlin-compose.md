@@ -7,7 +7,7 @@ paths:
 
 > 이 규칙은 Kotlin 파일(`**/*.kt`)을 열 때만 로드된다. 커밋 규칙은 `~/.claude/references/commit-rules.md`, 테스트 코드 스타일은 `~/.claude/rules/kotlin-test.md`를 따른다.
 
-> Android 프로젝트(heydealer, for-dealer, inspector, revolt)에서 공통으로 적용되는 패턴이다. 레이어 구조, ViewModel, Repository, Model 매핑 등 상세 규칙은 `~/.android-ai-prompts/rules/`에 별도 정리되어 있으며 이 섹션은 그 외 화면 골격/네이밍 패턴을 보완한다.
+> Android 프로젝트(heydealer, for-dealer, inspector, revolt)에서 공통으로 적용되는 패턴이다. 레이어 구조, ViewModel, Repository, Model 매핑 등 상세 규칙은 `~/.android-ai-prompts-olaf/rules/`에 별도 정리되어 있으며 이 섹션은 그 외 화면 골격/네이밍 패턴을 보완한다.
 
 ## Activity 골격
 
@@ -76,7 +76,7 @@ private fun XxxScreen(
 - 외부 함수: `internal fun` — uiState collect, onAction 정의
 - 내부 함수: `private fun` — 실제 UI 구현
 - `onAction`은 `remember(viewModel) { ... }`로 감싸 재구성 최소화
-- ViewModel 메서드는 UiAction 이름을 미러링한 `onXxx()`가 **아니라** 행위 동사로 짓는다 (`onItemClick` ❌ → `selectItem` ✅). 상세: `~/.android-ai-prompts/rules/common/viewmodel.md` 메서드 네이밍
+- ViewModel 메서드는 UiAction 이름을 미러링한 `onXxx()`가 **아니라** 행위 동사로 짓는다 (`onItemClick` ❌ → `selectItem` ✅). 상세: `~/.android-ai-prompts-olaf/rules/common/viewmodel.md` 메서드 네이밍
 
 ## UiAction 네이밍
 
@@ -99,7 +99,7 @@ internal sealed interface XxxUiAction {
 - 값 변경: `OnXxxChange`
 - 화면 동작: `OnRefresh`, `OnBackClick`, `OnNextPageRequest`
 
-> ViewModel `Event`(외부로 나가는 신호)는 `~/.android-ai-prompts/rules/common/viewmodel.md`의 `{행위}{대상}{결과}` 네이밍을 따른다. UiAction(사용자 입력)과 Event(결과 신호)는 서로 다른 컨셉이다.
+> ViewModel `Event`(외부로 나가는 신호)는 `~/.android-ai-prompts-olaf/rules/common/viewmodel.md`의 `{행위}{대상}{결과}` 네이밍을 따른다. UiAction(사용자 입력)과 Event(결과 신호)는 서로 다른 컨셉이다.
 
 ## Preview 다중 작성
 
@@ -128,7 +128,7 @@ private fun Preview2() { ... }   // read
 ```
 
 - `private fun`으로 외부 노출 차단
-- Preview 안에서는 하드코딩 텍스트/모델 허용 (`~/.android-ai-prompts/rules/common/string-resource.md` 예외)
+- Preview 안에서는 하드코딩 텍스트/모델 허용 (`~/.android-ai-prompts-olaf/rules/common/string-resource.md` 예외)
 - UiState는 `XxxUiState.Default.copy(...)` 패턴으로 변형해 사용
 
 ## Composable 파일 내부 구성
@@ -214,4 +214,4 @@ Clean Architecture 레이어 안에서 다음 구조를 사용한다.
 - `data/{model, source, impl}/`
 - `remote/{model, impl}/`, `local/{model, impl}/`
 
-상세 의존성 규칙은 `~/.android-ai-prompts/rules/common/architecture.md`를 따른다.
+상세 의존성 규칙은 `~/.android-ai-prompts-olaf/rules/common/architecture.md`를 따른다.
