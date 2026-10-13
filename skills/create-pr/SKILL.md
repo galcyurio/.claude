@@ -1,7 +1,7 @@
 ---
 name: create-pr
 effort: medium
-allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, AskUserQuestion
+allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), Bash(xargs -r grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, Skill(capture-preview-screenshot), Skill(upload-pr-image), AskUserQuestion
 description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그램). 사용자가 'create-pr', 'PR 생성', 'PR 만들어', 'PR 만들어줘', 'PR 작성', 'PR 올려줘', 'PR 올려', 'pull request 생성', 'pull request 만들어', '풀리퀘 생성', '풀리퀘 만들어' 등 PR 생성을 요청할 때 이 스킬을 사용해야 한다. PR 리뷰/조회 요청에는 사용하지 않는다.
 ---
 
@@ -44,7 +44,7 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 #### 작성 원칙 (필수)
 
 - 마크다운 형식으로 작성한다.
-- **기본 본문은 최소형이다.** 아래 두 섹션만 쓰고, 나머지(작업사항·다이어그램 등)는 "예외일 때만 추가"한다. 단 **스냅샷 이미지가 커밋돼 있으면 `## 반영화면`은 항상 채운다** (아래 "반영화면 작성 기준").
+- **기본 본문은 최소형이다.** 아래 두 섹션만 쓰고, 나머지(작업사항·다이어그램 등)는 "예외일 때만 추가"한다. 단 **스냅샷 이미지가 커밋돼 있거나 바뀐 파일에 Compose Preview가 있으면 `## 반영화면`은 항상 채운다** (아래 "반영화면 작성 기준").
 
    ```markdown
    ## 개요
@@ -65,7 +65,7 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
    - 예: `~ 문제를 해결한다.` → `~ 문제를 해결합니다.`
 - **작업사항·mermaid는 예외일 때만 추가한다.** 기본은 생략. 추가 기준은 아래 "작업사항·mermaid 추가 기준" 참고. 애매하면 생략한다.
 - **쉽게 말하면은 정말 이해하기 힘들고 복잡한 경우에만 추가한다.** 기본은 생략. 추가 기준은 아래 "쉽게 말하면 추가 기준" 참고. 애매하면 생략한다.
-- **반영화면은 스냅샷이 있으면 채운다.** 스냅샷 이미지가 이번 브랜치에 커밋돼 있으면 그것을 `## 반영화면`에 넣고, 이미 있던 스냅샷이 변경된 경우에는 Before/After 표로 넣는다. 작성 방법은 아래 "반영화면 작성 기준" 참고.
+- **반영화면은 스냅샷이나 Preview로 채운다.** 스냅샷 이미지가 이번 브랜치에 커밋돼 있으면 그것을 `## 반영화면`에 넣고, 이미 있던 스냅샷이 변경된 경우에는 Before/After 표로 넣는다. 스냅샷이 없으면 바뀐 파일의 Compose Preview를 찍어 넣는다. 작성 방법은 아래 "반영화면 작성 기준" 참고.
 
 #### 반영화면 작성 기준
 
@@ -73,10 +73,12 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 
 | PR이 바꾼 것 | 스냅샷 | 반영화면 |
 | --- | --- | --- |
-| 디자인 시스템 컴포넌트 | 있다 | 커밋된 스냅샷으로 채운다 (아래 1~4번) |
-| 화면·피처 | 없는 것이 정상 | 섹션을 비우고 실기기 캡처를 붙일지 사용자에게 묻는다 |
+| 디자인 시스템 컴포넌트 | 있다 | 커밋된 스냅샷으로 채운다 (아래 "스냅샷으로 채우기") |
+| 화면·피처 | 없는 것이 정상 | 바뀐 파일의 Compose Preview를 찍어 채운다 (아래 "Preview 캡처로 채우기") |
 
-디자인 시스템 PR에서는 캡처를 새로 요청하거나 실기기 스크린샷을 대신 올리지 않는다 — 스냅샷은 이미 커밋에 들어 있어 코드와 함께 갱신되므로 PR 본문이 낡지 않는다.
+판정은 계층을 따로 추측하지 않고, 아래 "스냅샷으로 채우기" 1번 명령의 출력으로 한다. 출력이 있으면 스냅샷으로 채우고, 비어 있으면 Preview 캡처로 넘어간다. 디자인 시스템 PR에서는 Preview를 새로 찍거나 실기기 스크린샷을 대신 올리지 않는다. 스냅샷은 이미 커밋에 들어 있어 코드와 함께 갱신되므로 PR 본문이 낡지 않는다.
+
+##### 스냅샷으로 채우기
 
 1. 대상 이미지와 변경 유형을 함께 찾는다. `A`는 이번에 새로 추가된 스냅샷이고, `M`은 이미 있던 스냅샷이 변경된 경우다.
 
@@ -120,7 +122,44 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 
 4. 폭은 `width="280"`을 기본으로 둔다. 원본 크기로 넣으면 본문이 화면을 넘긴다.
 
-스냅샷이 없으면 이 섹션을 제거한다. 화면이 바뀌었더라도 임의로 캡처해 채우지 않고, 섹션을 비운 채 사용자에게 실기기 캡처를 붙일지 물어본다.
+##### Preview 캡처로 채우기
+
+스냅샷이 없으면 이 PR에서 바뀐 파일에 있는 Compose Preview를 찍어 올린다. 리뷰어가 앱을 실행하지 않고도 바뀐 화면을 볼 수 있게 하려는 것이다.
+
+**찍을 수 없으면 섹션을 제거하고 PR 생성을 계속한다.** 아래 어느 단계에서 멈추더라도 스크린샷 때문에 PR 생성을 중단하거나 사용자에게 묻지 않는다.
+
+1. 대상 파일을 찾는다. base 이후 추가·수정·이동된 `.kt` 중 `@Preview`가 있는 파일이 대상이다. `@PreviewLightDark` 같은 멀티프리뷰 어노테이션도 잡히도록 `@Preview` 접두사로 찾는다.
+
+   ```bash
+   git diff --name-only --diff-filter=AMR {base}...HEAD -- '*.kt' | xargs -r grep -l '@Preview'
+   ```
+
+   `@Preview`가 하나도 없으면 `grep`이 실패 코드로 끝난다. 출력이 비어 있으면 종료 코드와 상관없이 대상이 없는 것으로 보고 섹션을 제거한다 (스킬·룰 저장소, 화면과 무관한 변경 등).
+
+2. 캡처한다. `capture-preview-screenshot` 스킬을 Skill 도구로 **한 번** 호출해 대상 파일을 모두 찍는다. 인자 맨 앞에 `[경로만]`을 붙여(`[경로만] <파일 경로> <파일 경로> ...`) 그 스킬이 "다른 스킬이 호출할 때" 규칙을 따르게 한다. 그러면 그 스킬은 사용자에게 묻거나 PNG를 열어 보이지 않고, 모듈별 묶음도 직접 처리한다.
+   - 캡처는 모듈마다 수 분씩 순서대로 돌기 때문에, 호출하기 전에 `Preview 캡처 중: 파일 {N}개 (수 분 걸릴 수 있음)` 한 줄을 출력한다.
+   - 돌려받은 PNG만 쓰고, 찍지 못한 모듈과 Preview는 건너뛴다 (app 모듈처럼 캡처 태스크가 없는 모듈 포함).
+
+3. 업로드한다. 돌려받은 PNG 경로를 모두 모아 `upload-pr-image` 스킬을 한 번 호출하고, `SCREENSHOT_URL:` 줄의 URL을 그대로 쓴다. PNG 이름에는 `@Preview(name = "...")` 값이 들어가 공백이 섞일 수 있으므로, 경로는 하나씩 따옴표로 감싸 넘긴다.
+   - 파일 이름이 겹쳐서 실패하면(종료 코드 2) 복사본을 만들어 다시 올리는 일은 `upload-pr-image` 스킬이 그 호출 안에서 처리한다. 호출할 때 복사본 이름은 원본 이름 뒤에 `-2`처럼 순번만 붙이라고 함께 넘겨, 돌려받은 URL이 어느 Preview의 것인지 알 수 있게 한다.
+   - 그 밖의 업로드 실패는 섹션 제거로 처리한다.
+
+4. 표를 만든다. 파일마다 파일 이름을 굵게 한 줄 쓰고, 빈 줄을 넣은 뒤 Preview를 열로 둔 표에 이미지를 나열한다. 빈 줄이 없으면 표가 앞 문단에 흡수돼 글자 그대로 렌더링된다.
+   - 표 하나에는 3열까지만 둔다. 넘치면 3장씩 끊어 표를 이어 붙이고, 표 사이에는 빈 줄을 넣는다 (빈 줄이 없으면 두 표가 하나로 합쳐진다).
+   - PNG 식별자(`<package>.<클래스>.<함수>…`)가 `<그 파일의 package>.<파일 이름>Kt.`(최상위 함수) 또는 `<그 파일의 package>.<파일 이름>.`(파일 이름과 같은 클래스·object 안의 함수)로 시작하는 것만 그 파일의 표에 넣는다. 포함 여부로 묶으면 `CarListScreen` 표에 `MarketCarListScreenKt` PNG가 섞인다. 넣을 PNG가 없는 파일은 굵은 이름 줄도 쓰지 않는다.
+   - 열 제목은 스냅샷 3번과 같이 **사람이 읽을 상태 이름**으로 적는다. 함수명에서 `Preview`를 떼고 남은 말을 풀어 쓰되(`PreviewUsed` → 사용 완료), 대상 파일을 Read해서 그 함수에 `@Preview(name = "...")` 값이 있고 PNG 식별자 뒷부분에 그 값이 들어 있으면 그 값을 제목으로 쓴다. 상태를 특정할 수 없으면(`Preview`·`Preview1` 등) 함수명을 그대로 쓴다. 근거 없이 지어내지 않는다.
+   - `alt`에는 PNG 식별자를 넣어 어느 Preview인지 추적할 수 있게 한다. 폭은 `width="280"`이다.
+   - 이미지가 많아도 `<details>`로 접지 않고 모두 펼쳐 둔다.
+
+   ```markdown
+   ## 반영화면
+
+   **MarketCarListScreen**
+
+   | 비어 있음 | 로드됨 |
+   | --- | --- |
+   | <img width="280" alt="kr.co.prnd.market.MarketCarListScreenKt.PreviewEmpty" src="{URL}"> | <img width="280" alt="kr.co.prnd.market.MarketCarListScreenKt.PreviewLoaded" src="{URL}"> |
+   ```
 
 #### 작업사항·mermaid 추가 기준
 
@@ -267,7 +306,7 @@ flowchart LR
    - "### 관련 채널 내용": 관련 링크 있을 때만
    - "## 쉽게 말하면": 4번 "쉽게 말하면 추가 기준"에 해당할 때만 `## 개요` 블록 다음에 추가 (기본 생략)
    - "## 작업사항": 4번 "작업사항·mermaid 추가 기준"에 해당할 때만 추가 (기본 생략)
-   - "## 반영화면": 이번 브랜치가 스냅샷 이미지를 추가·변경했으면 4번 "반영화면 작성 기준"대로 채움
+   - "## 반영화면": 4번 "반영화면 작성 기준"대로 스냅샷 또는 Preview 캡처로 채움. 둘 다 없거나 캡처·업로드에 실패하면 제거
    - 비어있는 섹션은 제거
 4. PR 본문을 임시 markdown 파일로 저장한다 (예: `/tmp/pr-body-{티켓ID}.md`).
    - 본문에 mermaid·백틱·대괄호가 포함되므로 `--body`에 인라인하지 않고 **반드시 `--body-file`로 전달**한다. (`--body "..."`에 백틱을 넣으면 셸 명령 치환으로 깨진다)
