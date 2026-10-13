@@ -1,6 +1,6 @@
 ---
 name: plan-feature-issues
-description: 피처(Jira 에픽) 작업을 착수할 때 Jira·Slack·Notion·Figma를 멀티소스로 파악해 본인이 구현할 작업을 도출하고 Jira 이슈로 만드는 스킬. 사용자가 'plan-feature-issues', '피처 시작', '피처 파악해서 이슈 만들어', '에픽 보고 내 작업 이슈로 쪼개줘', '내가 할 작업 찾아서 이슈 만들어', '이 피처 작업 이슈 만들어줘' 등 피처 착수 시 작업 도출+이슈화를 요청할 때 사용한다. 이슈 간 선후 관계를 정리해달라는 요청('뭐부터 해야 해', '작업 순서 정해줘', '이슈끼리 blocks 걸어줘', 'blocked by 연결해줘')에도 사용한다. 이슈 제목·목록이 이미 정해진 단순 생성에는 create-jira-issue를 사용한다.
+description: 피처(Jira 에픽) 작업을 착수할 때 Jira·Slack·Notion·Figma를 멀티소스로 파악해 본인이 구현할 작업을 도출하고 Jira 이슈로 만드는 스킬. 사용자가 'plan-feature-issues', '피처 시작', '피처 파악해서 이슈 만들어', '에픽 보고 내 작업 이슈로 쪼개줘', '내가 할 작업 찾아서 이슈 만들어', '이 피처 작업 이슈 만들어줘' 등 피처 착수 시 작업 도출+이슈화를 요청할 때 사용한다. 이슈 간 선후 관계를 정리해달라는 요청('이슈끼리 blocks 걸어줘', 'blocked by 연결해줘')에도 사용한다. 이슈 제목·목록이 이미 정해진 단순 생성에는 create-jira-issue를 사용한다.
 ---
 
 # plan-feature-issues
