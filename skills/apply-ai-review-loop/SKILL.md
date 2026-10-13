@@ -100,8 +100,8 @@ git log -p $BASE..HEAD | grep -nE '^\+(<{7}|={7}|>{7})( |$)'     # 출력이 없
 ```bash
 git fetch origin <head>
 git rev-parse origin/<head>             # LEASE 와 같아야 한다
-git push --force-with-lease=<head>:$LEASE origin HEAD:<head>
-LEASE=$(git rev-parse HEAD)
+git push --force-with-lease=<head>:<LEASE 40자 SHA> origin HEAD:<head>
+git rev-parse HEAD                      # 다음 push의 LEASE로 기억한다
 ```
 
 - 원격이 LEASE와 다르면 다른 사람이 push한 것이다. push하지 않고, 그 커밋을 rebase해 넣지도 않고 멈춘다.
