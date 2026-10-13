@@ -144,7 +144,7 @@ https://github.com/<owner>/<repo>/blob/<commit-sha>/<filepath>#L<start>-L<end>
 **SHA 얻기**:
 - 클론에서: `git rev-parse HEAD`
 - API에서: `gh api repos/owner/repo/commits/HEAD --jq '.sha'`
-- 태그에서: `gh api repos/owner/repo/git/refs/tags/v1.0.0 --jq '.object.sha'`
+- 태그에서: `gh api repos/owner/repo/commits/v1.0.0 --jq '.sha'`
 
 ## 임시 디렉토리
 
