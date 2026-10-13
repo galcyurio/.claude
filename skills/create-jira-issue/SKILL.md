@@ -63,7 +63,7 @@ description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명�
    - 프로젝트별 허용 타입(예: `작업`, `하위 작업`)이 다를 수 있으므로 확인 후 진행한다.
 
 5. **상위 이슈 생성 (App 필수 필드 포함)**
-   - 에픽을 찾은 경우: 에픽의 **프로젝트 키**와 **App 필드값**을 상속하고, **Parent**를 에픽 키로 설정한다.
+   - 에픽을 찾은 경우: 에픽의 **프로젝트 키**와 **App 필드값**을 상속하고, **Parent**를 에픽 키로 설정한다(`--from-json`에서는 최상위 `parentIssueId`에 에픽 KEY를 넣는다. `--parent` 플래그는 무시된다).
    - 에픽을 찾지 못한 경우: 사용자에게 프로젝트 키와 App 값을 입력받는다.
    - 프로젝트에 따라 App 필드가 필수일 수 있다.
    - 이 경우 `--from-json` + `additionalAttributes.customfield_10302` 방식으로 생성한다.
@@ -74,6 +74,7 @@ description: Jira 상위 이슈와 하위 이슈를 생성하고 제목/설명�
   "projectKey": "HDA",
   "type": "작업",
   "summary": "로그인 기능 추가",
+  "parentIssueId": "<에픽 키>",
   "additionalAttributes": {
     "customfield_10302": { "value": "고객" }
   }
