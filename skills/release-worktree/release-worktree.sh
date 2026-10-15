@@ -9,7 +9,7 @@
 #                     현재 브랜치가 base(develop·feature-base/*)면 삭제 없이 최신화만 한다.
 #   --base <name>     PR을 못 찾았거나 접미사 매칭을 건너뛰고 싶을 때 되돌아갈 base 사본을 직접 지정
 #   --force           PR이 없거나 머지되지 않았어도 해제한다. 머지 확인·미커밋 변경·
-#                     서브모듈 되돌리기 실패를 모두 넘기고 브랜치를 -D 로 지운다.
+#                     서브모듈 되돌리기 실패·라이브러리 머지 확인을 모두 넘기고 브랜치를 -D 로 지운다.
 #   --stash           working tree가 깨끗하지 않으면 stash하고 진행 (기본은 중단)
 #   --force-delete    git branch -D 로 삭제 (기본은 -d)
 #   --sweep           같은 base에 이미 머지된 다른 로컬 브랜치도 삭제
@@ -41,7 +41,7 @@ while [ $# -gt 0 ]; do
     --force-delete) opt_force_delete=1 ;;
     --sweep) opt_sweep=1 ;;
     --no-close) opt_no_close=1 ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) [ -z "$branch" ] || die "브랜치는 하나만 지정할 수 있습니다: $branch, $1"; branch="$1"; explicit_branch=1 ;;
   esac
@@ -49,6 +49,14 @@ while [ $# -gt 0 ]; do
 done
 
 git rev-parse --git-dir > /dev/null 2>&1 || die "git 저장소 안에서 실행해야 합니다."
+
+# 라이브러리 서브모듈 안에서 불렸으면 앱 저장소로 올라간다. 그대로 두면 라이브러리 저장소의
+# 브랜치와 worktree를 기준으로 판정해 앱 자리를 반납하지 못한다.
+superproject="$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)"
+if [ -n "$superproject" ]; then
+  info "서브모듈 안에서 불렸으므로 앱 저장소 기준으로 진행합니다: $superproject"
+  cd "$superproject"
+fi
 
 top="$(git rev-parse --show-toplevel)"
 
@@ -203,6 +211,74 @@ if [ -n "$base_holder" ] && [ "$base_holder" != "$top" ]; then
   die "base 사본 $base_copy 는 $base_holder 가 점유 중입니다."
 fi
 
+## 2-1. 라이브러리 작업 브랜치 판정
+# start-worktree --library 는 앱 자리의 라이브러리 서브모듈에 앱과 같은 이름의 작업 브랜치를
+# 끊는다. 그 브랜치도 앱 브랜치와 함께 정리한다. 이름이 다른 브랜치는 이 반납과 무관한 작업일
+# 수 있으므로 정리 대상이 아니며, 아래 서브모듈 되돌리기에서 경고만 남긴다.
+# 판정은 앱을 건드리기 전에 끝낸다. 라이브러리에서 막히면 앱도 그대로 두고 멈춰야 한다.
+
+lib_sub=""
+lib_cleanup=0
+if [ "$sync_only" = 0 ] && [ "$is_current" = 1 ] && [ -f "$top/.gitmodules" ]; then
+  lib_sub="$(git config --file "$top/.gitmodules" --get submodule.prnd-library.path || true)"
+fi
+if [ -n "$lib_sub" ] \
+  && [ "$(git -C "$top/$lib_sub" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" = "$branch" ]; then
+  lib="$top/$lib_sub"
+  lib_changes="$(git -C "$lib" status --porcelain --untracked-files=no)"
+  if [ -n "$lib_changes" ]; then
+    echo "라이브러리 서브모듈에 변경된 파일:" >&2
+    printf '%s\n' "$lib_changes" | head -10 >&2
+    if [ "$opt_stash" = 1 ] || [ "$opt_force" = 1 ]; then
+      lib_stash_tag="release-worktree-library: $branch @ $(date '+%Y%m%d-%H%M%S')"
+      git -C "$lib" stash push -m "$lib_stash_tag" \
+        || die "라이브러리 서브모듈 변경을 stash하지 못했습니다: $lib"
+      warn "라이브러리 변경은 서브모듈 stash에 있습니다 — $lib_stash_tag"
+    else
+      die "라이브러리 서브모듈이 깨끗하지 않습니다. 커밋하거나 --stash·--force로 다시 실행하세요."
+    fi
+  fi
+
+  git -C "$lib" fetch --prune origin \
+    || warn "라이브러리 원격을 가져오지 못했습니다. 로컬 ref로 판정합니다."
+  # 앱 PR의 base와 develop 어디에도 없는 커밋 수. 하나도 없으면 착수할 때 오탐으로 만든
+  # 빈 브랜치이므로 머지 확인 없이 지운다.
+  lib_bases=()
+  for ref in "$base_ref" develop; do
+    git -C "$lib" rev-parse --verify --quiet "refs/remotes/origin/$ref" > /dev/null \
+      && lib_bases+=("origin/$ref")
+  done
+  # 비교할 base를 하나도 못 찾으면 빈 브랜치라고 단정할 수 없으므로 머지 확인으로 넘긴다.
+  lib_ahead=1
+  if [ "${#lib_bases[@]}" -gt 0 ]; then
+    lib_ahead="$(git -C "$lib" rev-list --count "$branch" --not "${lib_bases[@]}" 2>/dev/null || echo 1)"
+  fi
+  if [ "$lib_ahead" = 0 ]; then
+    lib_cleanup=1
+    info "[1/6] 라이브러리 브랜치에 고유 커밋이 없어 함께 지웁니다: $branch"
+  else
+    lib_repo="$(git -C "$lib" remote get-url origin | sed -E 's#^(git@[^:]+:|https?://[^/]+/)##; s#\.git$##')"
+    lib_merged=""
+    if command -v gh > /dev/null; then
+      lib_merged="$(gh pr list --repo "$lib_repo" --state merged --head "$branch" --limit 1 \
+        --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+    fi
+    if [ -n "$lib_merged" ]; then
+      lib_cleanup=1
+      info "[1/6] 라이브러리 PR 머지 확인: $lib_repo#$lib_merged"
+    elif [ "$opt_force" = 1 ]; then
+      lib_cleanup=1
+      warn "--force: 라이브러리 브랜치 $branch 의 커밋 $lib_ahead 개가 머지되지 않았지만 지웁니다. 커밋은 reflog에만 남습니다."
+    else
+      lib_unpushed="$(git -C "$lib" rev-list --count "$branch" --not --remotes=origin 2>/dev/null || echo 0)"
+      echo "[오류] 라이브러리 브랜치 $branch 에 머지되지 않은 커밋이 $lib_ahead 개 있습니다 (push 안 된 커밋 $lib_unpushed 개)." >&2
+      echo "  $lib_repo 에서 $branch 로 머지된 PR을 찾지 못했습니다. 라이브러리 PR을 머지한 뒤 다시 실행하세요." >&2
+      echo "  머지 여부와 무관하게 자리를 비우려면 --force 로 실행하세요." >&2
+      exit 1
+    fi
+  fi
+fi
+
 ## 3. 손실 위험 점검 (현재 브랜치를 정리할 때만)
 
 tracked_changes() { git status --porcelain --untracked-files=no --ignore-submodules=all; }
@@ -290,6 +366,8 @@ if [ "$is_current" = 1 ]; then
       head_before="$(git -C "$top/$sub" rev-parse --short HEAD 2>/dev/null || true)"
       branch_before="$(git -C "$top/$sub" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
       [ -n "$branch_before" ] || continue
+      # 앱과 함께 정리할 라이브러리 브랜치는 아래에서 지우므로 경고하지 않는다.
+      if [ "$lib_cleanup" = 1 ] && [ "$sub" = "$lib_sub" ]; then continue; fi
       warn "서브모듈 $sub 이 $branch_before($head_before) 를 가리키고 있어 base 기준으로 되돌립니다."
     done < <(git config --file "$top/.gitmodules" --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
     if ! git submodule update; then
@@ -313,6 +391,18 @@ if [ "$is_current" = 1 ]; then
         exit 1
       fi
     fi
+  fi
+
+  if [ "$lib_cleanup" = 1 ]; then
+    lib="$top/$lib_sub"
+    # 포인터가 라이브러리 브랜치 tip과 같으면 submodule update가 아무것도 하지 않아 브랜치를
+    # 문 채로 남는다. 문 브랜치는 지울 수 없으므로 같은 커밋에서 떼어 낸다.
+    if git -C "$lib" symbolic-ref --quiet HEAD > /dev/null 2>&1; then
+      git -C "$lib" switch --detach --quiet
+    fi
+    info "라이브러리 브랜치 삭제: $lib_sub 의 $branch"
+    git -C "$lib" branch -D "$branch" \
+      || warn "라이브러리 브랜치를 지우지 못했습니다. 서브모듈에서 직접 지워 주세요: $lib"
   fi
 else
   info "[4/6] 현재 브랜치가 아니므로 전환·최신화를 건너뜁니다 (현재: ${current_branch:-detached})"

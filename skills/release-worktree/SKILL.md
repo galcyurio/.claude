@@ -28,7 +28,7 @@ allowed-tools: Bash
 
 ## 실행
 
-worktree 루트에서 아래 한 줄을 Bash 도구로 실행한다.
+worktree 루트에서 아래 한 줄을 Bash 도구로 실행한다. 세션이 라이브러리 서브모듈 안에 있어도 스크립트가 앱 저장소로 올라가므로 그대로 실행해도 된다.
 
 ```
 ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
@@ -38,11 +38,12 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 
 1. 대상 브랜치 확정 (detached HEAD·미존재는 중단). 보호 브랜치는 **인자로 지정했을 때만** 중단하고, 현재 브랜치가 보호 브랜치면 최신화 전용 모드로 전환한다
 2. `gh pr list --state merged`로 머지 확인, `baseRefName`으로 base 판별. `--force`면 머지 확인을 건너뛰고, base는 PR이 있으면 머지 상태와 무관하게 그 `baseRefName`을, PR이 아예 없으면 이 자리의 base 사본(`develop-AGP-10-migration-2` 등)에서 upstream을 거꾸로 읽어 얻는다. 사본 후보가 여럿이면 추정하지 않고 `--base`를 요구한다
-3. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인. 디렉토리 이름에서 저장소 이름을 뗀 나머지가 숫자가 아니면 그 이름을 계열로 보고 `<base>-<계열>`을 먼저 시도하므로, 이름 슬롯 자리는 `develop`이 아니라 자기 계열 사본으로 되돌아간다. 맞는 사본이 없으면 `origin/<base>`로 새로 만들고 upstream을 건다
-4. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch`(이미 그 브랜치면 생략) → `git pull --ff-only` → `git submodule update`
-5. 이 worktree에 쌓인 세션 이력(`.claude/projects/`)을 메인 저장소로 회수 (`cp -n`, 기존 파일은 덮어쓰지 않음)
-6. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제. 최신화 전용 모드에서는 삭제를 건너뛴다
-7. `orca worktree set --workspace-status completed` → `orca terminal close --tab`
+3. 라이브러리 서브모듈이 앱과 같은 이름의 작업 브랜치를 물고 있으면 함께 정리할지 판정한다. 앱 PR base와 `develop` 어디에도 없는 커밋이 없으면 바로 정리 대상이고, 있으면 라이브러리 저장소에서 머지된 PR을 확인한다. 판정은 앱을 건드리기 전에 끝난다
+4. worktree 디렉토리 접미사에 맞는 base 사본 선택 (`develop` → `develop-3`), 다른 worktree 점유 확인. 디렉토리 이름에서 저장소 이름을 뗀 나머지가 숫자가 아니면 그 이름을 계열로 보고 `<base>-<계열>`을 먼저 시도하므로, 이름 슬롯 자리는 `develop`이 아니라 자기 계열 사본으로 되돌아간다. 맞는 사본이 없으면 `origin/<base>`로 새로 만들고 upstream을 건다
+5. working tree 검사 → `git fetch --prune` → base 사본으로 `git switch`(이미 그 브랜치면 생략) → `git pull --ff-only` → `git submodule update` → 라이브러리 작업 브랜치 삭제
+6. 이 worktree에 쌓인 세션 이력(`.claude/projects/`)을 메인 저장소로 회수 (`cp -n`, 기존 파일은 덮어쓰지 않음)
+7. `git branch -d` (기본), 남은 머지 브랜치 목록 보고 또는 스윕 삭제. 최신화 전용 모드에서는 삭제를 건너뛴다
+8. `orca worktree set --workspace-status completed` → `orca terminal close --tab`
 
 접미사 매칭 예시:
 
@@ -61,6 +62,7 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 | 중단 이유 | 다음 행동 |
 |---|---|
 | 머지된 PR 없음 | 머지 여부를 사용자가 확인한다. base를 알려주면 `--base`로 재실행. **base를 추정하지 않는다.** 사용자가 머지 여부와 무관하게 비우라고 하면 `--force`. |
+| 라이브러리 브랜치에 머지되지 않은 커밋 | 라이브러리 PR 머지 여부를 사용자가 확인한다. 앱과 서브모듈 모두 그대로 남아 있다. 머지와 무관하게 비우라고 하면 `--force`. |
 | 추적 중인 파일에 미커밋 변경 | 커밋할지 stash할지 사용자가 고른다. `--force`면 태그를 붙여 stash로 치우고 진행한다. |
 | 인자로 지정한 브랜치가 보호 브랜치 | 지울 대상이 맞는지 사용자가 확인한다. 인자 없이 실행하면 최신화 전용 모드로 돈다. |
 | `git branch -d` 거부 | 거부 메시지를 그대로 보여준다. `--force-delete`와 `--force`는 명시 요청 전용. |
@@ -69,7 +71,7 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 
 ## `--force`가 넘기지 못하는 것
 
-`--force`가 넘기는 것은 네 가지다. 머지 확인, 추적 파일의 미커밋 변경, 서브모듈 되돌리기 실패, `git branch -d` 거부. 가운데 두 가지는 그냥 버리지 않고 흔적을 남긴다. 미커밋 변경은 `release-worktree-force: <브랜치> @ <시각>` 태그를 붙여 stash로 치우므로 `git stash list`에서 찾아 apply할 수 있고, 서브모듈은 `git submodule update --force`로 base가 기록한 커밋에 맞춘다.
+`--force`가 넘기는 것은 다섯 가지다. 머지 확인, 추적 파일의 미커밋 변경(서브모듈 포함), 서브모듈 되돌리기 실패, 라이브러리 브랜치 머지 확인, `git branch -d` 거부. 미커밋 변경과 서브모듈 되돌리기 실패는 그냥 버리지 않고 흔적을 남긴다. 미커밋 변경은 `release-worktree-force: <브랜치> @ <시각>` 태그를 붙여 stash로 치우므로 `git stash list`에서 찾아 apply할 수 있고, 서브모듈은 `git submodule update --force`로 base가 기록한 커밋에 맞춘다.
 
 아래는 되돌아갈 자리 자체가 없거나 대상이 잘못된 경우여서 `--force`로도 막힌다.
 
@@ -87,7 +89,7 @@ ${CLAUDE_SKILL_DIR}/release-worktree.sh [<branch>] [플래그]
 아래 둘은 중단 사유가 아니다. 세션 마감을 막을 이유가 없고, base를 최신으로 맞추는 데 방해가 되지도 않는다.
 
 - **untracked 파일** — 하네스·임시 스크립트처럼 일부러 커밋하지 않은 파일이 남아 있어도 그대로 두고 진행한다.
-- **서브모듈 포인터 드리프트** — 서브모듈이 작업 브랜치를 가리키고 있어도 막지 않는다. `git submodule update`가 base가 기록한 커밋으로 되돌리며, 그 전에 무엇을 가리키고 있었는지(브랜치명과 커밋)를 경고로 남긴다. 서브모듈 커밋을 아직 push하지 않았다면 이 스킬을 실행하기 전에 push한다.
+- **서브모듈 포인터 드리프트** — 서브모듈이 앱 작업 브랜치와 **다른 이름**의 브랜치를 가리키고 있으면 막지 않는다. `git submodule update`가 base가 기록한 커밋으로 되돌리며, 그 전에 무엇을 가리키고 있었는지(브랜치명과 커밋)를 경고로 남긴다. 앱과 **같은 이름**의 라이브러리 브랜치는 `start-worktree --library`가 만든 작업 브랜치이므로 함께 정리하며, 머지되지 않은 커밋이 있으면 막는다.
 
 ## 주의
 
