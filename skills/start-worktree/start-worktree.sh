@@ -155,6 +155,32 @@ library_path() {
 # 남의 차이가 섞인다. start-point로 커밋 id를 주므로 upstream은 걸리지 않는다(rules/git.md).
 #
 # 포인터 bump와 .gitmodules branch 갱신은 git-submodule-update 스킬의 몫이라 손대지 않는다.
+#
+# 앱과 라이브러리의 에픽 base는 이름이 다를 수 있다. 2026-10-13에 라이브러리 base는 market
+# 없이 feature-base/HDA-23273-installment-calculator 로 만들어졌고, 리볼트 에픽 HDA-23292는
+# 다른 에픽 키인 그 base를 함께 쓴다. 그래서 풀 base와 같은 이름이 없으면 두 단서를 차례로 본다.
+#   1. 앱 풀 base의 .gitmodules가 추적하는 라이브러리 브랜치 — feature-base/* 일 때만.
+#      에픽이 라이브러리 base를 따르기로 했다는 기록이라 키가 달라도 맞는다.
+#      release/* 는 아직 라이브러리 base로 bump하지 않은 상태라 시작점으로 쓰지 않는다.
+#   2. 같은 에픽 키의 feature-base — 하나일 때만.
+library_epic_base() {
+  local lib="$1" ref="$2" wt="${3:-}" key rest found tracked
+  case "$ref" in feature-base/*) ;; *) return 1 ;; esac
+  if [ -n "$wt" ]; then
+    tracked="$(git -C "$wt" config --blob "origin/$ref:.gitmodules" \
+      --get submodule.prnd-library.branch 2>/dev/null || true)"
+    case "$tracked" in
+      feature-base/*) printf '%s' "$tracked"; return 0 ;;
+    esac
+  fi
+  rest="${ref#feature-base/}"
+  key="${rest%%-*}-$(printf '%s' "${rest#*-}" | cut -d- -f1)"
+  found="$(git -C "$lib" for-each-ref --format='%(refname:short)' \
+    "refs/remotes/origin/feature-base/$key" "refs/remotes/origin/feature-base/$key-*")"
+  [ -n "$found" ] && [ "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" = 1 ] || return 1
+  printf '%s' "${found#origin/}"
+}
+
 library_note=""
 cut_library_branch() {
   local wt="$1" base="$2" branch="$3" pool="$4" sub lib ref start_commit=""
@@ -171,7 +197,8 @@ cut_library_branch() {
     || die "서브모듈에 미커밋 변경이 있어 라이브러리 브랜치를 끊지 않습니다: $lib (앱 브랜치 $branch 는 이미 만들어졌습니다)"
   git -C "$lib" fetch origin \
     || warn "라이브러리 원격을 가져오지 못했습니다. 로컬 ref로 진행합니다."
-  for ref in "$base" "$pool" develop; do
+  for ref in "$base" "$pool" "$(library_epic_base "$lib" "$pool" "$wt" || true)" develop; do
+    [ -n "$ref" ] || continue
     start_commit="$(git -C "$lib" rev-parse --verify --quiet "refs/remotes/origin/$ref^{commit}" || true)"
     if [ -n "$start_commit" ]; then break; fi
   done

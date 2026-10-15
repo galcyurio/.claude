@@ -252,8 +252,30 @@ if [ -n "$lib_sub" ] \
     || warn "라이브러리 원격을 가져오지 못했습니다. 로컬 ref로 판정합니다."
   # 앱 PR의 base와 develop 어디에도 없는 커밋 수. 하나도 없으면 착수할 때 오탐으로 만든
   # 빈 브랜치이므로 머지 확인 없이 지운다.
+  # 라이브러리의 에픽 base는 앱과 이름이나 에픽 키가 다를 수 있다. start-worktree와 같은
+  # 규칙으로, 앱 base 사본의 .gitmodules가 추적하는 feature-base/* 를 먼저 보고, 없으면
+  # 같은 에픽 키의 feature-base가 하나뿐일 때 그것을 비교 대상에 넣는다.
+  lib_epic_base=""
+  case "$base_ref" in
+    feature-base/*)
+      lib_tracked="$(git config --blob "$base_copy:.gitmodules" \
+        --get submodule.prnd-library.branch 2>/dev/null || true)"
+      case "$lib_tracked" in
+        feature-base/*) lib_epic_base="$lib_tracked" ;;
+      esac
+      lib_key_rest="${base_ref#feature-base/}"
+      lib_key="${lib_key_rest%%-*}-$(printf '%s' "${lib_key_rest#*-}" | cut -d- -f1)"
+      lib_found="$(git -C "$lib" for-each-ref --format='%(refname:short)' \
+        "refs/remotes/origin/feature-base/$lib_key" "refs/remotes/origin/feature-base/$lib_key-*")"
+      if [ -z "$lib_epic_base" ] && [ -n "$lib_found" ] \
+        && [ "$(printf '%s\n' "$lib_found" | wc -l | tr -d ' ')" = 1 ]; then
+        lib_epic_base="${lib_found#origin/}"
+      fi
+      ;;
+  esac
   lib_bases=()
-  for ref in "$base_ref" develop; do
+  for ref in "$base_ref" "$lib_epic_base" develop; do
+    [ -n "$ref" ] || continue
     git -C "$lib" rev-parse --verify --quiet "refs/remotes/origin/$ref" > /dev/null \
       && lib_bases+=("origin/$ref")
   done
