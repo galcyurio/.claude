@@ -167,14 +167,23 @@ else
 
   # 이름 슬롯 자리(heydealer-android-AGP-10-migration[-N])는 끝의 숫자만 읽으면 develop
   # 이나 develop-2로 되돌아가려 해서 메인·다른 슬롯과 충돌한다. 디렉토리에서 저장소
-  # 이름을 뗀 나머지를 계열 이름으로 보고 <base>-<나머지>를 첫 후보로 둔다. 존재하지
-  # 않는 후보는 아래 루프가 건너뛰므로, 에픽 자리(-<에픽키>-N)에서는 이 후보가 걸리지
-  # 않고 기존 숫자 접미사 매칭이 그대로 동작한다.
+  # 이름을 뗀 나머지를 계열 이름으로 보고 <base>-<나머지>를 첫 후보로 둔다.
+  #
+  # 계열 슬롯은 풀 base가 develop일 때만 있다(start-worktree는 원격 feature-base가 없을
+  # 때만 --slot을 판정한다). 에픽 자리(-<에픽키>-N)의 나머지 "HDA-23292-3"은 계열 이름이
+  # 아니므로 feature-base에서는 이 후보를 두지 않는다. 두면 사본이 없을 때 아래 생성
+  # 분기가 <base>-HDA-23292-3 을 만들고, start-worktree는 그 접미사를 숫자 슬롯으로 받지
+  # 않아 그 자리를 유휴 후보에서 뺀다(2026-10-13 revolt-android에서 실제로 생겼다).
   slot_candidate=""
   rest="$(worktree_rest)"
-  case "$rest" in
-    ""|[0-9]|[0-9][0-9]) ;;
-    *) slot_candidate="${base_ref}-${rest}" ;;
+  case "$base_ref" in
+    feature-base/*) ;;
+    *)
+      case "$rest" in
+        ""|[0-9]|[0-9][0-9]) ;;
+        *) slot_candidate="${base_ref}-${rest}" ;;
+      esac
+      ;;
   esac
 
   base_copy=""
