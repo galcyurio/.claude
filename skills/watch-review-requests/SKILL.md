@@ -1,7 +1,7 @@
 ---
 name: watch-review-requests
 effort: low
-description: 나에게 온 PR 리뷰 요청을 주기적으로 확인하는 모니터를 Orca 탭에 띄우거나 끄는 스킬. 모니터는 새 요청이 오면 같은 레포·같은 Jira 키의 PR 을 묶어 Orca 탭 하나를 열고 `/review-by-agents` 를 보낸다. 사용자가 'watch-review-requests', '리뷰 모니터', '리뷰 요청 감시', '리뷰 요청 모니터링 켜줘', '리뷰 모니터 꺼줘' 등을 요청할 때 이 스킬을 사용해야 한다. PR 하나를 지금 리뷰하는 요청에는 `review-by-agents` 를 사용한다.
+description: 나에게 온 PR 리뷰 요청을 주기적으로 확인하는 모니터를 Orca 탭에 띄우거나 끄는 스킬. 모니터는 새 요청이 오면 같은 Jira 키의 PR 을 레포와 상관없이 묶어 Orca 탭 하나를 열고 `/review-by-agents` 를 보낸다. 사용자가 'watch-review-requests', '리뷰 모니터', '리뷰 요청 감시', '리뷰 요청 모니터링 켜줘', '리뷰 모니터 꺼줘' 등을 요청할 때 이 스킬을 사용해야 한다. PR 하나를 지금 리뷰하는 요청에는 `review-by-agents` 를 사용한다.
 argument-hint: "[--interval <초>] | stop"
 allowed-tools: Bash
 ---
@@ -11,8 +11,8 @@ allowed-tools: Bash
 `watch-review-requests.sh` 를 Orca 탭 하나에 띄운다. 감시와 세션 발송은 전부 스크립트가 맡고, 이 스킬은 띄우기 · 상태 확인 · 끄기만 한다.
 
 - 스크립트는 `PRNDcompany` 의 열린 PR 중 나에게 개인으로 리뷰를 요청한 것을 10분마다 확인한다
-- 새 요청은 레포와 PR 제목의 Jira 키로 묶는다. 제목에 Jira 키가 없으면 PR 하나가 한 묶음이다. 레포가 다르면 Jira 키가 같아도 따로 묶는다(리뷰가 실행 위치의 레포에서 diff 를 받기 때문이다)
-- 묶음마다 `~/dev/{repo}` 원본 클론에서 새 탭(`🔍 리뷰 · {repo}#{Jira 키 또는 n}`)을 열어 `claude '/review-by-agents {PR 링크 …}'` 를 실행한다
+- 새 요청은 PR 제목의 Jira 키로 묶는다. 레포가 달라도 Jira 키가 같으면 한 묶음이고, 제목에 Jira 키가 없으면 PR 하나가 한 묶음이다
+- Jira 키 묶음은 `~/dev` 에서, Jira 키가 없는 PR 은 `~/dev/{repo}` 원본 클론에서 새 탭(`🔍 리뷰 · {Jira 키 또는 repo#n}`)을 열어 `claude '/review-by-agents {PR 링크 …}'` 를 실행한다. Jira 키 묶음은 나중에 다른 레포의 PR 이 합류해도 같은 대화를 이어 써야 해서 폴더를 `~/dev` 로 고정한다
 - 이미 세션이 있는 묶음에 요청이 다시 오거나 같은 Jira 키의 PR 이 나중에 오면 그 세션 탭에 `/review-by-agents` 를 보낸다. 탭이 닫혔으면 같은 claude 대화를 `--resume` 으로 이어 새 탭을 연다
 - 상태 파일은 `~/.claude/state/watch-review-requests/` 에 쌓인다. 실행 기록은 그 안의 `watch.log` 에 있다
 
