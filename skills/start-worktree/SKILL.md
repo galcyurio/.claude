@@ -2,7 +2,7 @@
 name: start-worktree
 effort: low
 description: Jira 이슈 하나를 worktree에서 착수하는 스킬. 유휴 worktree를 재사용하거나 새로 만들고 브랜치를 끊은 뒤, 현재 claude 세션을 대화 이력째 그 자리로 옮기고 원래 탭을 닫는다. 사용자가 'start-worktree', '이 이슈 작업 시작해', 'worktree에서 시작해', '작업 시작해줘', '착수해줘' 등을 Jira 키와 함께 요청할 때 이 스킬을 사용해야 한다. 피처 자체를 여는 요청에는 `start-feature`, 작업을 끝내고 자리를 반납하는 요청에는 `release-worktree`를 사용한다.
-argument-hint: "<JIRA-KEY> [--base <ref>] [--pool <ref>] [--slot <계열>] [--new] [--no-move]"
+argument-hint: "<JIRA-KEY> [--base <ref>] [--pool <ref>] [--slot <계열>] [--library] [--new] [--no-move]"
 allowed-tools: Bash, AskUserQuestion
 ---
 
@@ -15,7 +15,7 @@ Jira 이슈 하나를 착수한다. base를 재사용할 수 있는 유휴 workt
 ## 절차
 
 1. **이슈 키 확정** — 인자에 없으면 대화에서 찾는다. 그래도 없으면 `AskUserQuestion`으로 묻는다.
-2. **base 결정** — 값이 셋이다. **자리를 찾는 기준**과 **브랜치를 끊을 지점**은 다른 개념이므로 하나로 합치지 않는다.
+2. **base 결정** — git 조회는 앱 저장소 루트에서 한다. 세션이 라이브러리 서브모듈 안에 있으면 `git rev-parse --show-superproject-working-tree`로 앱 루트를 구해 `git -C <앱 루트>`로 부른다. 서브모듈에서 그대로 조회하면 라이브러리 저장소의 브랜치가 잡힌다. 값이 셋이다. **자리를 찾는 기준**과 **브랜치를 끊을 지점**은 다른 개념이므로 하나로 합치지 않는다.
    - **풀 base (`--pool`)** — 유휴 worktree를 찾는 기준이다. `mcp__claude_ai_Atlassian__getJiraIssue`로 부모 에픽 키를 얻고, `git ls-remote --heads origin 'feature-base/<에픽키>*'`에 결과가 있으면 그 전체 이름을, 없으면 `develop`을 쓴다. 후보가 둘 이상이면 `AskUserQuestion`으로 묻는다.
    - **분기 지점 (`--base`)** — 작업 브랜치를 끊을 ref다. 기본값은 풀 base와 같다. 사용자가 형제 이슈 브랜치 위에서 진행하라고 지시하면(예: "위를 base로 진행해") 그 브랜치를 여기에만 넣는다. **이때도 풀 base는 그대로 구해서 넘긴다.** 자리를 찾는 기준까지 바꾸면 에픽의 유휴 자리가 후보에서 빠져 매번 새 worktree가 생긴다.
    - **슬롯 계열 (`--slot`)** — 풀 base 안에서 어느 슬롯 계열의 자리를 쓸지다. 풀 base가 `develop`으로 내려간 경우에만 판정하며, 원격 feature-base를 찾았다면 넘기지 않는다. 아래 순서를 그대로 밟는다.
@@ -24,13 +24,19 @@ Jira 이슈 하나를 착수한다. base를 재사용할 수 있는 유휴 workt
      3. 계열이 있으면 에픽 제목으로 대조한다. 에픽 제목에는 한글이 섞여 있어 기계적 치환으로는 계열 이름이 나오지 않으므로, `create-new-branch-name`의 **에픽 slug 규칙**(마지막 대괄호 그룹의 내용을 명사구 kebab-case 영어로 옮긴다)을 적용해 slug를 만들고, 계열 이름은 소문자로만 바꿔 비교한다. 에픽 `[공통][AGP 10.0 마이그레이션]`의 slug는 `agp-10-migration`이고 계열 `AGP-10-migration`을 소문자로 바꾸면 같아진다.
      4. 정확히 하나가 맞으면 그 계열 이름을 `--slot`으로 넘긴다.
      5. **맞는 계열이 없는데 계열이 존재하거나, 둘 이상이 맞으면 `AskUserQuestion`으로 어느 자리에서 시작할지 확인받는다.** 추정으로 넘기지 않고, 확인 없이 범용 슬롯으로 떨어지지도 않는다.
-3. **브랜치 이름** — `create-new-branch-name` 스킬의 규칙을 그대로 적용해 `feature/<키>-<slug>`를 만든다. 규칙 본문은 그 스킬의 SKILL.md를 읽어 확인한다.
-4. **탭 제목** — 2번 절차에서 이미 받아 둔 이슈의 `summary`에서 앞머리의 대괄호 그룹(`[고객]`, `[마켓 추천 매물 강화]` 등)을 모두 떼어 핵심 제목만 남기고 `--summary`로 넘긴다. 이 값은 `~/.claude/CLAUDE.md`의 세션 이름 규칙에 나오는 `JiraShortTitle`과 같으며, 스크립트가 탭 제목을 `<키> <제목>` 형태로 조립한다. **이 플래그를 빠뜨리면 탭 제목이 이슈 키만 남아 어떤 작업인지 읽히지 않으므로 생략하지 않는다.**
-5. **Jira 상태 전이** — `~/.claude/references/jira-start-work.md` 절차로 이슈를 "진행 중"으로 옮긴다.
-6. **스크립트 호출**
+3. **라이브러리 작업 판정 (`--library`)** — 2번 절차에서 받은 Jira 정보로 판정한다. 아래 중 하나라도 맞으면 `--library`를 넘기며, 스크립트가 그 자리의 라이브러리 서브모듈에도 같은 이름의 작업 브랜치를 끊는다.
+   - 이슈 `summary`에 `라이브러리`가 들어 있다 (`[라이브러리] ...`, `... 라이브러리로 이동` 모두 해당)
+   - 부모 에픽 `summary`에 `라이브러리`가 들어 있다
+   - 사용자가 라이브러리 작업이라고 말했다
+
+   PRND 이슈는 components·labels가 비어 있어 제목 말고는 신호가 없다. 오탐의 비용은 빈 라이브러리 브랜치 하나이고 `release-worktree`가 조용히 지우므로, 애매하면 넘기는 쪽을 택한다.
+4. **브랜치 이름** — `create-new-branch-name` 스킬의 규칙을 그대로 적용해 `feature/<키>-<slug>`를 만든다. 규칙 본문은 그 스킬의 SKILL.md를 읽어 확인한다.
+5. **탭 제목** — 2번 절차에서 이미 받아 둔 이슈의 `summary`에서 앞머리의 대괄호 그룹(`[고객]`, `[마켓 추천 매물 강화]` 등)을 모두 떼어 핵심 제목만 남기고 `--summary`로 넘긴다. 이 값은 `~/.claude/CLAUDE.md`의 세션 이름 규칙에 나오는 `JiraShortTitle`과 같으며, 스크립트가 탭 제목을 `<키> <제목>` 형태로 조립한다. **이 플래그를 빠뜨리면 탭 제목이 이슈 키만 남아 어떤 작업인지 읽히지 않으므로 생략하지 않는다.**
+6. **Jira 상태 전이** — `~/.claude/references/jira-start-work.md` 절차로 이슈를 "진행 중"으로 옮긴다.
+7. **스크립트 호출**
 
 ```
-bash ~/.claude/skills/start-worktree/start-worktree.sh <키> --pool <풀 base> --base <분기 지점> --branch <branch> --summary <핵심 제목> [--slot <계열>]
+bash ~/.claude/skills/start-worktree/start-worktree.sh <키> --pool <풀 base> --base <분기 지점> --branch <branch> --summary <핵심 제목> [--slot <계열>] [--library]
 ```
 
 **스크립트가 성공하면 이 탭을 닫으므로, 호출 이후에는 어떤 도구도 부르지 않고 어떤 메시지도 쓰지 않는다.** 착수 보고는 새로 열린 탭이 이어받아서 한다.
@@ -47,8 +53,9 @@ bash ~/.claude/skills/start-worktree/start-worktree.sh <키> --pool <풀 base> -
 | "자리만 준비해줘", "옮기지 마" | `--no-move` |
 | base를 직접 지정 | `--base <ref>` (분기 지점만 바뀐다. `--pool`은 2번 절차대로 구해서 그대로 넘긴다) |
 | "AGP 자리에서 해", 특정 계열을 지목 | `--slot <계열 이름>` |
+| "라이브러리 작업이야", 3번 절차의 Jira 판정 | `--library` |
 
-**플래그를 추정해서 붙이지 않는다.** `--new`, `--no-move`는 사용자가 그 뜻으로 말했을 때만 붙인다. `--slot`은 2번 절차의 대조나 사용자 지목으로 계열이 확정됐을 때만 붙인다.
+**플래그를 추정해서 붙이지 않는다.** `--new`, `--no-move`는 사용자가 그 뜻으로 말했을 때만 붙인다. `--slot`은 2번 절차의 대조나 사용자 지목으로 계열이 확정됐을 때만 붙인다. `--library`는 3번 절차의 판정 결과로만 붙인다.
 
 ## 주의
 
@@ -58,5 +65,7 @@ bash ~/.claude/skills/start-worktree/start-worktree.sh <키> --pool <풀 base> -
 - **계열을 지목해도 그 계열의 상위 base 자리는 후보가 아니다.** 접미사가 계열 이름뿐인 `develop-AGP-10-migration` 자리는 계열의 기준 자리이므로, 숫자 사본을 문 `develop-AGP-10-migration-2`·`-3` 자리만 받는다. 기준 자리를 작업 브랜치로 덮으면 그 계열이 되돌아갈 사본이 사라진다.
 - **새로 만드는 자리는 base 사본과 짝을 이룬다.** 스크립트는 새 자리를 `<상위 자리 이름>-N`으로 짓고 그 자리에 `<풀 base>-N` 사본을 물린 뒤 작업 브랜치를 끊는다. 자리 이름 끝의 번호와 사본 접미사가 짝이어야 `release-worktree`가 반납할 때 되돌아갈 사본을 찾는다. 짝이 깨지면 반납 때 엉뚱한 이름의 사본이 생기고, 그 자리는 다음 착수의 유휴 후보에서도 빠진다.
 - **하위 worktree에서 스킬을 불렀다면 그 자리가 1순위 후보다.** 스크립트는 다른 자리를 훑기 전에 지금 서 있는 자리를 같은 조건으로 먼저 판정하고, 통과하면 거기서 브랜치를 끊은 뒤 세션 이사와 탭 닫기를 건너뛰고 탭 제목만 `<키> <제목>`으로 바꾼다. 조건이 하나라도 어긋나면(상위 base 자리이거나, 이미 작업 브랜치를 물었거나, 슬롯 계열이 다르거나, 미커밋 변경이 남아 있는 경우) 상위에서 부른 것과 똑같이 다른 유휴 자리를 찾는다. 판정 기준이 순회와 동일하므로, 하위 worktree에서 부르더라도 2번 절차의 `--pool`과 `--slot` 결정을 생략하면 안 된다.
+- **라이브러리는 같은 자리의 서브모듈에서 작업한다.** 라이브러리 작업이라고 해서 라이브러리 저장소의 worktree를 따로 만들지 않는다. 스크립트는 서브모듈 안에서 불려도 앱 저장소로 올라가 자리를 고르고, `--library`면 그 자리의 서브모듈에서 브랜치를 끊는다. 시작점은 라이브러리 원격의 `origin/<분기 지점>`, `origin/<풀 base>`, `origin/develop` 중 처음 있는 것이다. 포인터 bump와 `.gitmodules` branch 갱신은 `git-submodule-update` 스킬의 몫이다.
+- **라이브러리 서브모듈이 작업 브랜치를 문 자리는 유휴 후보가 아니다.** 반납이 덜 된 자리로 본다. `develop`·`release/*`·`feature-base/*`처럼 base 이름을 문 것은 작업 흔적이 아니므로 후보로 받는다.
 - **탭을 닫는 성공 경로에서는 보고할 기회가 없다.** 탭이 닫히는 순간 이 세션이 끝난다. 결과를 보여줘야 하는 상황이면 `--no-move`로 자리만 준비하고 사용자에게 안내한다.
 - **범위 밖은 손대지 않는다**: 피처(에픽) 자체를 여는 일(`start-feature`), worktree 반납·삭제(`release-worktree`, `remove-worktree`).

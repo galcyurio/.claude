@@ -11,6 +11,7 @@
 #   --slot <접미사>   유휴 자리를 찾을 슬롯 계열 (기본: 숫자 접미사 슬롯만)
 #   --branch <name>   작업 브랜치 이름을 직접 지정
 #   --summary <제목>  탭 제목에 붙일 이슈 제목 (대괄호 prefix를 뗀 핵심 제목)
+#   --library         자리의 prnd-library 서브모듈에도 같은 이름의 작업 브랜치를 끊는다
 #   --new             유휴 worktree를 찾지 않고 새로 만든다
 #   --no-move         세션을 옮기지 않는다 (자리만 준비)
 #   --dry-run         파괴적 동작 없이 계획만 출력
@@ -139,6 +140,47 @@ cut_work_branch() {
   git -C "$wt" checkout -b "$branch" "$start_commit"
 }
 
+# 자리의 라이브러리 서브모듈 경로. 서브모듈이 없는 저장소면 비어 있다.
+library_path() {
+  git -C "$1" config --file .gitmodules --get submodule.prnd-library.path 2>/dev/null || true
+}
+
+# 자리의 라이브러리 서브모듈에서 앱과 같은 이름의 작업 브랜치를 끊는다. 앱과 라이브러리를
+# 한 저장소처럼 다루려는 것이다 — 라이브러리 코드는 전용 클론이 아니라 이 서브모듈에서
+# 고쳐야 앱 Gradle이 push 없이 그 트리를 그대로 컴파일한다.
+#
+# 시작점은 앱이 따르는 base와 같은 이름을 라이브러리 원격에서 찾는다. 형제 이슈 브랜치
+# 위에 얹는 경우(분기 지점), 에픽 feature-base(풀 base), develop 순서로 처음 있는 것을 쓴다.
+# 포인터 커밋에 이름만 붙이면 포인터가 release 브랜치에 있을 때 develop보다 뒤처져 PR에
+# 남의 차이가 섞인다. start-point로 커밋 id를 주므로 upstream은 걸리지 않는다(rules/git.md).
+#
+# 포인터 bump와 .gitmodules branch 갱신은 git-submodule-update 스킬의 몫이라 손대지 않는다.
+library_note=""
+cut_library_branch() {
+  local wt="$1" base="$2" branch="$3" pool="$4" sub lib ref start_commit=""
+  sub="$(library_path "$wt")"
+  if [ -z "$sub" ]; then
+    warn "라이브러리 서브모듈이 없는 저장소라 라이브러리 브랜치를 건너뜁니다."
+    return 0
+  fi
+  lib="$wt/$sub"
+  # 유휴 자리를 재사용하면 pull이 포인터를 옮겼을 수 있으므로 앱 브랜치가 기록한 커밋에 먼저 맞춘다.
+  git -C "$wt" submodule update --init -- "$sub" \
+    || die "서브모듈을 앱 브랜치 기준으로 맞추지 못했습니다. 앱 브랜치 $branch 는 이미 만들어졌습니다."
+  [ -z "$(git -C "$lib" status --porcelain --untracked-files=no)" ] \
+    || die "서브모듈에 미커밋 변경이 있어 라이브러리 브랜치를 끊지 않습니다: $lib (앱 브랜치 $branch 는 이미 만들어졌습니다)"
+  git -C "$lib" fetch origin \
+    || warn "라이브러리 원격을 가져오지 못했습니다. 로컬 ref로 진행합니다."
+  for ref in "$base" "$pool" develop; do
+    start_commit="$(git -C "$lib" rev-parse --verify --quiet "refs/remotes/origin/$ref^{commit}" || true)"
+    if [ -n "$start_commit" ]; then break; fi
+  done
+  [ -n "$start_commit" ] || die "라이브러리 원격에서 시작점을 찾지 못했습니다 ($base, $pool, develop)."
+  git -C "$lib" checkout -b "$branch" "$start_commit"
+  library_note="라이브러리도 $sub 에서 $branch (base origin/$ref)를 물었다"
+  info "  라이브러리 브랜치: $lib ($branch, base origin/$ref)"
+}
+
 # 새로 만든 자리를 orca 보드에서 어느 자리 밑에 붙일지 정한다.
 # 기준은 풀 base(계열을 지목받았으면 <풀 base>-<계열>) 브랜치를 그대로 물고 있는 자리다.
 # start-feature가 만든 상위 base worktree가 여기 해당하고, 풀 base가 develop으로
@@ -203,6 +245,7 @@ opt_slot=""
 opt_branch=""
 opt_summary=""
 opt_new=0
+opt_library=0
 opt_no_move=0
 opt_dry_run=0
 
@@ -214,12 +257,22 @@ while [ $# -gt 0 ]; do
     --branch) opt_branch="${2:-}"; shift 2 ;;
     --summary) opt_summary="${2:-}"; shift 2 ;;
     --new) opt_new=1; shift ;;
+    --library) opt_library=1; shift ;;
     --no-move) opt_no_move=1; shift ;;
     --dry-run) opt_dry_run=1; shift ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) issue_key="$1"; shift ;;
   esac
 done
+
+# 라이브러리 서브모듈 안에서 불렸으면 앱 저장소로 올라간다. 그대로 두면 git-common-dir가
+# .git/[worktrees/<자리>/]modules/prnd-library 를 가리켜, 라이브러리 저장소를 기준으로 자리를
+# 찾고 그 저장소의 worktree를 엉뚱한 위치에 새로 만든다.
+superproject="$(git rev-parse --show-superproject-working-tree 2>/dev/null || true)"
+if [ -n "$superproject" ]; then
+  info "서브모듈 안에서 불렸으므로 앱 저장소 기준으로 진행합니다: $superproject"
+  cd "$superproject"
+fi
 
 [ -n "$issue_key" ] || die "Jira 키가 필요합니다. 사용법: start-worktree.sh <JIRA-KEY>"
 [ -n "$opt_base" ] || die "base 브랜치가 필요합니다. SKILL.md가 --base로 넘깁니다."
@@ -267,7 +320,7 @@ tab_title="$issue_key${opt_summary:+ $opt_summary}"
 # 순회로 고르는 자리와 "지금 서 있는 자리"가 같은 기준으로 걸러져야 하므로 이 조건을
 # 함수 하나로 묶고 두 경로에서 함께 쓴다.
 is_idle_candidate() {
-  local wt="$1" pool="$2" slot="${3:-}" main_wt="$4" br up suffix
+  local wt="$1" pool="$2" slot="${3:-}" main_wt="$4" br up suffix sub sub_br
   [ -n "$wt" ] || return 1
   [ "$wt" != "$main_wt" ] || return 1
   br="$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
@@ -290,6 +343,16 @@ is_idle_candidate() {
   up="$(git -C "$wt" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)"
   [ "$up" = "origin/$pool" ] || return 1
   [ -z "$(git -C "$wt" status --porcelain --untracked-files=no --ignore-submodules=all)" ] || return 1
+  # 라이브러리 서브모듈이 작업 브랜치를 물고 있으면 반납이 덜 된 자리다. base 이름
+  # (develop, release/*, feature-base/*)을 문 것은 작업 흔적이 아니므로 그대로 받는다.
+  sub="$(library_path "$wt")"
+  if [ -n "$sub" ]; then
+    sub_br="$(git -C "$wt/$sub" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    case "$sub_br" in
+      ""|develop|main|master|release/*|feature-base/*) ;;
+      *) return 1 ;;
+    esac
+  fi
   return 0
 }
 
@@ -336,6 +399,9 @@ if [ -n "$target_worktree" ]; then
   fi
   if [ "$opt_dry_run" = 0 ]; then
     cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
+    [ "$opt_library" = 0 ] || cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
+  elif [ "$opt_library" = 1 ]; then
+    info "[dry-run] 라이브러리 서브모듈에도 $work_branch 를 끊습니다 (시작점: origin/$base_ref, origin/$pool_ref, origin/develop 중 처음 있는 것)"
   fi
 else
   # 계열을 지목받았는데 그 안에 빈 자리가 없으면 새 자리를 만들지 않고 멈춘다. 새로
@@ -364,6 +430,7 @@ else
     "$(worktree_stem "$pool_ref" "$slot_name" "$parent_path")" "$pool_base")"
   pool_copy="$pool_base-${target_worktree##*-}"
   info "  새 자리: $target_worktree (base 사본: $pool_copy)"
+  [ "$opt_library" = 0 ] || info "  라이브러리 서브모듈에도 $work_branch 를 끊습니다"
   if [ "$opt_dry_run" = 1 ]; then
     info "[dry-run] 자리 이름까지만 확인했습니다. 이후 단계는 실제 경로가 있어야 진행합니다."
     exit 0
@@ -383,6 +450,8 @@ else
     || die "upstream을 걸지 못했습니다. 풀 base가 원격에 올라가 있어야 합니다."
   cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
   bash "$(dirname "$0")/init.sh" "$target_worktree"
+  # 서브모듈은 init.sh가 초기화한 뒤에야 브랜치를 끊을 수 있다.
+  [ "$opt_library" = 0 ] || cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
 
   # orca 보드에서 새 자리를 상위 base 자리 밑에 붙인다. 연결하지 않으면 카드가 최상위로
   # 떠서 어느 피처의 자리인지 보드에서 읽히지 않는다. 상위 자리가 없으면(풀 base를 문
@@ -404,7 +473,7 @@ else
 fi
 
 if [ "$opt_no_move" = 1 ]; then
-  info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree"
+  info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree${library_note:+ / $library_note}"
   exit 0
 fi
 
@@ -424,7 +493,7 @@ if [ "$reused_current" = 1 ]; then
   else
     warn "터미널 핸들을 찾지 못해 탭 제목은 그대로 둡니다."
   fi
-  info "[3/3] 착수 준비 완료, 탭을 닫지 않습니다: $target_worktree ($work_branch, base $base_ref)"
+  info "[3/3] 착수 준비 완료, 탭을 닫지 않습니다: $target_worktree ($work_branch, base $base_ref)${library_note:+ / $library_note}"
   exit 0
 fi
 
@@ -454,7 +523,7 @@ wt_id="$(wait_orca_worktree "$target_worktree")" \
 # jsonl 복사는 이 실행 도중에 일어나 이 스크립트의 출력이 새 세션에 실리지 않는다(spec 4.2-4).
 # 마지막 문장은 새 세션이 착수 여부를 되묻지 않게 하려고 넣는다. 이 문장이 없으면 이사한 세션이
 # 대화 이력을 읽고 나서 시작할지 다시 확인하는데, 자리 이동 자체가 이미 착수 지시다.
-first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason. 착수 여부나 진행 방향을 다시 묻지 말고, 이전 대화에서 합의된 내용대로 곧바로 작업에 들어간다."
+first_prompt="$issue_key 작업을 이어서 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason.${library_note:+ $library_note.} 착수 여부나 진행 방향을 다시 묻지 말고, 이전 대화에서 합의된 내용대로 곧바로 작업에 들어간다."
 
 "$ORCA" terminal create --worktree "id:$wt_id" --title "$tab_title" \
   --command "claude --resume $sid \"$first_prompt\"" --json > /dev/null \
