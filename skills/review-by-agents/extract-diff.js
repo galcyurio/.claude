@@ -13,7 +13,7 @@
  * stdout(항상 단일 JSON 객체):
  *   {
  *     mode: 'pr' | 'file' | 'diff',
- *     targetDesc: string,          // "PR #12" | "<path>" | "<base>...HEAD"
+ *     targetDesc: string,          // "<repo>#12"(URL) | "PR #12"(번호) | "<path>" | "<base>...HEAD"
  *     base: string|null,           // diff 모드만
  *     prNumber: number|null,       // pr 모드만
  *     changedFiles: string[],
@@ -75,10 +75,13 @@ function countLines(text) {
 function classify(target) {
   if (!target) return { mode: 'diff' }
   if (/github\.com/.test(target)) {
-    const m = target.match(/\/pull\/(\d+)/)
-    return { mode: 'pr', prNumber: m ? parseInt(m[1], 10) : null }
+    const m = target.match(/github\.com\/[^/]+\/([^/]+)\/pull\/(\d+)/)
+    // gh 에 URL 을 그대로 넘겨야 실행 위치가 그 PR 의 레포가 아니어도 diff 를 받는다
+    return m
+      ? { mode: 'pr', prNumber: parseInt(m[2], 10), prRef: target, repoName: m[1] }
+      : { mode: 'pr', prNumber: null }
   }
-  if (/^\d+$/.test(target)) return { mode: 'pr', prNumber: parseInt(target, 10) }
+  if (/^\d+$/.test(target)) return { mode: 'pr', prNumber: parseInt(target, 10), prRef: target }
   if (fs.existsSync(target) && fs.statSync(target).isFile()) {
     return { mode: 'file' }
   }
@@ -164,15 +167,15 @@ function main() {
       emit(result)
       return
     }
-    result.targetDesc = `PR #${result.prNumber}`
-    const num = String(result.prNumber)
-    const diff = run('gh', ['pr', 'diff', num])
+    result.targetDesc = cls.repoName ? `${cls.repoName}#${result.prNumber}` : `PR #${result.prNumber}`
+    const ref = cls.prRef
+    const diff = run('gh', ['pr', 'diff', ref])
     if (diff == null) {
-      result.error = `gh pr diff ${num} 실패 (인증·네트워크·존재 여부 확인)`
+      result.error = `gh pr diff ${ref} 실패 (인증·네트워크·존재 여부 확인)`
       emit(result)
       return
     }
-    const names = run('gh', ['pr', 'diff', num, '--name-only'])
+    const names = run('gh', ['pr', 'diff', ref, '--name-only'])
     result.changedFiles = names ? names.split('\n').filter(Boolean) : []
     result.diffLines = countLines(diff)
     result.empty = diff.trim().length === 0
