@@ -1,5 +1,5 @@
 #!/bin/bash
-# 나에게 온 리뷰 요청을 주기적으로 확인해, PR 마다 Orca 리뷰 세션을 열어 /review-by-agents 를 보낸다.
+# 나에게 온 리뷰 요청을 주기적으로 확인해, 같은 레포·같은 Jira 키의 PR 을 묶어 Orca 리뷰 세션을 열고 /review-by-agents 를 보낸다.
 # 이 터미널을 점유한다. Enter 를 누르면 바로 확인하고, 끄려면 Ctrl+C 또는 탭을 닫는다.
 #
 #   watch-review-requests                  10분 간격으로 모니터링
@@ -19,7 +19,7 @@ ORG=PRNDcompany
 WORKSPACE=~/dev
 STATE=~/.claude/state/watch-review-requests
 DISPATCHED=$STATE/dispatched   # 세션에 보낸 PR. 줄마다 "repo#n"
-SESSIONS=$STATE/sessions       # PR → 리뷰 세션. 줄마다 "repo#n<TAB>ptyId<TAB>claude 세션 id"
+SESSIONS=$STATE/sessions       # 묶음 → 리뷰 세션. 줄마다 "repo#묶음키<TAB>ptyId<TAB>claude 세션 id". 묶음키는 Jira 키, 없으면 PR 번호
 LOG=$STATE/watch.log
 DEFERRED=$STATE/deferred       # 이번 확인에서 못 보낸 PR 과 사유. 줄마다 "repo#n<TAB>사유"
 TAB_TITLE="📡 리뷰 모니터"
@@ -100,9 +100,9 @@ set_session() {  # $1 repo#n, $2 ptyId, $3 claude 세션 id
 
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 
-# review-by-agents 는 PR 하나를 받고 실행 위치의 레포에서 gh pr diff 를 돌리므로, PR 마다 그 레포 클론에서 세션을 띄운다
-# 재요청이면 그 PR 의 세션 탭에 보내고, 탭이 닫혔으면 같은 claude 대화를 이어 새 탭을 연다
-# $1 repo#n, $2 url. 성공하면 0
+# review-by-agents 는 실행 위치의 레포에서 gh pr diff 를 돌리므로, 묶음은 레포를 넘지 않고 그 레포 클론에서 세션을 띄운다
+# 이미 세션이 있는 묶음이면 그 세션 탭에 보내고, 탭이 닫혔으면 같은 claude 대화를 이어 새 탭을 연다
+# $1 repo#묶음키, $2 공백으로 이은 url. 성공하면 0
 dispatch() {
   local key=$1 urls=$2 prompt pty sid live handle last now repo dir claude_args kind
   prompt="/review-by-agents $urls"
@@ -155,14 +155,14 @@ check() {
   [ -z "$gone" ] || printf '%s\n' "$gone" | while read -r id; do log "  $id 요청 해제 (리뷰 제출 또는 요청 취소)"; done
   sort -u "$DISPATCHED" | comm -12 - "$STATE/current" > "$DISPATCHED.tmp"; mv "$DISPATCHED.tmp" "$DISPATCHED"
 
-  # 아직 안 보낸 요청. 줄마다 "repo#n<TAB>repo#n<TAB>url"
+  # 아직 안 보낸 요청. 줄마다 "repo#묶음키<TAB>repo#n<TAB>url"
   local pending; pending=$(printf '%s\n' "$reqs" | while IFS=$'\t' read -r repo n url title; do
     [ -n "$repo" ] || continue
     grep -qxF "$repo#$n" "$DISPATCHED" && continue
     if has_my_pending_review "$repo" "$n"; then
       echo "$repo#$n" >> "$DISPATCHED"; log "  $repo#$n 내 pending review 가 있어 리뷰 중으로 넘김"; continue
     fi
-    printf '%s\t%s\t%s\n' "$repo#$n" "$repo#$n" "$url"
+    printf '%s\t%s\t%s\n' "$repo#$(ticket_of "$title" "$n")" "$repo#$n" "$url"
   done)
 
   if [ -n "$pending" ]; then
