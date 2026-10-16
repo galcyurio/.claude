@@ -120,12 +120,13 @@ if [ "$sync_only" = 1 ]; then
   base_copy="$branch"
   base_ref="$branch"
   info "[1/6] base 브랜치에 있으므로 삭제 없이 최신화만 합니다: $branch"
-elif [ -n "$opt_base" ]; then
-  base_copy="$opt_base"
-  base_ref="$opt_base"
-  info "[1/6] base를 직접 지정했습니다: $base_copy (머지 확인 생략)"
 else
-  if [ "$opt_force" = 1 ]; then
+  # --base 로 받은 값도 아래 사본 결정을 거친다. develop-3 자리에서 --base develop 을 넘기면
+  # 메인이 문 develop 이 아니라 이 자리 번호의 develop-3 으로 되돌아가야 한다.
+  if [ -n "$opt_base" ]; then
+    base_ref="$opt_base"
+    info "[1/6] base를 직접 지정했습니다: $base_ref (머지 확인 생략)"
+  elif [ "$opt_force" = 1 ]; then
     # 머지 여부를 묻지 않는다. PR이 있으면 머지 상태와 무관하게 그 base를 쓰고, PR이
     # 아예 없으면 이 자리가 물고 있던 base 사본에서 역으로 얻는다. 둘 다 실패하면
     # base를 추정하지 않고 --base 를 요구한다.
