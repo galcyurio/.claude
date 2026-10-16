@@ -54,7 +54,7 @@ fi
 #    - checkout -- <path>: 파일 내용 원복이라 포인터와 무관하다.
 if printf '%s' "$cmd" | grep -Fq 'prnd-library' \
   && printf '%s' "$cmd" | grep -Eq 'git[[:space:]]+([^|;&]*[[:space:]])?(checkout|switch)[[:space:]]' \
-  && ! printf '%s' "$cmd" | grep -Eq '(checkout|switch)[[:space:]]+(-[bBc][[:space:]]|--[[:space:]]|feature/)'; then
+  && ! printf '%s' "$cmd" | grep -Eq '(checkout|switch)([[:space:]]+(-q|--quiet))*[[:space:]]+(-[bBc][[:space:]]|--[[:space:]]|feature/)'; then
   deny
 fi
 
