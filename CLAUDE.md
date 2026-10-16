@@ -9,6 +9,7 @@
 
 # 세션 이름 규칙
 - Jira 이슈가 확인되면 Jira ID와 Title을 이용해 세션 이름을 작성한다.
+- 세션 이름이나 Orca 탭·카드 이름을 바꾸는 요청은 `rename-session` 스킬로 처리한다. 스킬이 Orca 이름을 바꾸고 아래 2줄을 만든다.
 - 세션 이름을 지을 때는 설명 없이 아래 2줄을 단독 출력한다.
   1. `/rename ${JiraId} ${JiraFullTitle}` — Jira 원본 제목 그대로 (대괄호 prefix 포함)
   2. `/rename ${JiraId} ${JiraShortTitle}` — 대괄호 prefix(`[고객]`, `[마켓 추천 매물 강화]` 등)를 모두 제거한 핵심 제목만
