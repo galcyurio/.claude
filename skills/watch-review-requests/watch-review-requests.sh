@@ -2,11 +2,11 @@
 # 나에게 온 리뷰 요청을 주기적으로 확인해, 같은 Jira 키의 PR 을 레포와 상관없이 묶어 Orca 리뷰 세션을 열고 /review-by-agents 를 보낸다.
 # 이 터미널을 점유한다. Enter 를 누르면 바로 확인하고, 끄려면 Ctrl+C 또는 탭을 닫는다.
 #
-#   watch-review-requests                  10분 간격으로 모니터링
+#   watch-review-requests                  1분 간격으로 모니터링
 #   watch-review-requests --interval 300   간격(초) 지정
 set -uo pipefail
 
-INTERVAL=600
+INTERVAL=60
 while [ $# -gt 0 ]; do
   case $1 in
     --interval) INTERVAL=$2; shift 2 ;;
