@@ -1,7 +1,7 @@
 ---
 name: create-pr
 effort: medium
-allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), Bash(xargs -r grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, Skill(capture-preview-screenshot), Skill(upload-pr-image), AskUserQuestion
+allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), Bash(xargs -r grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Bash(test -x:*), Bash(perl -e:*), Read, Write, Skill(capture-preview-screenshot), Skill(upload-pr-image), AskUserQuestion
 description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그램). 사용자가 'create-pr', 'PR 생성', 'PR 만들어', 'PR 만들어줘', 'PR 작성', 'PR 올려줘', 'PR 올려', 'pull request 생성', 'pull request 만들어', '풀리퀘 생성', '풀리퀘 만들어' 등 PR 생성을 요청할 때 이 스킬을 사용해야 한다. PR 리뷰/조회 요청에는 사용하지 않는다.
 ---
 
@@ -186,8 +186,56 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 - 글은 1~3문장으로 쓰고, 한 줄에 한 문장만 둔다. 문장 사이에 빈 줄을 넣지 않는다.
 - 구성은 "무엇이 바뀌나 → 왜 → 누가/어디서 체감하나" 순서다.
 - 클래스·함수·필드 이름을 옮기지 않고, 그 코드가 하는 일을 사용자가 보는 화면·기능 이름으로 풀어 쓴다. 코드 용어를 지운 뒤에도 문장이 성립하는지 확인한다.
-- 바뀌기 전과 후를 비교하면 글 다음에 `| 항목 | 변경 전 | 변경 후 |` 표를 붙인다. 셀 값도 쉬운 말로 쓴다.
+- 표와 그림은 아래 "표"·"그림" 기준을 따른다.
 - 근거는 Jira 본문과 커밋이다. 코드에 없는 효과는 지어내지 않는다.
+
+**표**: 바뀌기 전과 후를 비교하면 글 다음에 반드시 표로 보여준다. `~에서 ~로 변경` 같은 문장이나 `A → B` 화살표로 쓰지 않는다.
+
+- 헤더는 `| 항목 | 변경 전 | 변경 후 |`이고, 셀 값도 쉬운 말로 쓴다. 비교 대상이 하나뿐이면 `항목` 열을 뺀다.
+- 실제로 바뀐 행만 넣는다. 변경 전·후가 같은 행은 넣지 않고, 달라지지 않는 것은 글로 쓴다.
+- 전후가 아니라 모양별·탭별처럼 나란히 있는 것끼리의 차이도 표로 쓴다. 이때 헤더는 비교 대상 이름(`| 조작 | 세로 목록 | 가로 카드 |`)이다.
+- 목록 항목 안에 중첩하지 않고 섹션 레벨에 둔다.
+
+**그림**: 글보다 그림이 빨리 전달될 때만, 그 그림이 설명하는 글 바로 뒤에 넣는다. 이 섹션에 최대 3개까지 넣고, 그림이 없는 것이 정상이다.
+
+| 바뀐 것 | 그림 | 비고 |
+|---|---|---|
+| 화면 흐름·분기 | mermaid `flowchart` | |
+| 앱↔서버·CI↔서버처럼 주고받는 순서 | mermaid `sequenceDiagram` | 참여자 이름도 쉬운 말 (`앱`·`서버`·`빌드 캐시 창고`) |
+| 상태가 바뀌는 규칙 | mermaid `stateDiagram-v2` | |
+| 사용자가 겪는 단계별 경험 | mermaid `journey` | |
+| 화면 모양·배치·구성의 전후 | 그린 이미지 (아래) | 폰 프레임 2개에 전후, 바뀐 부분만 강조색 |
+| 일상 비유로 설명하는 구조 | 그린 이미지 (아래) | 큰 도형 + 짧은 라벨 |
+
+- mermaid는 노드·참여자 7개 이하, 라벨은 쉬운 말로 쓰고, 바뀐 부분만 그린다.
+  - `flowchart`는 노드 라벨을 항상 큰따옴표로 감싼다 (`A["견적 결과 화면 (첫 진입)"]`). 괄호·콜론이 따옴표 밖에 있으면 파싱 에러로 다이어그램이 깨진다.
+  - `sequenceDiagram`·`journey`는 따옴표를 쓰지 않는다. 참여자 이름에 괄호·콜론을 넣지 않고, 설명이 필요하면 메시지 텍스트로 쓴다.
+  - `stateDiagram-v2`는 상태 id에 공백을 쓸 수 없으므로 `s1 : 견적 요청 중`처럼 짧은 id에 설명 구문으로 쉬운 말을 붙이고, 전이는 id로 쓴다 (`s1 --> s2 : 딜러 연락`).
+- 선과 상자로 되는 흐름·순서·상태는 mermaid를 우선한다. 모양·배치·비유처럼 mermaid로 어색한 것만 이미지로 그린다.
+
+**그린 이미지 만들기·올리기**
+
+시작 전에 Chrome 실행 파일을 확인한다. `test -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"`이 실패하면 이미지 경로를 시작하지 않고 mermaid나 글로 간다.
+
+1. **그리기**: SVG를 Write로 `/tmp/pr-images/{JIRA-KEY}/{nn}-{슬러그}.svg`에 작성한다. 경로에 셸 변수를 쓰지 않고(Write는 `$TMPDIR`를 전개하지 않는다), 작업 레포 안에 만들지 않는다. `viewBox="0 0 1200 {600~800}"`에 `width`·`height`도 같은 값, 배경 흰색 `<rect>`, 색은 회색 계열 + 강조 1색, 글자 22px 이상·`font-family="-apple-system, 'Apple SD Gothic Neo', sans-serif"`로 그리고, 글자는 라벨 수준으로만 쓴다. 전후 비교는 왼쪽 `변경 전`·오른쪽 `변경 후` 폰 프레임에 바뀐 부분만 강조색으로 칠한다. 변경 후 상태가 여럿이면 변경 후 프레임을 상태 수만큼(최대 3개) 나란히 둔다.
+2. **PNG 변환**: Chrome headless로 변환한다. PNG는 바로 나오지만 프로세스가 끝나지 않으므로 시간 제한으로 끊는다. `qlmanage`는 정사각형으로 잘라내므로 쓰지 않는다.
+   ```bash
+   perl -e 'alarm 15; exec @ARGV' -- "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+     --headless=new --disable-gpu --hide-scrollbars --no-first-run \
+     --user-data-dir=/tmp/pr-images/{JIRA-KEY}/.chrome --force-device-scale-factor=2 \
+     --window-size=1200,{높이} --screenshot=/tmp/pr-images/{JIRA-KEY}/{nn}-{슬러그}.png \
+     "file:///tmp/pr-images/{JIRA-KEY}/{nn}-{슬러그}.svg"
+   ```
+   종료 코드는 무시하고 PNG가 생겼는지로 판정한다. 생성된 PNG를 Read로 열어 글자 깨짐·잘림을 확인한다.
+3. **업로드**: `upload-pr-image` 스킬을 Skill 도구로 호출해 PNG 경로를 넘긴다. 직접 올리거나 URL을 조립하지 않는다.
+4. **본문 삽입**: 스킬이 돌려준 `SCREENSHOT_URL`을 그대로 `<img width="720" src="{url}">`로 넣는다.
+5. **실패 시**: 변환·업로드가 실패했으면 링크를 남기지 않는다. mermaid로 대체할 수 있으면 대체하고, 아니면 글만 남긴다.
+
+**표·그림 점검**
+
+1. 코드 용어를 지운 뒤에도 표 셀·mermaid 노드·이미지 라벨이 성립하는지 확인한다. 코드 내부 값(enum·상수·설정 키)은 역할로 풀어 쓴다 (`RICH` → `카드형`).
+2. 표에 변경 전·후가 같은 행이 없는지 확인한다.
+3. 이미지를 넣었으면 PNG를 Read로 확인했고, URL이 `SCREENSHOT_URL` 출력과 같은지 확인한다.
 
 잘못된 형태 (X):
 
@@ -304,7 +352,7 @@ flowchart LR
    - "## 개요": 4번 전략으로 작성 (필수)
    - "### 디자인 화면": Figma 링크 있을 때만
    - "### 관련 채널 내용": 관련 링크 있을 때만
-   - "## 쉽게 말하면": 4번 "쉽게 말하면 추가 기준"에 해당할 때만 `## 개요` 블록 다음에 추가 (기본 생략)
+   - "## 쉽게 말하면": 4번 "쉽게 말하면 추가 기준"에 해당할 때만 `## 개요` 블록 다음에 추가 (기본 생략). 이미지는 PR 생성 **전에** 업로드해 URL을 확보한다
    - "## 작업사항": 4번 "작업사항·mermaid 추가 기준"에 해당할 때만 추가 (기본 생략)
    - "## 반영화면": 4번 "반영화면 작성 기준"대로 스냅샷 또는 Preview 캡처로 채움. 둘 다 없거나 캡처·업로드에 실패하면 제거
    - 비어있는 섹션은 제거
