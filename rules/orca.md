@@ -4,17 +4,19 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 ## 전이 규칙
 
+보드는 Idle, In progress, In review 세 열이다. Idle은 지금 볼 필요가 없는 카드로, 아직 시작하지 않은 세션과 끝난 세션을 함께 담는다. 기존 Done 열의 id인 `completed`를 그대로 쓰고 이름만 Idle로 바꿨다.
+
 | 시점 | 훅 이벤트 | status id | 보드 컬럼 |
 |---|---|---|---|
-| 세션이 시작된 순간 | `SessionStart` | `todo` | Todo |
+| 세션이 시작된 순간 | `SessionStart` | `completed` | Idle |
 | 사용자가 프롬프트를 보낸 순간 | `UserPromptSubmit` | `in-progress` | In progress |
 | `gh pr create`가 성공한 직후 | `PostToolUse` | `in-review` | In review |
-| 세션이 끝난 순간 | `SessionEnd` | `completed` | Done |
-| 탭을 그대로 닫아 세션이 사라진 순간 | `SessionStart`에서 띄운 지킴이 | `completed` | Done |
+| 세션이 끝난 순간 | `SessionEnd` | `completed` | Idle |
+| 탭을 그대로 닫아 세션이 사라진 순간 | `SessionStart`에서 띄운 지킴이 | `completed` | Idle |
 
-- 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Done으로 내려가지 않게 하려는 것이다.
+- 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Idle로 내려가지 않게 하려는 것이다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
-- 세션을 새로 열면 카드는 `todo`로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. `release-worktree` 스킬은 자리를 반납할 때 카드를 `completed`로 넘기며, 내가 임의로 `todo`로 내리지 않는다.
+- 세션을 새로 열면 카드는 `completed`(Idle)로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. `release-worktree` 스킬도 자리를 반납할 때 카드를 `completed`로 넘긴다.
 
 ## 훅이 닿지 않는 경우
 

@@ -1,5 +1,5 @@
 #!/bin/sh
-# 이 세션의 claude 프로세스를 지켜보다가, 그것이 사라지면 Orca 카드를 Done으로 넘긴다.
+# 이 세션의 claude 프로세스를 지켜보다가, 그것이 사라지면 Orca 카드를 Idle로 넘긴다.
 # 탭을 그대로 닫아 SessionEnd 훅이 오지 않는 경로를 받치는 것이 목적이다.
 # SessionStart 훅에 async 로 등록해 실행한다.
 
