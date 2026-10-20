@@ -4,17 +4,25 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 ## 전이 규칙
 
-보드는 Idle, In progress, In review 세 열이다. Idle은 지금 볼 필요가 없는 카드로, 아직 시작하지 않은 세션과 끝난 세션을 함께 담는다. 기존 Done 열의 id인 `completed`를 그대로 쓰고 이름만 Idle로 바꿨다.
+보드는 Idle, In progress, My turn, In review 네 열이다.
+
+- Idle은 지금 볼 필요가 없는 카드로, 아직 시작하지 않은 세션과 끝난 세션을 함께 담는다. 기존 Done 열의 id인 `completed`를 그대로 쓰고 이름만 Idle로 바꿨다.
+- My turn은 사용자가 볼 차례인 카드다. 턴이 끝나 결과를 확인할 때와 권한 승인·질문에 답해야 할 때를 함께 담는다. 보드에서 열을 추가할 때 만들어진 id `status-4`를 쓴다.
 
 | 시점 | 훅 이벤트 | status id | 보드 컬럼 |
 |---|---|---|---|
 | 세션이 시작된 순간 | `SessionStart` | `completed` | Idle |
 | 사용자가 프롬프트를 보낸 순간 | `UserPromptSubmit` | `in-progress` | In progress |
+| 권한 승인을 요청한 순간 | `PermissionRequest` | `status-4` | My turn |
+| 질문을 띄우기 직전 | `PreToolUse`(`AskUserQuestion`) | `status-4` | My turn |
+| 권한·질문에 답해 도구가 실행된 직후 | `PostToolUse` | `in-progress` | In progress |
+| 턴이 끝난 순간 | `Stop`, `StopFailure` | `status-4` | My turn |
 | `gh pr create`가 성공한 직후 | `PostToolUse` | `in-review` | In review |
 | 세션이 끝난 순간 | `SessionEnd` | `completed` | Idle |
 | 탭을 그대로 닫아 세션이 사라진 순간 | `SessionStart`에서 띄운 지킴이 | `completed` | Idle |
 
-- 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 In progress나 Idle로 내려가지 않게 하려는 것이다.
+- 카드가 이미 `in-review`면 스크립트가 다른 상태로 되돌리지 않는다. PR이 리뷰를 기다리는 동안 다른 열로 옮겨지지 않게 하려는 것이다.
+- `PostToolUse`는 도구 호출마다 불리므로 스크립트가 `resume` 모드로 받아, 자신이 마지막으로 My turn으로 넘긴 카드만 In progress로 되돌린다. 사용자가 카드를 직접 옮겼다면 되돌리지 않는다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
 - 세션을 새로 열면 카드는 `completed`(Idle)로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. `release-worktree` 스킬도 자리를 반납할 때 카드를 `completed`로 넘긴다.
 
