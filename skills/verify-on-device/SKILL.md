@@ -78,14 +78,19 @@ wait 2500
 swipe 540 1800 540 1000 500
 wait 2000
 key BACK                      # BACK HOME ENTER TAB ESC DPAD_* VOLUME_*
-wait 2500
+wait 1500                     # 마지막 결과를 보여줄 만큼만 머문다
 ```
+
+- **시나리오 맨 앞에 `wait`을 넣지 않는다.** 첫 줄은 바로 조작이다. 앞쪽 대기는 변환기의 register 1.5초로 충분하고, 그 이상은 리뷰어가 보는 정지 구간이 된다.
+- 마지막 `wait`은 결과 화면을 확인할 시간만 준다(1500~2000ms). 영상 끝은 이 `wait`이 끝나는 시점에서 잘린다(§4.3).
 
 ### 4.2 변환과 실행
 
-**한 Bash 호출 안에서** 띄우고, 조작하고, 끊는다. 이 환경에서 foreground `sleep`은 정상 동작하므로 아래 형태를 그대로 쓴다(우회 불필요).
+**한 Bash 호출 안에서** 띄우고, 조작하고, 끊는다. 이 환경에서 foreground `sleep`은 정상 동작하므로 아래 형태를 그대로 쓴다(우회 불필요). uinput 실행 전후 호스트 시각(`T_U`, `T_DONE`)을 남겨 §4.3에서 시나리오 길이를 구한다.
 
 ```bash
+now() { python3 -c 'import time; print(time.time())'; }
+
 python3 ~/.claude/skills/verify-on-device/uinput_scenario.py 1080x2400 \
   < <scratchpad>/scenario.txt > <scratchpad>/touch.json
 adb push <scratchpad>/touch.json /data/local/tmp/touch.json
@@ -97,25 +102,49 @@ adb shell am start -n <pkg>/<activity>; sleep 3
 
 adb shell screenrecord --time-limit 60 --bit-rate 6000000 /sdcard/rec.mp4 &
 REC=$!
-sleep 2
+for i in $(seq 20); do adb shell pidof screenrecord >/dev/null && break; sleep 0.2; done
 adb shell pidof screenrecord                 # 빈 출력이면 녹화가 안 떴다
 
+T_U=$(now)
 adb shell 'uinput - < /data/local/tmp/touch.json'   # 시나리오 전체가 여기서 실행된다
+T_DONE=$(now)
 
 adb shell pkill -INT screenrecord            # SIGINT여야 파일이 정상 마무리된다
 wait $REC 2>/dev/null
-sleep 2
-adb pull /sdcard/rec.mp4 <저장경로>
-adb shell 'rm -f /data/local/tmp/touch.json'
+sleep 1
+adb pull /sdcard/rec.mp4 <scratchpad>/raw.mp4
+adb shell 'rm -f /data/local/tmp/touch.json /sdcard/rec.mp4'
 ```
 
 - 화면 크기는 `adb shell wm size`가 알려준 값을 그대로 넘긴다. 다른 값을 넣으면 좌표가 스케일되어 엉뚱한 곳을 누른다.
-- 변환기가 맨 앞에 1.5초 `delay`를 넣는다. InputReader가 가상 디바이스를 잡는 시간이며, 녹화 길이 계산에 포함된다.
+- 변환기가 맨 앞에 1.5초 `delay`를 넣는다. InputReader가 가상 디바이스를 잡는 시간이며, §4.3에서 잘라낸다.
+- 녹화가 떴는지는 고정 `sleep 2` 대신 `pidof` 폴링으로 확인한다. 고정 대기는 그대로 영상 앞 정지 구간이 된다.
 - **시나리오는 한 파일에 모은다.** 가상 터치스크린은 uinput 프로세스가 살아 있는 동안만 존재하므로, 조작을 여러 호출로 나누면 매번 register 1.5초를 다시 내고 그만큼 영상에 정지 구간이 생긴다.
 - `--time-limit`은 시나리오보다 넉넉하게(최대 180초) 주고, 실제 길이는 `pkill -INT`가 결정한다.
 - 조작 사이 `wait`은 전환 애니메이션보다 길게. 2000~2500ms가 기본이고, 확인시켜야 할 상태는 3000~4000ms 머문다.
 - 스팟은 반투명 회색이라 **밝은 배경에서 대비가 약하다.** 탭 지점을 확실히 보여줘야 하면 `tap X Y 400`처럼 프레스를 늘린다(400ms는 롱프레스 임계값이므로 그 이상은 앱 동작이 달라진다).
 - `sendevent`로 `/dev/input/eventN`에 직접 쓰는 방법은 쓰지 않는다. shell이 `input` 그룹에 속해 있어도 SELinux가 막아 `Permission denied`가 난다.
+
+### 4.3 앞뒤 정지 구간 잘라내기
+
+원본에는 첫 조작 전 register 대기와, 마지막 `wait` 뒤 `pkill`·파일 마무리 시간이 남는다. 리뷰어가 보는 영상은 **첫 조작 0.5초 전부터 마지막 `wait`이 끝나는 시점까지**만 남긴다.
+
+```bash
+# screenrecord는 화면이 바뀔 때만 프레임을 쓴다. 0초 다음 프레임이 첫 조작이다.
+FIRST=$(ffprobe -v error -select_streams v -show_entries frame=pts_time -of csv=p=0 \
+  <scratchpad>/raw.mp4 | sed -n 2p)
+read START END < <(python3 -c "
+first, u, done = $FIRST, $T_U, $T_DONE
+print(f'{max(0, first - 0.5):.2f} {first + (done - u - 1.5):.2f}')")
+ffmpeg -v error -y -i <scratchpad>/raw.mp4 \
+  -vf "fps=30,trim=start=$START:end=$END,setpts=PTS-STARTPTS" \
+  -c:v libx264 -crf 18 -pix_fmt yuv420p -an <저장경로>
+```
+
+- **첫 조작 시각은 호스트 시계가 아니라 영상 프레임에서 구한다.** 영상의 0초는 녹화 명령보다 0.5~0.7초 늦게 시작해(실측), 호스트 시각으로 자르면 그만큼 어긋난다.
+- 끝 시각은 첫 조작 + 시나리오 길이(`T_DONE - T_U`에서 register 1.5초를 뺀 값)다. 마지막 조작 뒤 프레임은 `pkill` 무렵의 변화라 기준으로 쓰지 않는다.
+- `fps=30` 필터를 반드시 거친다. 원본은 정지 구간에 프레임이 없어 `-ss`로 자르면 직전 정지 프레임이 버려지고 첫 조작부터 시작해 버린다. `-c copy`도 키프레임 단위로 잘려 쓰지 않는다.
+- 첫 조작 전에 화면이 바뀌는 앱(애니메이션, 상태 표시줄 시계 변경)은 `FIRST`가 앞당겨진다. §5에서 `START` 직후 프레임에 첫 조작이 보이는지 확인하고, 아니면 프레임 시각 목록에서 첫 조작 묶음을 골라 다시 자른다. 원본 `raw.mp4`가 scratchpad에 남으므로 재녹화할 필요는 없다.
 
 ## 5. 검증 (건너뛰지 않는다)
 
@@ -153,6 +182,7 @@ ffmpeg -v error -ss 12 -i <파일> -frames:v 1 <scratchpad>/f12.png -y
 
 | 실수 | 결과 | 대응 |
 |---|---|---|
+| 시나리오 맨 앞에 `wait`을 넣거나 원본 영상을 그대로 전달 | 첫 조작 전·마지막 조작 뒤로 수 초씩 정지 화면이 흘러 리뷰어가 기다린다 | 첫 줄은 바로 조작, §4.3으로 앞뒤를 자른다 |
 | 녹화 시작과 조작을 별도 Bash 호출로 나눔 | 앞 10초 이상이 정지 화면, 뒤쪽 조작 누락 | 한 호출에서 `&` + `pkill -INT` |
 | foreground `sleep`이 막혀 있다고 보고 우회를 만듦 | 불필요한 background 실행으로 중간 출력을 못 봄 | 이 환경에서 foreground `sleep`은 정상 동작한다 |
 | 기기 쪽 옛 파일을 지우지 않음 | 녹화가 실패했는데 지난 영상을 pull해 검증을 통과시킴 | 녹화 전 `adb shell rm -f` |
