@@ -78,6 +78,43 @@ branch_holder() {
     $0==b{print p}'
 }
 
+# 자리 선점 표시. 유휴 자리를 고른 뒤 그 자리에 작업 브랜치를 checkout하기까지 fetch·pull이
+# 끼어 수 초가 걸리는데, 그 사이 동시에 돈 다른 실행도 같은 자리를 유휴로 판정해 두 세션이
+# 한 자리에 겹쳤다. 고르는 순간 mkdir로 원자적으로 표시를 남겨 다른 실행이 그 자리를 건너뛰게 한다.
+# 표시는 자리 이름 단위이며 새로 만들 자리의 번호에도 같은 표시를 쓴다.
+#
+# 표시는 PID 주인이 사라졌거나 CLAIM_TTL초가 지나면 남은 것으로 보고 회수한다. 정상 경로는
+# checkout 직후와 EXIT trap에서 지우지만, 강제 종료나 PID 재사용으로 표시가 영영 남아 그 자리가
+# 후보에서 계속 빠지는 일을 시간 제한으로 막는다.
+CLAIM_TTL=600
+claims_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)/start-worktree-claims"
+
+# 선점에 성공하면 0을 돌려준다. 명령 치환의 서브셸에서 불려도 $$는 이 스크립트의 PID다.
+claim_slot() {
+  local d="$claims_dir/$(basename "$1")" pid age
+  mkdir -p "$claims_dir"
+  if mkdir "$d" 2>/dev/null; then echo $$ > "$d/pid"; return 0; fi
+  pid="$(cat "$d/pid" 2>/dev/null || true)"
+  age=$(( $(date +%s) - $(stat -f %m "$d" 2>/dev/null || echo 0) ))
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ "$age" -lt "$CLAIM_TTL" ]; then
+    return 1
+  fi
+  rm -rf "$d"
+  mkdir "$d" 2>/dev/null || return 1
+  echo $$ > "$d/pid"
+}
+
+# 이 실행이 남긴 선점 표시를 모두 지운다. 표시는 서브셸에서 만들어지므로 경로를 변수로
+# 들고 오지 않고 PID로 찾는다.
+release_claims() {
+  local f
+  for f in "$claims_dir"/*/pid; do
+    [ -f "$f" ] && [ "$(cat "$f" 2>/dev/null)" = "$$" ] && rm -rf "$(dirname "$f")"
+  done
+  return 0
+}
+trap release_claims EXIT
+
 # 새 자리 이름의 stem. 자리 이름 끝의 번호와 그 자리가 물 base 사본의 접미사가 짝을
 # 이뤄야 하므로(release-worktree가 그 대응으로 되돌아갈 사본을 찾는다), 풀 base를 그대로
 # 물고 있는 상위 자리 이름을 stem으로 쓴다. 풀 base가 develop이면 메인 worktree가 그
@@ -112,7 +149,10 @@ next_worktree_path() {
   local stem_name="$1" pool_base="$2" parent stem n=2
   parent="$(dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   stem="$parent/$stem_name"
-  while [ -e "$stem-$n" ] || [ -n "$(branch_holder "$pool_base-$n")" ]; do
+  # 선점한 뒤에 비어 있는지를 다시 본다. 다른 실행이 자리를 만들고 표시를 이미 지웠을 수 있다.
+  while [ -e "$stem-$n" ] || [ -n "$(branch_holder "$pool_base-$n")" ] \
+    || ! claim_slot "$stem-$n" \
+    || [ -e "$stem-$n" ] || [ -n "$(branch_holder "$pool_base-$n")" ]; do
     n=$((n+1))
   done
   printf '%s-%s' "$stem" "$n"
@@ -384,7 +424,7 @@ is_idle_candidate() {
 }
 
 find_idle_worktree() {
-  local pool="$1" slot="${2:-}" main_wt best="" best_ts="" wt ts cur
+  local pool="$1" slot="${2:-}" main_wt wt ts cur
   main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 
   # 스킬을 부른 자리가 그대로 후보 자격을 갖추면 다른 후보를 보지 않고 그 자리를 쓴다.
@@ -392,18 +432,24 @@ find_idle_worktree() {
   # 지금 자리가 유휴로 남고 사람만 이동하게 된다. 자격 판정 기준은 순회와 완전히 같으므로
   # 조건이 하나라도 어긋나면 아래 순회로 내려가 상위에서 부른 것과 똑같이 동작한다.
   cur="$(current_worktree_path)"
-  if is_idle_candidate "$cur" "$pool" "$slot" "$main_wt"; then
+  if is_idle_candidate "$cur" "$pool" "$slot" "$main_wt" && claim_slot "$cur"; then
     printf '%s' "$cur"; return
   fi
 
-  while IFS= read -r wt; do
-    is_idle_candidate "$wt" "$pool" "$slot" "$main_wt" || continue
-    # 마지막 커밋 시각은 같은 브랜치를 문 worktree끼리 동일해 변별력이 없다.
-    # 디렉토리 mtime은 빌드 산출물 때문에 실제 사용 시점을 따라간다.
-    ts="$(stat -f %m "$wt" 2>/dev/null || echo 0)"
-    if [ -z "$best" ] || [ "$ts" -lt "$best_ts" ]; then best="$wt"; best_ts="$ts"; fi
-  done < <(git worktree list --porcelain | awk '/^worktree /{print $2}')
-  printf '%s' "$best"
+  # 오래 쉰 자리부터 선점을 시도한다. 선점한 뒤에 자격을 다시 보는 이유는, 다른 실행이 그
+  # 자리에 작업 브랜치를 끊고 표시를 이미 지웠다면 처음 판정이 낡은 결과이기 때문이다.
+  while IFS=' ' read -r ts wt; do
+    [ -n "$wt" ] || continue
+    claim_slot "$wt" || continue
+    if is_idle_candidate "$wt" "$pool" "$slot" "$main_wt"; then printf '%s' "$wt"; return; fi
+  done < <(
+    git worktree list --porcelain | awk '/^worktree /{print $2}' | while IFS= read -r wt; do
+      is_idle_candidate "$wt" "$pool" "$slot" "$main_wt" || continue
+      # 마지막 커밋 시각은 같은 브랜치를 문 worktree끼리 동일해 변별력이 없다.
+      # 디렉토리 mtime은 빌드 산출물 때문에 실제 사용 시점을 따라간다.
+      printf '%s %s\n' "$(stat -f %m "$wt" 2>/dev/null || echo 0)" "$wt"
+    done | sort -n
+  )
 }
 
 target_worktree=""
@@ -426,6 +472,8 @@ if [ -n "$target_worktree" ]; then
   fi
   if [ "$opt_dry_run" = 0 ]; then
     cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
+    # 작업 브랜치를 문 자리는 유휴 판정에서 빠지므로 여기서부터는 표시가 필요 없다.
+    release_claims
     [ "$opt_library" = 0 ] || cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
   elif [ "$opt_library" = 1 ]; then
     info "[dry-run] 라이브러리 서브모듈에도 $work_branch 를 끊습니다 (시작점: origin/$base_ref, origin/$pool_ref, origin/develop 중 처음 있는 것)"
@@ -476,6 +524,7 @@ else
   git -C "$target_worktree" branch --set-upstream-to="origin/$pool_ref" "$pool_copy" \
     || die "upstream을 걸지 못했습니다. 풀 base가 원격에 올라가 있어야 합니다."
   cut_work_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
+  release_claims
   bash "$(dirname "$0")/init.sh" "$target_worktree"
   # 서브모듈은 init.sh가 초기화한 뒤에야 브랜치를 끊을 수 있다.
   [ "$opt_library" = 0 ] || cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
