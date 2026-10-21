@@ -3,7 +3,7 @@
 # usage: orca-workspace-status.sh <in-progress|my-turn|resume|in-review|completed> [--dry-run]
 #   my-turn  사용자가 볼 차례(턴 종료, 권한 승인·질문 대기)로 넘긴다
 #   resume   My turn 카드만 In progress로 되돌린다. 도구 호출마다 불리므로 Orca를 조회하기 전에 캐시로 거른다
-#   In review와 Standby 카드는 옮기지 않는다. Standby 카드에 볼 차례가 오면 읽지 않음 표시만 붙인다
+#   In review와 Standby 카드는 사용자가 프롬프트를 보낼 때만 옮긴다. 그 밖에 Standby 카드에 볼 차례가 오면 읽지 않음 표시만 붙인다
 
 set -u
 
@@ -71,9 +71,10 @@ if [ "$target" = "resume" ] && [ "$current" != "$MY_TURN_STATUS" ]; then
   exit 0
 fi
 
-# PR이 리뷰를 기다리는 카드와 사용자가 세워 둔 Standby 카드는 다른 상태로 옮기지 않는다.
-# Standby 카드에 볼 차례가 오면 열은 그대로 두고 사이드바에 읽지 않음 표시만 붙인다.
-if [ "$current" = "in-review" ] || [ "$current" = "$STANDBY_STATUS" ]; then
+# PR이 리뷰를 기다리는 카드와 사용자가 세워 둔 Standby 카드는 사용자가 다시 말을 걸 때만 옮긴다.
+# 그러면 In progress를 거쳐 턴이 끝날 때 My turn으로 온다.
+# 말을 걸지 않았는데 Standby 카드에 볼 차례가 오면 열은 그대로 두고 사이드바에 읽지 않음 표시만 붙인다.
+if { [ "$current" = "in-review" ] || [ "$current" = "$STANDBY_STATUS" ]; } && [ "$target" != "in-progress" ]; then
   if [ "$current" = "$STANDBY_STATUS" ] && [ "$target" = "my-turn" ] && [ "$dry_run" != "--dry-run" ]; then
     "$ORCA" worktree set --worktree "$selector" --unread --json > /dev/null 2>&1 || :
   fi
