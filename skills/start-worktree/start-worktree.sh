@@ -452,17 +452,76 @@ find_idle_worktree() {
   )
 }
 
+# orca 보드에서 새 자리를 상위 base 자리 밑에 붙인다. 연결하지 않으면 카드가 최상위로
+# 떠서 어느 피처의 자리인지 보드에서 읽히지 않는다. 상위 자리가 없으면(풀 base를 문
+# 자리가 하나도 없는 경우) 연결하지 않고 넘어간다.
+# 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
+# selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
+link_parent_worktree() {
+  local wt="$1" parent="$2" wt_id
+  if [ -z "$parent" ] || [ "$parent" = "$wt" ]; then
+    info "  상위 worktree가 없어 부모 연결을 건너뜁니다 (풀 base: $pool_ref${slot_name:+-$slot_name})"
+    return 0
+  fi
+  if wt_id="$(wait_orca_worktree "$wt")"; then
+    info "  상위 worktree 연결: $parent"
+    "$ORCA" worktree set --worktree "id:$wt_id" \
+      --parent-worktree "path:$parent" --json > /dev/null \
+      || warn "orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요: $parent"
+  else
+    warn "orca가 아직 인식하지 못해 부모 연결을 건너뜁니다: $wt"
+  fi
+}
+
+# 작업 브랜치를 물고 있는 worktree 경로. 없으면 비어 있다.
+worktree_with_branch() {
+  git worktree list --porcelain | awk -v ref="refs/heads/$1" '
+    /^worktree /{wt=substr($0, 10)}
+    $0 == "branch " ref {print wt; exit}'
+}
+
 target_worktree=""
 # 고른 자리가 지금 서 있는 자리와 같은지를 뒤의 세션 이사 단계까지 들고 간다.
 reused_current=0
-if [ "$opt_new" = 0 ]; then
+# 작업 브랜치가 이미 있으면 새 자리를 고르지 않는다. 앞선 착수가 브랜치를 끊은 뒤 중단되면
+# (2026-10-30 실측: init.sh의 서브모듈 clone 도중 중단) 그 자리는 작업 브랜치를 물어 유휴
+# 판정에서 빠지므로, 확인 없이 진행하면 새 자리를 하나 더 만든 뒤 checkout -b에서야 실패하고
+# 새 자리가 고아로 남는다. 브랜치를 문 자리가 있으면 그 자리에서 남은 단계를 이어 가고,
+# 브랜치만 있고 자리가 없으면 어느 쪽이 맞는지 판단할 수 없으므로 멈춘다.
+resumed=0
+if git rev-parse --verify --quiet "refs/heads/$work_branch" > /dev/null; then
+  target_worktree="$(worktree_with_branch "$work_branch")"
+  [ -n "$target_worktree" ] \
+    || die "작업 브랜치 $work_branch 가 이미 있지만 물고 있는 worktree가 없습니다. 브랜치를 지우거나 다른 이름으로 다시 실행하세요."
+  resumed=1
+  [ "$target_worktree" != "$(current_worktree_path)" ] || reused_current=1
+fi
+if [ "$resumed" = 0 ] && [ "$opt_new" = 0 ]; then
   target_worktree="$(find_idle_worktree "$pool_ref" "$slot_name")"
   if [ -n "$target_worktree" ] && [ "$target_worktree" = "$(current_worktree_path)" ]; then
     reused_current=1
   fi
 fi
 
-if [ -n "$target_worktree" ]; then
+if [ "$resumed" = 1 ]; then
+  pick_reason="중단된 착수가 남긴 자리를 이어 썼다"
+  info "[1/3] 작업 브랜치를 이미 문 자리를 이어 씁니다: $target_worktree ($work_branch)"
+  if [ "$opt_dry_run" = 1 ]; then
+    info "[dry-run] 실제로는 init.sh와 상위 연결을 다시 수행합니다."
+    exit 0
+  fi
+  release_claims
+  # 중단 지점을 알 수 없으므로 브랜치 이후 단계를 모두 다시 밟는다. init.sh는 재실행해도
+  # 기존 항목을 덮어쓰지 않는다.
+  bash "$(dirname "$0")/init.sh" "$target_worktree"
+  if [ "$opt_library" = 1 ]; then
+    lib_sub="$(library_path "$target_worktree")"
+    if [ -n "$lib_sub" ] && ! git -C "$target_worktree/$lib_sub" rev-parse --verify --quiet "refs/heads/$work_branch" > /dev/null; then
+      cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
+    fi
+  fi
+  link_parent_worktree "$target_worktree" "$(parent_worktree_path "$pool_ref" "$slot_name")"
+elif [ -n "$target_worktree" ]; then
   if [ "$reused_current" = 1 ]; then
     pick_reason="스킬을 부른 자리가 유휴여서 그대로 썼다"
     info "[1/3] 지금 서 있는 자리를 그대로 사용: $target_worktree ($(git -C "$target_worktree" symbolic-ref --short HEAD) -> $work_branch, base: $base_ref)"
@@ -529,23 +588,7 @@ else
   # 서브모듈은 init.sh가 초기화한 뒤에야 브랜치를 끊을 수 있다.
   [ "$opt_library" = 0 ] || cut_library_branch "$target_worktree" "$base_ref" "$work_branch" "$pool_ref"
 
-  # orca 보드에서 새 자리를 상위 base 자리 밑에 붙인다. 연결하지 않으면 카드가 최상위로
-  # 떠서 어느 피처의 자리인지 보드에서 읽히지 않는다. 상위 자리가 없으면(풀 base를 문
-  # 자리가 하나도 없는 경우) 연결하지 않고 넘어간다.
-  # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
-  # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
-  if [ -n "$parent_path" ]; then
-    if new_wt_id="$(wait_orca_worktree "$target_worktree")"; then
-      info "  상위 worktree 연결: $parent_path"
-      "$ORCA" worktree set --worktree "id:$new_wt_id" \
-        --parent-worktree "path:$parent_path" --json > /dev/null \
-        || warn "orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요: $parent_path"
-    else
-      warn "orca가 아직 인식하지 못해 부모 연결을 건너뜁니다: $target_worktree"
-    fi
-  else
-    info "  상위 worktree가 없어 부모 연결을 건너뜁니다 (풀 base: $pool_ref${slot_name:+-$slot_name})"
-  fi
+  link_parent_worktree "$target_worktree" "$parent_path"
 fi
 
 if [ "$opt_no_move" = 1 ]; then
