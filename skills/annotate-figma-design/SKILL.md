@@ -1,6 +1,6 @@
 ---
 name: annotate-figma-design
-description: Figma 시안에서 바뀐 부분을 표시한 이미지(PNG)가 필요할 때 사용한다. PR 본문의 디자인 화면, 변경 전·후 시안 비교, A안·B안 비교가 대상이다. 사용자가 'annotate-figma-design', '시안에 바뀐 부분 표시해줘', '디자인 화면 이미지 만들어줘', 'Figma 변경점 이미지', '시안 비교 이미지' 등을 Figma 링크와 함께 요청할 때 이 스킬을 사용한다. 코드 구조를 설명하는 그림은 `illustrate-concept`, 앱 화면 캡처는 `capture-preview-screenshot`·`verify-on-device`, 업로드는 `upload-pr-image`를 사용한다.
+description: Figma 시안에서 바뀐 부분을 표시한 이미지(PNG)가 필요할 때 사용한다. PR 본문의 디자인 화면, 변경 전·후 시안 비교, A안·B안 비교가 대상이다. 사용자가 'annotate-figma-design', '시안에 바뀐 부분 표시해줘', '디자인 화면 이미지 만들어줘', 'Figma 변경점 이미지', '시안 비교 이미지' 등을 Figma 링크와 함께 요청하거나, `create-pr`가 디자인 화면 이미지를 요청할 때 이 스킬을 사용한다. 코드 구조를 설명하는 그림은 `illustrate-concept`, 앱 화면 캡처는 `capture-preview-screenshot`·`verify-on-device`, 업로드는 `upload-pr-image`를 사용한다.
 ---
 
 # Figma 시안 변경점 이미지
