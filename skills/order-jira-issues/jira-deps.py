@@ -13,13 +13,11 @@ import io
 import json
 import subprocess
 import sys
-import unicodedata
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 import jira_rest
 
-SUMMARY_MAX = 40  # 그래프 한 줄이 터미널 폭을 넘지 않게 제목을 자르는 표시 폭
 DESC_MAX = 600    # 설명 부록에서 이슈당 싣는 길이. 판단에 필요한 앞부분만 남긴다
 MAX_WORKERS = 8   # acli 는 호출마다 프로세스를 새로 띄운다. 순차로 돌리면 이슈 수에 비례해 느려진다
 
@@ -161,11 +159,6 @@ def longest_path(issues):
 
 # --- 그래프 렌더링 -------------------------------------------------------------
 
-def dwidth(s):
-    """터미널 표시 폭. 한글·전각 문자는 두 칸을 먹는다."""
-    return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
-
-
 def md(s):
     """마크다운 강조로 먹히는 문자를 이스케이프한다. 제목·임계 경로 표시가 기울임으로 바뀌지 않게 한다."""
     return s.replace("\\", "\\\\").replace("*", "\\*").replace("_", "\\_")
@@ -173,18 +166,6 @@ def md(s):
 
 def link(k):
     return f"[{k}]({jira_rest.BASE_URL}/browse/{k})"
-
-
-def trunc(s, w):
-    """표시 폭 w 로 자른다. 말줄임표는 폭이 확정된 ASCII 를 쓴다."""
-    if dwidth(s) <= w:
-        return s
-    out = ""
-    for c in s:
-        if dwidth(out) + dwidth(c) > w - 2:
-            break
-        out += c
-    return out + ".."
 
 
 def build_waves(issues, keys, open_blockers):
@@ -230,7 +211,7 @@ def render_graph(issues, keys, crit):
         if i.get("extdep"):
             # 외부 의존은 키가 없다. 키 자리를 제목에 내주고 마커는 막힌 이슈와
             # 같은 🔴 를 쓴다 — 읽는 쪽에서는 둘 다 "지금 못 하는 이유"다.
-            s = f"🔴 {md(trunc(i['summary'], SUMMARY_MAX + 12))}"
+            s = f"🔴 {md(i['summary'])}"
             return s + " \\*" if k in crit else s
         if open_blockers(k):
             mark = "🔴"
@@ -238,7 +219,8 @@ def render_graph(issues, keys, crit):
             mark = "🟠"
         else:
             mark = "🟢"
-        s = f"{mark} {link(k)} {md(trunc(i['summary'], SUMMARY_MAX))}"
+        # 제목은 자르지 않는다. 마크다운 목록이라 열 정렬이 없어 길이를 맞출 이유가 없다.
+        s = f"{mark} {link(k)} {md(i['summary'])}"
         if i["active"]:
             s += f" ({i['status']})"
         if k not in inside:
