@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import jira_rest
 
-SUMMARY_MAX = 40  # 그래프 정렬이 깨지지 않게 제목을 자르는 표시 폭
+SUMMARY_MAX = 40  # 그래프 한 줄이 터미널 폭을 넘지 않게 제목을 자르는 표시 폭
 DESC_MAX = 600    # 설명 부록에서 이슈당 싣는 길이. 판단에 필요한 앞부분만 남긴다
 MAX_WORKERS = 8   # acli 는 호출마다 프로세스를 새로 띄운다. 순차로 돌리면 이슈 수에 비례해 느려진다
 
@@ -166,8 +166,13 @@ def dwidth(s):
     return sum(2 if unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
 
 
-def pad(s, w):
-    return s + " " * max(0, w - dwidth(s))
+def md(s):
+    """마크다운 강조로 먹히는 문자를 이스케이프한다. 제목·임계 경로 표시가 기울임으로 바뀌지 않게 한다."""
+    return s.replace("\\", "\\\\").replace("*", "\\*").replace("_", "\\_")
+
+
+def link(k):
+    return f"[{k}]({jira_rest.BASE_URL}/browse/{k})"
 
 
 def trunc(s, w):
@@ -207,7 +212,11 @@ def build_waves(issues, keys, open_blockers):
 
 
 def render_graph(issues, keys, crit):
-    """Wave 레이어 그래프. 관계표를 대체하는 전량 뷰다."""
+    """Wave 레이어 그래프. 관계표를 대체하는 전량 뷰다.
+
+    이슈 키에 링크를 걸려고 마크다운 목록으로 낸다. 코드블록에 넣으면 링크가
+    렌더링되지 않으므로, 화살표 열 정렬을 포기하고 줄마다 관계를 붙여 쓴다.
+    """
     inside = set(keys)
 
     def open_blockers(k):
@@ -218,61 +227,52 @@ def render_graph(issues, keys, crit):
 
     def label(k):
         i = issues[k]
-        # 마커는 East Asian Wide 글리프만 쓴다. ○ ▶ ✔ 는 폭이 터미널마다 1~2 로
-        # 달라져서 뒤따르는 화살표 열이 어긋난다.
         if i.get("extdep"):
             # 외부 의존은 키가 없다. 키 자리를 제목에 내주고 마커는 막힌 이슈와
             # 같은 🔴 를 쓴다 — 읽는 쪽에서는 둘 다 "지금 못 하는 이유"다.
-            s = f"🔴 {trunc(i['summary'], SUMMARY_MAX + 12)}"
-            return s + " *" if k in crit else s
+            s = f"🔴 {md(trunc(i['summary'], SUMMARY_MAX + 12))}"
+            return s + " \\*" if k in crit else s
         if open_blockers(k):
             mark = "🔴"
         elif i["active"]:
             mark = "🟠"
         else:
             mark = "🟢"
-        s = f"{mark} {k}  {trunc(i['summary'], SUMMARY_MAX)}"
+        s = f"{mark} {link(k)} {md(trunc(i['summary'], SUMMARY_MAX))}"
         if i["active"]:
             s += f" ({i['status']})"
         if k not in inside:
             s += " (에픽 밖)"
         if k in crit:
-            s += " *"
+            s += " \\*"
         return s
 
     shown = [k for lv in sorted(waves) for k in waves[lv]] + cyclic
     if not shown:
         print("## 그래프\n\n열린 이슈가 없다.")
         return
-    labels = {k: label(k) for k in shown}
-    col = max((dwidth(v) for v in labels.values()), default=0) + 4
 
     def name(k):
         """외부 의존은 키가 아니라 제목으로 가리킨다."""
         i = issues.get(k)
-        return i["summary"] if i and i.get("extdep") else k
+        return md(i["summary"]) if i and i.get("extdep") else link(k)
 
     def block(k):
-        rows = []
-        head = "  " + labels[k]
-        outs = [name(t) if t in issues else t + "(?)"
+        head = "- " + label(k)
+        outs = [name(t) if t in issues else link(t) + "(?)"
                 for t in issues[k]["blocks"]
                 if not (t in issues and issues[t]["done"])]
         # 조회 못 한 blocker 도 그린다. 안 그리면 그래프가 실제보다 낙관적으로 보인다.
         ins = [name(b) for b in open_blockers(k)] + [
-            b + "(?)" for b in issues[k]["blocked_by"] if b not in issues]
+            link(b) + "(?)" for b in issues[k]["blocked_by"] if b not in issues]
         lone = not outs and not issues[k]["blocked_by"] and not issues[k]["done"]
-        if not outs:
-            rows.append(head + ("  (고립)" if lone else ""))
-        elif len(outs) == 1:
-            rows.append(pad(head, col) + f"───▶ {outs[0]}")
-        else:
-            rows.append(pad(head, col) + f"─┬─▶ {outs[0]}")
-            for t in outs[1:-1]:
-                rows.append(" " * col + f" ├─▶ {t}")
-            rows.append(" " * col + f" └─▶ {outs[-1]}")
+        if outs:
+            head += " ───▶ " + ", ".join(outs)
+        elif lone:
+            head += " (고립)"
+        rows = [head]
         if ins:
-            rows.append(" " * 7 + "▲ " + ", ".join(ins))
+            rows.append("  - ▲ " + ", ".join(ins))
         return "\n".join(rows)
 
     # 외부 의존은 Wave 에 섞지 않고 따로 낸다. 내가 지금 잡을 수 있는 것과
@@ -291,23 +291,23 @@ def render_graph(issues, keys, crit):
             # Wave 1 은 "미완료 blocker 가 없다"는 뜻일 뿐이다. 이미 누가 잡고 있는
             # 이슈까지 "착수 가능"으로 세면 병렬 여력이 실제보다 커 보인다.
             active = len([k for k in mine if issues[k]["active"]])
-            head = f"Wave 1 ─ 막힌 것 없음 (착수 가능 {n - active}"
+            head = f"**Wave 1** ─ 막힌 것 없음 (착수 가능 {n - active}"
             head += f" · 진행 중 {active})" if active else ")"
         else:
-            head = f"Wave {lv} ─ Wave {lv - 1} 이후 ({n}건)"
-        print(f"\n{head}")
+            head = f"**Wave {lv}** ─ Wave {lv - 1} 이후 ({n}건)"
+        print(f"\n{head}\n")
         for k in layer:
             print(block(k))
 
     if ext_nodes:
-        print(f"\n외부 대기 ─ 다른 팀에서 와야 풀린다 ({len(ext_nodes)}건)")
+        print(f"\n**외부 대기** ─ 다른 팀에서 와야 풀린다 ({len(ext_nodes)}건)\n")
         for k in ext_nodes:
             print(block(k))
     if cyclic:
-        print("\n순환 ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다")
+        print("\n**순환** ─ blocks 링크가 서로를 물고 있어 Wave 를 매길 수 없다\n")
         for k in cyclic:
             print(block(k))
-    print("\n범례  🟢 착수 가능  🟠 진행 중  🔴 막힘·외부 대기  * 임계 경로"
+    print("\n범례  🟢 착수 가능  🟠 진행 중  🔴 막힘·외부 대기  \\* 임계 경로"
           "  ───▶ blocks  ▲ 남은 blocker  (?) 조회 실패")
 
 
