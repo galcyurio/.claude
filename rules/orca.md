@@ -12,7 +12,7 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 
 | 시점 | 훅 이벤트 | status id | 보드 컬럼 |
 |---|---|---|---|
-| 세션이 시작된 순간 | `SessionStart` | `completed` | Idle |
+| 세션이 시작된 순간(압축 제외) | `SessionStart`(`startup`·`resume`·`clear`) | `completed` | Idle |
 | 사용자가 프롬프트를 보낸 순간 | `UserPromptSubmit` | `in-progress` | In progress |
 | 권한 승인을 요청한 순간 | `PermissionRequest` | `status-4` | My turn |
 | 질문을 띄우기 직전 | `PreToolUse`(`AskUserQuestion`) | `status-4` | My turn |
@@ -25,6 +25,7 @@ Orca가 관리하는 세션에서는 카드 상태를 실제 진행 상황과 �
 - 카드가 이미 `in-review`나 Standby(`status-5`)면 스크립트가 다른 상태로 옮기지 않는다. PR이 리뷰를 기다리는 동안이나 사용자가 세워 둔 동안 다른 열로 옮겨지지 않게 하려는 것이다.
 - 예외는 사용자가 그 세션에 프롬프트를 보낸 경우다. 이때는 `UserPromptSubmit`이 카드를 In progress로 옮기고, 턴이 끝나면 My turn으로 온다. 확인을 마친 뒤 In review나 Standby로 되돌리는 것은 사용자가 직접 한다.
 - `PostToolUse`는 도구 호출마다 불리므로 스크립트가 `resume` 모드로 받아, 자신이 마지막으로 My turn으로 넘긴 카드만 In progress로 되돌린다. 사용자가 카드를 직접 옮겼다면 되돌리지 않는다.
+- 컨텍스트 압축(자동·idle·`/compact`)도 `SessionStart`를 `compact`로 부르지만 matcher에서 빠져 있어 카드를 옮기지 않는다. 압축은 세션이 이어지는 것이므로 기존 열을 유지한다.
 - `/clear`로 세션이 끊기는 경우도 `SessionEnd`에 해당하므로 `completed`로 보낸다. 대화를 이어가면 다음 프롬프트에서 다시 `in-progress`로 올라간다.
 - 세션을 새로 열면 카드는 `completed`(Idle)로 돌아가고, 첫 프롬프트에서 다시 `in-progress`로 올라간다. `release-worktree` 스킬도 자리를 반납할 때 카드를 `completed`로 넘긴다.
 
