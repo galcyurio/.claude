@@ -102,16 +102,31 @@ fi
 
 # 원래 자리가 되돌아갈 base 사본. 자리 이름 끝 번호와 사본 접미사가 짝이어야
 # release-worktree·start-worktree가 이 자리를 유휴 자리로 다시 찾는다.
+# 원래 자리의 풀은 대상 자리의 풀과 다를 수 있다(feature-base 자리에서 develop 자리로 옮기는 경우).
+# 그래서 원래 자리의 풀은 상위 자리(이름 끝 -N을 뗀 자리)가 문 base 브랜치로 정하고,
+# 상위 자리를 찾지 못했을 때만 대상 자리의 풀을 쓴다.
 source_copy=""
 src_num=""
+src_pool="$pool"
 case "$(basename "$source_wt")" in *-[0-9]|*-[0-9][0-9]) src_num="${source_wt##*-}" ;; esac
-for candidate in ${src_num:+"$pool-$src_num"} "$pool"; do
-  [ -z "$src_num" ] || [ "$candidate" != "$pool" ] || continue
+if [ -n "$src_num" ]; then
+  parent_entry="$(worktree_entry "${source_wt%-"$src_num"}" 2>/dev/null || true)"
+  if [ -n "$parent_entry" ]; then
+    parent_branch="$(current_branch_of "$parent_entry")"
+    if [ -n "$parent_branch" ] && is_base_branch "$parent_branch"; then
+      src_pool="$parent_branch"
+    fi
+  fi
+fi
+for candidate in ${src_num:+"$src_pool-$src_num"} "$src_pool"; do
+  [ -z "$src_num" ] || [ "$candidate" != "$src_pool" ] || continue
   git rev-parse --verify --quiet "refs/heads/$candidate" > /dev/null || continue
   [ -z "$(branch_holder "$candidate")" ] || continue
   source_copy="$candidate"; break
 done
-[ -n "$source_copy" ] || die "현재 자리가 되돌아갈 base 사본을 찾지 못했습니다 (풀 base: $pool, 후보: ${src_num:+$pool-$src_num}${src_num:-$pool})."
+expected_copy="$src_pool"
+[ -z "$src_num" ] || expected_copy="$src_pool-$src_num"
+[ -n "$source_copy" ] || die "현재 자리가 되돌아갈 base 사본을 찾지 못했습니다 (풀 base: $src_pool, 후보: $expected_copy)."
 
 # 서브모듈이 작업 브랜치를 물고 있으면 대상 자리의 서브모듈에서도 같은 브랜치를 문다.
 lib_branch=""
