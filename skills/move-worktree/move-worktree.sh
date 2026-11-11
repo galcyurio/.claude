@@ -177,9 +177,16 @@ git -C "$target_wt" switch "$work_branch" \
   || die "대상 자리에서 $work_branch 로 전환하지 못했습니다. 원래 자리는 $source_copy 로 돌아가 있습니다."
 git -C "$target_wt" submodule update --init \
   || warn "대상 자리의 서브모듈 포인터를 맞추지 못했습니다."
+# 서브모듈 저장소는 자리마다 따로 있어 원래 자리의 라이브러리 커밋이 대상 자리에 없다.
+# 원래 자리의 서브모듈에서 브랜치를 가져와 전환하고, 옮겨진 뒤 원래 자리의 브랜치는 지운다.
 if [ -n "$lib_branch" ]; then
-  git -C "$target_wt/$LIB" switch "$lib_branch" \
-    || warn "대상 자리의 서브모듈을 $lib_branch 로 전환하지 못했습니다."
+  if git -C "$target_wt/$LIB" fetch --no-tags --quiet "$source_wt/$LIB" "+refs/heads/$lib_branch:refs/heads/$lib_branch" \
+    && git -C "$target_wt/$LIB" switch "$lib_branch"; then
+    git -C "$source_wt/$LIB" branch -D "$lib_branch" > /dev/null \
+      || warn "원래 자리 서브모듈의 $lib_branch 브랜치를 지우지 못했습니다."
+  else
+    warn "대상 자리의 서브모듈을 $lib_branch 로 전환하지 못했습니다. 원래 자리 서브모듈에 브랜치가 남아 있습니다."
+  fi
 fi
 info "[2/3] 브랜치 이동 완료: $target_wt ($work_branch)"
 
