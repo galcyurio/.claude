@@ -33,7 +33,7 @@ PR URL이 하나뿐이어도 실행 위치가 그 PR의 레포가 아니면, 아
 - **2단계**: PR마다 본문과 외부 링크를 수집한다. 같은 링크는 한 번만 조회한다. 각 PR의 CONTEXT에 `## CONTEXT — 함께 리뷰하는 PR` 블록을 더해 나머지 PR의 레포·번호·제목·변경 파일을 적고, 다른 PR에서 처리한 부분이 이 PR에 없다는 이유만으로 이슈를 보고하지 말라고 명시한다.
 - **3단계**: 모든 PR의 finder(와 Designer)를 **한 응답에서 함께** 스폰한다. 결과 디렉토리는 `<스크래치패드>/review-results/<레포 이름>-<PR번호>/`로 PR마다 나누고, 3-C 대기는 모든 PR의 기대 파일을 한 목록으로 기다린다. fast-path 판정도 PR마다 따로 한다.
 - **4~5단계**: 병합·선별·판정을 PR마다 따로 한다. PR끼리 이슈를 합치거나 판정을 합치지 않는다.
-- **6단계**: PR마다 difit를 서로 다른 포트로 띄우고, 터미널에는 PR별 `# 코드 리뷰 결과 — <레포 이름>#N` 블록을 레포 이름 순서로 이어 출력한다. 6-D 회수 신호를 받으면 띄운 difit를 모두 회수해 PR별로 보고하고 종료한다.
+- **6단계**: PR마다 difit를 서로 다른 포트로 띄우고, 터미널에는 PR별 `# 코드 리뷰 결과 — <레포 이름>#N <PR 제목>` 블록을 레포 이름 순서로 이어 출력한다. 6-D 회수 신호를 받으면 띄운 difit를 모두 회수해 PR별로 보고하고 종료한다.
 
 ---
 
@@ -60,6 +60,7 @@ node ~/.claude/skills/review-by-agents/extract-diff.js [<인자>] --out <스크�
 | `targetDesc` | 리뷰 대상 설명(`<repo>#N` / `PR #N` / 파일 경로 / `<base>...HEAD`) |
 | `base` | diff 모드의 base 브랜치 (6단계 difit `--merge-base`에 사용) |
 | `prNumber` | PR 모드 번호 (2단계 PR 본문·6단계 difit에 사용) |
+| `prTitle` | PR 모드 제목 (탭 제목·6단계 출력 제목에 사용, 조회 실패 시 `null`) |
 | `changedFiles` | 변경 파일 경로 배열 (3단계 finder CONTEXT) |
 | `diffLines` | diff/파일 라인 수 |
 | `empty` | `true`면 리뷰 대상 없음 |
@@ -72,6 +73,7 @@ JSON을 파싱해 분기한다:
 - `error`가 비어 있지 않으면(PR 조회 실패·base 미감지·인자 해석 불가 등) 사유를 보고하고 중단하거나, 판단에 따라 수동 diff 추출(`gh pr diff`·`git diff` 직접 실행)로 전환한다.
 - `empty === true` → "리뷰할 변경사항이 없습니다"를 출력하고 종료한다.
 - `oversized === true` → 사용자에게 파일 단위 분할 리뷰를 `AskUserQuestion`으로 제안하고 진행 여부를 확인한다.
+- PR 모드에서 `prTitle`이 있으면 `bash ~/.claude/skills/review-by-agents/rename-review-tab.sh <targetDesc> <prTitle>`로 Orca 탭 제목을 PR 제목으로 바꾼다. 다중 PR이면 남은 PR마다 `<targetDesc> <prTitle>` 쌍을 이어 붙여 한 번만 호출한다. Orca 밖이거나 실패해도 스크립트가 조용히 넘어가므로 리뷰를 계속한다.
 - 정상이면 `diffFile`을 Read해 diff 텍스트를 확보한다. 이 텍스트가 3단계 finder 프롬프트의 REVIEW SCOPE가 되고, `changedFiles`·`targetDesc`·`base`·`prNumber`는 이후 단계로 그대로 전달한다.
 
 ### 2단계: 외부 링크 컨텍스트 수집 (PR 모드만)
@@ -371,7 +373,7 @@ PR 모드의 `gh pr diff`나 `npx difit`는 네트워크가 필요하므로 샌�
 상세(문제 코드·제안 코드)는 difit 코멘트에 있으므로 터미널은 **인덱스 + 판정**만 압축 출력한다.
 
 ````markdown
-# 코드 리뷰 결과
+# 코드 리뷰 결과 — {PR 모드면 targetDesc와 PR 제목}
 
 리뷰 대상: {설명 — PR #N, `base...HEAD`} · 변경 파일 N개 · difit 프리로드 (코멘트 M건)
 
@@ -396,6 +398,7 @@ difit: http://localhost:4966
 반영할 것이 있으면 알려주세요 — 코멘트를 회수해 정리합니다. 없으면 그대로 닫으셔도 difit는 알아서 종료됩니다.
 ````
 
+- **제목 라인**: PR 모드면 `# 코드 리뷰 결과 — heydealer-android#13073 HDA-23793 [고객] ...`처럼 targetDesc 뒤에 PR 제목을 원문 그대로 붙인다. `prTitle`이 `null`이면 targetDesc만 붙이고, PR 모드가 아니면 `# 코드 리뷰 결과`만 쓴다. 6-C도 같다.
 - **요약 라인**: `리뷰 대상: {설명} · 변경 파일 N개 · difit 프리로드 (코멘트 M건)`. (6-C의 `에이전트: …` 목록은 difit 런치 시 생략한다.)
 - **핵심 이슈**: 선별된 코드 이슈(Critical·머지차단 Warning 전량 + 나머지 non-critical 최대 5건)와 디자인 이슈(개수 제한 없음)를 **한 목록**에 컴팩트 한 줄씩 출력한다. 형식: `- [<심각도 이모지> <심각도> · <관점 이모지> <관점>] \`file:line\` — <issue 한 문장>`. 정렬은 severity 내림차순 → file → line. 이슈가 0건이면 이 섹션을 생략한다.
 - **이상 없음 · 판정**: 6-C와 동일 규칙을 따른다. 판정은 이슈가 0건이어도 항상 출력한다.
@@ -410,7 +413,7 @@ difit: http://localhost:4966
 최종 출력 형식:
 
 ````markdown
-# 코드 리뷰 결과
+# 코드 리뷰 결과 — {PR 모드면 targetDesc와 PR 제목}
 
 리뷰 대상: {설명 — PR #N, 파일 경로, 또는 `base...HEAD` diff} · 변경 파일 N개 · 에이전트: Code Reviewer, Architecture{, Designer}
 

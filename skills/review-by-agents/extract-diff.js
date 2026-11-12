@@ -16,6 +16,7 @@
  *     targetDesc: string,          // "<repo>#12"(URL) | "PR #12"(번호) | "<path>" | "<base>...HEAD"
  *     base: string|null,           // diff 모드만
  *     prNumber: number|null,       // pr 모드만
+ *     prTitle: string|null,        // pr 모드만. 조회 실패 시 null
  *     changedFiles: string[],
  *     diffLines: number,
  *     empty: boolean,              // true → 메인은 "리뷰할 변경사항이 없습니다" 출력 후 종료
@@ -128,6 +129,7 @@ function main() {
     targetDesc: '',
     base: null,
     prNumber: cls.prNumber ?? null,
+    prTitle: null,
     changedFiles: [],
     diffLines: 0,
     empty: false,
@@ -175,6 +177,8 @@ function main() {
       emit(result)
       return
     }
+    const title = run('gh', ['pr', 'view', ref, '--json', 'title', '-q', '.title'])
+    result.prTitle = title ? title.trim() || null : null
     const names = run('gh', ['pr', 'diff', ref, '--name-only'])
     result.changedFiles = names ? names.split('\n').filter(Boolean) : []
     result.diffLines = countLines(diff)
