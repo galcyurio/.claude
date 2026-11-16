@@ -14,6 +14,12 @@
 #   --force-delete    git branch -D 로 삭제 (기본은 -d)
 #   --sweep           같은 base에 이미 머지된 다른 로컬 브랜치도 삭제
 #   --no-close        카드는 Idle로 넘기되 탭은 닫지 않는다
+#   --sibling         (내부용) 다른 저장소의 같은 이름 브랜치 자리를 정리할 때 붙인다.
+#                     형제 자리를 다시 찾지 않고, Orca 카드와 탭도 건드리지 않는다.
+#
+# 같은 이름의 작업 브랜치를 체크아웃한 다른 worktree(여러 앱에 같은 브랜치로 작업한 자리)도
+# 함께 정리한다. 대상은 $RELEASE_WORKTREE_REPOS_ROOT(기본 ~/dev) 바로 아래 저장소들의 worktree다.
+# 현재 자리에서 이미 브랜치를 지웠다면 브랜치 이름을 인자로 넘겨 남은 자리만 정리할 수 있다.
 #
 # 종료 코드: 0 정상 / 1 사전 검증 실패·중단 (이 경우 카드와 탭은 건드리지 않는다)
 
@@ -32,6 +38,7 @@ opt_stash=0
 opt_force_delete=0
 opt_sweep=0
 opt_no_close=0
+opt_sibling=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -41,7 +48,8 @@ while [ $# -gt 0 ]; do
     --force-delete) opt_force_delete=1 ;;
     --sweep) opt_sweep=1 ;;
     --no-close) opt_no_close=1 ;;
-    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+    --sibling) opt_sibling=1 ;;
+    -h|--help) sed -n '2,23p' "$0"; exit 0 ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) [ -z "$branch" ] || die "브랜치는 하나만 지정할 수 있습니다: $branch, $1"; branch="$1"; explicit_branch=1 ;;
   esac
@@ -67,6 +75,47 @@ branch_holder() {
     $0==b{print p}'
 }
 
+## 형제 자리
+# 같은 작업 브랜치를 다른 저장소의 worktree에서도 체크아웃하고 있으면(한 이슈를 여러 앱에서
+# 같은 브랜치 이름으로 작업한 경우) 그 자리들도 함께 정리한다. 각 자리는 이 스크립트를
+# --sibling 으로 다시 불러 같은 가드레일(머지 확인·미커밋 변경·서브모듈)을 그대로 거친다.
+
+find_sibling_worktrees() {
+  local name="$1" root="${RELEASE_WORKTREE_REPOS_ROOT:-$HOME/dev}" repo
+  [ -d "$root" ] || return 0
+  for repo in "$root"/*/; do
+    repo="${repo%/}"
+    # 메인 저장소만 본다. worktree 자리(.git 이 파일)는 메인 저장소의 목록에 이미 들어 있다.
+    [ -d "$repo/.git" ] || continue
+    git -C "$repo" worktree list --porcelain 2>/dev/null | awk -v b="branch refs/heads/$name" '
+      /^worktree /{p=substr($0,10)}
+      $0==b{print p}'
+  done | while IFS= read -r wt; do
+    if [ -n "$wt" ] && [ "$wt" != "$top" ]; then printf '%s\n' "$wt"; fi
+  done
+}
+
+sibling_failed=0
+release_siblings() {
+  local name="$1" wt pass=()
+  [ "$opt_force" = 1 ] && pass+=(--force)
+  [ "$opt_stash" = 1 ] && pass+=(--stash)
+  [ "$opt_force_delete" = 1 ] && pass+=(--force-delete)
+  [ "$opt_sweep" = 1 ] && pass+=(--sweep)
+  while IFS= read -r wt; do
+    [ -n "$wt" ] || continue
+    info ""
+    info "=== 같은 브랜치를 쓰는 자리 정리: $wt"
+    if ( cd "$wt" && env -u ORCA_WORKTREE_ID -u ORCA_TERMINAL_HANDLE -u ORCA_TAB_ID \
+          "$0" "$name" --sibling ${pass[@]+"${pass[@]}"} ); then
+      info "=== 완료: $wt"
+    else
+      sibling_failed=1
+      warn "=== 중단: $wt — 위 메시지를 확인하고 그 자리에서 다시 실행하세요."
+    fi
+  done < <(find_sibling_worktrees "$name")
+}
+
 ## 1. 대상 브랜치 확정
 
 current_branch="$(git symbolic-ref --quiet --short HEAD || true)"
@@ -76,8 +125,17 @@ if [ -z "$branch" ]; then
 fi
 [ "$branch" = "$current_branch" ] && is_current=1 || is_current=0
 
-git rev-parse --verify --quiet "refs/heads/$branch" > /dev/null \
-  || die "로컬에 없는 브랜치입니다: $branch"
+if ! git rev-parse --verify --quiet "refs/heads/$branch" > /dev/null; then
+  # 이 자리는 이미 정리했고 다른 저장소 자리에만 브랜치가 남은 경우다. 남은 자리만 정리하고
+  # 이 자리의 카드와 탭은 건드리지 않는다.
+  if [ "$opt_sibling" = 0 ] && [ -n "$(find_sibling_worktrees "$branch")" ]; then
+    info "이 자리에는 $branch 가 없어, 같은 브랜치를 쓰는 다른 자리만 정리합니다."
+    release_siblings "$branch"
+    [ "$sibling_failed" = 0 ] || exit 1
+    exit 0
+  fi
+  die "로컬에 없는 브랜치입니다: $branch"
+fi
 
 case "$branch" in
   develop|develop-*|main|master|feature-base/*)
@@ -487,7 +545,22 @@ else
   info "[완료] $branch 삭제, 현재 위치 $base_copy"
 fi
 
+## 6-1. 같은 브랜치를 쓰는 다른 자리
+
+if [ "$opt_sibling" = 0 ] && [ "$sync_only" = 0 ]; then
+  release_siblings "$branch"
+  if [ "$sibling_failed" = 1 ]; then
+    # 탭이 닫히면 실패 내용을 볼 수 없으므로 열어 둔다.
+    warn "정리하지 못한 자리가 있어 탭을 닫지 않습니다."
+    opt_no_close=1
+  fi
+fi
+
 ## 7. Orca 카드 상태와 탭
+
+if [ "$opt_sibling" = 1 ]; then
+  exit 0
+fi
 
 if [ -z "${ORCA_WORKTREE_ID:-}" ]; then
   info "Orca가 관리하는 세션이 아니므로 카드 상태 전환과 탭 종료를 건너뜁니다."
