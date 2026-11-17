@@ -5,26 +5,54 @@
 #
 # 사용법: start-feature.sh <base-branch> [옵션]
 #   <base-branch>   feature-base/HDA-xxxx-slug 형태의 전체 이름
-#   --children <n>  하위 worktree 개수 (기본 2)
+#   --children <n>  저장소마다 만들 하위 worktree 개수 (기본 2)
 #   --display-name <제목>  base worktree의 orca 표시 이름 (Jira 에픽 제목)
+#   --with <repo>   함께 진행할 다른 앱 저장소 (~/dev/<repo> 또는 절대 경로, 반복 가능).
+#                   그 저장소에도 같은 base 브랜치를 원격에 올리되 base worktree는 만들지
+#                   않고, 하위 worktree(-2, -3 ...)만 만들어 현재 저장소의 base worktree를
+#                   orca 부모로 연결한다. 대화는 현재 저장소의 base worktree 하나가 이끈다.
 #   --dry-run       파괴적 동작 없이 계획만 출력
+#
+# 현재 디렉토리의 저장소가 오케스트레이터(base worktree를 갖는 저장소)가 된다.
 set -euo pipefail
 
 die() { echo "[오류] $*" >&2; exit 1; }
 info() { echo "$*"; }
 ORCA="${ORCA_CLI_COMMAND:-orca}"
 
+# 하위 카드 이름에 쓸 앱 이름. 목록에 없는 저장소는 저장소 이름을 그대로 쓴다.
+app_label() {
+  case "$1" in
+    heydealer-android) echo "고객" ;;
+    heydealer-for-dealer-android) echo "딜러" ;;
+    heydealer-call-android) echo "딜러-콜" ;;
+    heydealer-inspector-android) echo "평가사" ;;
+    heydealer-inspector-call-android) echo "평가사-콜" ;;
+    revolt-android) echo "리볼트" ;;
+    techbay-reconditioning-android) echo "테크베이-공업사" ;;
+    techbay-admin-android) echo "테크베이-어드민" ;;
+    techbay-call-android) echo "테크베이-콜" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# 저장소의 메인 worktree 경로
+main_worktree_of() {
+  dirname "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)"
+}
+
 # 메인 worktree 옆에 <repo>-<이슈키>[-N] 형식으로 비어 있는 자리를 정한다.
 # 이름만 보고 어떤 피처의 자리인지 알 수 있게 이슈키를 넣는다.
 # release-worktree는 이름 끝의 -<한두자리 숫자>만 브랜치 접미사로 읽으므로,
 # 이슈키의 숫자 부분(HDA-22644의 22644)과 섞이지 않는다.
+# 세 번째 인자가 1이면 접미사 없는 자리를 건너뛰고 -2부터 찾는다(하위 전용 자리).
 next_worktree_path() {
-  local key="$1" main_wt parent repo stem n
-  main_wt="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+  local repo_dir="$1" key="$2" numbered_only="${3:-0}" main_wt parent repo stem n
+  main_wt="$(main_worktree_of "$repo_dir")"
   parent="$(dirname "$main_wt")"
   repo="$(basename "$main_wt")"
   stem="$parent/$repo-$key"
-  if [ ! -e "$stem" ]; then printf '%s' "$stem"; return; fi
+  if [ "$numbered_only" = 0 ] && [ ! -e "$stem" ]; then printf '%s' "$stem"; return; fi
   n=2
   while [ -e "$stem-$n" ]; do n=$((n+1)); done
   printf '%s-%s' "$stem" "$n"
@@ -49,15 +77,82 @@ for w in (json.load(sys.stdin).get("result") or {}).get("worktrees") or []:
   return 1
 }
 
+# develop을 최신화하고 base 브랜치를 끊어 원격에 올린다.
+# 하위 worktree가 origin/<base>를 upstream으로 따라가야 하므로 이 단계 없이는 뒤가
+# 전부 실패한다. 이 스킬을 부르는 것이 곧 이 업로드에 대한 지시이며, SKILL.md가 실행
+# 전에 브랜치 이름을 보여 확인받는 것으로 게이트를 대신한다.
+create_base_branch() {
+  local repo_dir="$1"
+  git -C "$repo_dir" rev-parse --verify --quiet "refs/heads/$base_branch" > /dev/null \
+    && die "이미 있는 브랜치입니다: $repo_dir ($base_branch)"
+  info "  $repo_dir: develop 최신화 후 $base_branch 생성, 원격에 올립니다"
+  [ "$opt_dry_run" = 0 ] || return 0
+  git -C "$repo_dir" fetch origin develop
+  git -C "$repo_dir" switch develop
+  git -C "$repo_dir" pull --ff-only
+  git -C "$repo_dir" checkout -b "$base_branch"
+  git -C "$repo_dir" push -u origin "$base_branch" \
+    || die "원격에 올리지 못했습니다. 하위 worktree의 upstream을 걸 수 없으므로 중단합니다."
+  git -C "$repo_dir" switch -
+}
+
+# repo_dir에 하위 worktree를 children개 만들고 parent_path를 orca 부모로 연결한다.
+create_children() {
+  local repo_dir="$1" parent_path="$2" numbered_only="$3" label i=0
+  local child_path suffix child_branch child_id
+  label="$(app_label "$(basename "$(main_worktree_of "$repo_dir")")")"
+  while [ "$i" -lt "$children" ]; do
+    i=$((i+1))
+    if [ "$opt_dry_run" = 1 ]; then
+      info "  (dry-run) $repo_dir 의 하위 자리 $i 번째 (부모: $parent_path)"
+      continue
+    fi
+
+    # 경로를 먼저 정하고 그 디렉토리 접미사로 브랜치 이름을 짓는다.
+    # release-worktree가 이 대응으로 되돌아갈 base 사본을 찾으므로 둘이 어긋나면 안 된다.
+    child_path="$(next_worktree_path "$repo_dir" "$epic_key" "$numbered_only")"
+    suffix="$(basename "$child_path")"
+    case "$suffix" in
+      *-[0-9]|*-[0-9][0-9]) suffix="${suffix##*-}" ;;
+      *) suffix="" ;;
+    esac
+    child_branch="${base_branch}${suffix:+-$suffix}"
+    info "  $child_path  ($child_branch, 부모: $parent_path)"
+
+    git -C "$repo_dir" worktree add -b "$child_branch" "$child_path" "$base_branch" \
+      || die "하위 worktree를 만들지 못했습니다: $child_path"
+    git -C "$child_path" branch --set-upstream-to="origin/$base_branch" "$child_branch" \
+      || die "upstream을 걸지 못했습니다. base 브랜치가 원격에 올라가 있어야 합니다."
+    bash "$HOME/.claude/skills/start-worktree/init.sh" "$child_path"
+
+    # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
+    # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
+    if child_id="$(wait_orca_worktree "$child_path")"; then
+      "$ORCA" worktree set --worktree "id:$child_id" \
+        --parent-worktree "path:$parent_path" \
+        --display-name "$label${suffix:+ $suffix}" --json > /dev/null \
+        || info "    orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요."
+    else
+      info "    orca가 아직 인식하지 못해 부모 연결을 건너뜁니다."
+    fi
+  done
+}
+
 
 base_branch=""
 children=2
 opt_display_name=""
 opt_dry_run=0
+with_repos=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --children) children="${2:-2}"; shift 2 ;;
     --display-name) opt_display_name="${2:-}"; shift 2 ;;
+    --with)
+      r="${2:-}"; [ -n "$r" ] || die "--with 에 저장소가 필요합니다."
+      case "$r" in /*) ;; *) r="$HOME/dev/$r" ;; esac
+      git -C "$r" rev-parse --git-dir > /dev/null 2>&1 || die "git 저장소가 아닙니다: $r"
+      with_repos+=("$(main_worktree_of "$r")"); shift 2 ;;
     --dry-run) opt_dry_run=1; shift ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) base_branch="$1"; shift ;;
@@ -69,33 +164,18 @@ case "$base_branch" in feature-base/*) ;; *) die "base 브랜치는 feature-base
 # worktree 디렉토리 이름에 쓸 에픽 키를 뽑는다 (feature-base/HDA-22644-slug -> HDA-22644).
 epic_key="$(printf '%s' "$base_branch" | sed -E 's|^feature-base/([A-Za-z]+-[0-9]+).*|\1|')"
 [ "$epic_key" != "$base_branch" ] || die "base 브랜치에서 이슈 키를 찾지 못했습니다: $base_branch"
-git rev-parse --verify --quiet "refs/heads/$base_branch" > /dev/null \
-  && die "이미 있는 브랜치입니다: $base_branch"
+
+main_repo="$(main_worktree_of "$PWD")"
 
 info "[1/3] develop 최신화 후 base 브랜치 생성: $base_branch"
-if [ "$opt_dry_run" = 0 ]; then
-  git fetch origin develop
-  git switch develop
-  git pull --ff-only
-  git checkout -b "$base_branch"
-fi
-
-# base 브랜치를 원격에 올린다. 하위 worktree가 origin/<base>를 upstream으로 따라가야
-# 하므로 이 단계 없이는 뒤가 전부 실패한다. 이 스킬을 부르는 것이 곧 이 업로드에 대한
-# 지시이며, SKILL.md가 실행 전에 브랜치 이름을 보여 확인받는 것으로 게이트를 대신한다.
-info "  원격에 올립니다: origin/$base_branch"
-if [ "$opt_dry_run" = 0 ]; then
-  git push -u origin "$base_branch" \
-    || die "원격에 올리지 못했습니다. 하위 worktree의 upstream을 걸 수 없으므로 중단합니다."
-  git switch -
-fi
+create_base_branch "$main_repo"
+for r in ${with_repos[@]+"${with_repos[@]}"}; do create_base_branch "$r"; done
 
 info "[2/3] base worktree 생성"
-base_wt_id=""
-base_path="$(next_worktree_path "$epic_key")"
+base_path="$(next_worktree_path "$main_repo" "$epic_key")"
 info "  $base_path  ($base_branch)"
 if [ "$opt_dry_run" = 0 ]; then
-  git worktree add "$base_path" "$base_branch" \
+  git -C "$main_repo" worktree add "$base_path" "$base_branch" \
     || die "base worktree를 만들지 못했습니다: $base_path"
   bash "$HOME/.claude/skills/start-worktree/init.sh" "$base_path"
   base_wt_id="$(wait_orca_worktree "$base_path")" \
@@ -109,39 +189,7 @@ if [ "$opt_dry_run" = 0 ]; then
   fi
 fi
 
-info "[3/3] 하위 worktree ${children}개 생성"
-i=0
-while [ "$i" -lt "$children" ]; do
-  i=$((i+1))
-  if [ "$opt_dry_run" = 1 ]; then
-    info "  (dry-run) $base_path 다음 번호가 하위 자리가 됩니다 ($i 번째)"
-    continue
-  fi
-
-  # 경로를 먼저 정하고 그 디렉토리 접미사로 브랜치 이름을 짓는다.
-  # release-worktree가 이 대응으로 되돌아갈 base 사본을 찾으므로 둘이 어긋나면 안 된다.
-  child_path="$(next_worktree_path "$epic_key")"
-  suffix="$(basename "$child_path")"
-  case "$suffix" in
-    *-[0-9]|*-[0-9][0-9]) suffix="${suffix##*-}" ;;
-    *) suffix="" ;;
-  esac
-  child_branch="${base_branch}${suffix:+-$suffix}"
-  info "  $child_path  ($child_branch, 부모: $base_branch)"
-
-  git worktree add -b "$child_branch" "$child_path" "$base_branch" \
-    || die "하위 worktree를 만들지 못했습니다: $child_path"
-  git -C "$child_path" branch --set-upstream-to="origin/$base_branch" "$child_branch" \
-    || die "upstream을 걸지 못했습니다. base 브랜치가 원격에 올라가 있어야 합니다."
-  bash "$HOME/.claude/skills/start-worktree/init.sh" "$child_path"
-
-  # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
-  # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
-  if child_id="$(wait_orca_worktree "$child_path")"; then
-    "$ORCA" worktree set --worktree "id:$child_id" \
-      --parent-worktree "path:$base_path" --json > /dev/null \
-      || info "    orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요."
-  else
-    info "    orca가 아직 인식하지 못해 부모 연결을 건너뜁니다."
-  fi
-done
+info "[3/3] 하위 worktree 생성 (저장소마다 ${children}개, 부모: $base_path)"
+create_children "$main_repo" "$base_path" 0
+# 다른 앱 저장소에는 base worktree가 없으므로 접미사 없는 자리를 비워 두고 -2부터 쓴다.
+for r in ${with_repos[@]+"${with_repos[@]}"}; do create_children "$r" "$base_path" 1; done

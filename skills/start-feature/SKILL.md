@@ -2,13 +2,13 @@
 name: start-feature
 effort: low
 description: 에픽의 feature-base 브랜치를 만들어 원격에 올리고 base worktree와 하위 작업용 worktree를 준비하는 스킬. 사용자가 'start-feature', '피처 시작', '피처 브랜치 만들어', 'feature-base 만들어', '에픽 브랜치 준비해줘' 등을 에픽 키와 함께 요청할 때 이 스킬을 사용해야 한다. 에픽 자체를 만드는 일은 `~/.prnd-cli/create_jira_epic.mjs`가 맡고, 이슈 하나를 착수하는 요청에는 `start-worktree`를 사용한다.
-argument-hint: "<에픽키 또는 feature-base 브랜치명> [--children <n>] [--display-name <에픽 제목>]"
+argument-hint: "<에픽키 또는 feature-base 브랜치명> [--children <n>] [--display-name <에픽 제목>] [--with <다른 앱 저장소>...]"
 allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian__getJiraIssue
 ---
 
 # start-feature
 
-에픽의 `feature-base` 브랜치를 만들어 원격에 올리고, 그 브랜치를 물 base worktree와 하위 작업용 worktree 2개를 준비한다.
+에픽의 `feature-base` 브랜치를 만들어 원격에 올리고, 그 브랜치를 물 base worktree와 하위 작업용 worktree 2개를 준비한다. 여러 앱에 걸친 에픽이면 다른 앱 저장소에도 같은 브랜치를 올리고, 그 앱의 하위 worktree를 오케스트레이터 base worktree 아래에 함께 만든다.
 
 ## 절차
 
@@ -20,18 +20,33 @@ allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian__getJiraIssue
    bash ~/.claude/skills/start-feature/start-feature.sh <base-branch> --display-name "<에픽 제목>"
    ```
 
+   여러 앱에 걸친 에픽이면 대화를 이끌 앱 저장소(보통 고객)에서 실행하고, 나머지 앱을 `--with`로 넘긴다. 이름만 쓰면 `~/dev/<이름>`으로 읽는다.
+
+   ```bash
+   bash ~/.claude/skills/start-feature/start-feature.sh <base-branch> --display-name "<에픽 제목>" \
+     --with heydealer-for-dealer-android --with heydealer-inspector-android
+   ```
+
    `--display-name`에는 Jira 에픽의 summary를 그대로 넘긴다. base worktree의 orca 카드 이름이 브랜치명 대신 그 제목이 되어 보드에서 어떤 피처인지 바로 읽힌다. 대괄호 prefix(`[고객]` 등)는 제거하지 않고 원문을 쓴다.
 
-4. **결과를 보고한다.** 만들어진 worktree 경로 세 자리와 각각의 브랜치를 나열한다.
+4. **결과를 보고한다.** 만들어진 worktree 경로와 각각의 브랜치를 부모 관계가 보이는 트리로 나열한다.
 
 ## 스크립트가 하는 일
 
-1. `develop`을 최신화하고 `feature-base/...` 브랜치를 끊는다.
+1. `develop`을 최신화하고 `feature-base/...` 브랜치를 끊는다. `--with` 저장소에도 똑같이 한다.
 2. 그 브랜치를 원격에 올린다. 하위 worktree가 `origin/<base>`를 upstream으로 따라가야 하므로 이 단계가 빠지면 뒤가 전부 실패한다.
 3. `git worktree add`로 메인 옆 `<repo>-<에픽키>` 자리에 base worktree를 만들고, orca 카드 이름을 에픽 제목으로 바꾼다.
-4. 하위 worktree를 `<repo>-<에픽키>-<N>` 자리에 만들어 upstream을 걸고, base worktree를 부모로 연결한다.
+4. 하위 worktree를 `<repo>-<에픽키>-<N>` 자리에 만들어 upstream을 걸고, base worktree를 부모로 연결한다. 카드 이름은 `고객 2`, `딜러 3`처럼 `<앱> <번호>`로 둔다.
+5. `--with` 저장소에는 base worktree를 만들지 않는다. 하위 worktree만 `<repo>-<에픽키>-2`부터 만들어, 실행한 저장소의 base worktree를 부모로 직접 연결한다. 대화는 그 base worktree 하나가 이끌고, 라이브러리 작업도 그 저장소의 `prnd-library` 서브모듈에서 한다.
+
+```
+heydealer-android-HDA-xxxx   (오케스트레이터, 카드 이름: 에픽 제목)
+├─ 고객 2 / 고객 3      heydealer-android-HDA-xxxx-2, -3
+├─ 딜러 2 / 딜러 3      heydealer-for-dealer-android-HDA-xxxx-2, -3
+└─ 평가사 2 / 평가사 3  heydealer-inspector-android-HDA-xxxx-2, -3
+```
 
 ## 주의
 
 - 부모 연결에 쓰는 selector는 `path:<경로>`다. `orca worktree set`은 `worktree:<id>` 형식을 받지 않아 `selector_not_found`로 실패한다. `orca worktree create`의 selector 목록과 다르다는 점에 유의한다.
-- 하위 worktree 개수는 기본 2개이며 `--children <n>`으로 바꾼다.
+- 하위 worktree 개수는 기본 2개이며 `--children <n>`으로 바꾼다. 이 값은 `--with` 저장소에도 똑같이 적용된다.
