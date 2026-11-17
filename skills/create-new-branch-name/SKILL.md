@@ -39,7 +39,7 @@ git checkout -b {브랜치}
 
 ### 2. 이슈 조회
 
-`mcp__claude_ai_Atlassian__getJiraIssue`
+`mcp__claude_ai_Atlassian_MCP__getJiraIssue`
 
 - `cloudId`: `4e8e1a3d-2b6f-40df-820b-43c476f41656` (`prndcompany.atlassian.net`)
 - `issueIdOrKey`: 확정한 키

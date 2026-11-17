@@ -16,10 +16,10 @@ Jira 키가 붙은 **구현 작업**에 착수할 때, 그 이슈가 아직 "해
 ## 절차
 
 1. 이슈 키를 확정한다. 사용자 발화에 없으면 현재 브랜치 이름(`feature/HDA-\d+-...`)에서 뽑는다. 어느 쪽에서도 못 찾으면 조용히 skip한다 — 키를 추측하지 않는다.
-2. `mcp__claude_ai_Atlassian__getJiraIssue`로 현재 상태를 확인한다. `fields.status.statusCategory.key`가 `new`("해야 할 일")가 아니면 skip한다. 이미 진행 중이거나 검토 중인 이슈를 되돌리지 않는다.
+2. `mcp__claude_ai_Atlassian_MCP__getJiraIssue`로 현재 상태를 확인한다. `fields.status.statusCategory.key`가 `new`("해야 할 일")가 아니면 skip한다. 이미 진행 중이거나 검토 중인 이슈를 되돌리지 않는다.
 3. 담당자(`fields.assignee`)가 본인도 미지정도 아니면 전이하지 않고, 사실만 한 줄 알린 뒤 작업을 계속한다. 남의 이슈 상태를 대신 옮기지 않는다.
-4. `mcp__claude_ai_Atlassian__getTransitionsForJiraIssue`로 전이 목록을 받아 `to.name`이 `진행 중`인 항목을 고른다. transition id는 워크플로우마다 다르므로 **매번 조회해서 고르고, 값을 외워 쓰지 않는다.**
-5. `mcp__claude_ai_Atlassian__transitionJiraIssue`로 전이한다.
+4. `mcp__claude_ai_Atlassian_MCP__executeRead`로 `listJiraIssueTransitions` 연산을 호출해(`name: "listJiraIssueTransitions"`, `inputs: {issueIdOrKey}`) 전이 목록을 받고, `to.name`이 `진행 중`인 항목을 고른다. transition id는 워크플로우마다 다르므로 **매번 조회해서 고르고, 값을 외워 쓰지 않는다.**
+5. `mcp__claude_ai_Atlassian_MCP__transitionJiraIssue`로 전이한다.
 6. 결과를 응답에 한 줄 남긴다 (`HDA-22577 Backlog → 진행 중`). 전이해 놓고 말없이 넘어가지 않는다.
 
 전이에 실패해도 작업은 멈추지 않는다. 실패 사실만 한 줄 남기고 구현을 이어간다.

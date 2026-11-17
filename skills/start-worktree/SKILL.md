@@ -15,7 +15,7 @@ Jira 이슈 하나를 착수한다. base를 재사용할 수 있는 유휴 workt
 ## 절차
 
 1. **이슈 키 확정** — 인자에 없으면 대화에서 찾는다. 그래도 없으면 `AskUserQuestion`으로 묻는다.
-1-1. **대상 저장소 확인** — `mcp__claude_ai_Atlassian__getJiraIssue`로 이슈와 부모 에픽의 `summary`를 받는다. 아래 중 하나라도 맞으면 이 이슈는 다른 앱 저장소의 작업이다.
+1-1. **대상 저장소 확인** — `mcp__claude_ai_Atlassian_MCP__getJiraIssue`로 이슈와 부모 에픽의 `summary`를 받는다. 아래 중 하나라도 맞으면 이 이슈는 다른 앱 저장소의 작업이다.
    - 에픽 제목 첫 대괄호의 역할(`[리볼트]`, `[고객]`, `[딜러]` 등)이 `~/.claude/rules/prnd-projects.md`의 표에서 현재 앱 저장소가 아닌 디렉토리를 가리킨다. `[공통]`, `[라이브러리]`처럼 표에서 앱 하나로 정해지지 않는 역할은 판정하지 않는다.
    - 현재 저장소에는 `refs/remotes/origin/feature-base/<에픽키>*`가 없는데, 표의 다른 앱 디렉토리(`~/dev/<디렉토리>`, 접미사 없는 원본)에는 있다. `git -C ~/dev/<디렉토리> for-each-ref`로 로컬 ref만 본다.
 

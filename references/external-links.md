@@ -20,7 +20,7 @@
 |-----------|------------|----------|----------|
 | Notion | `*.notion.so`, `*.notion.site` | `mcp__claude_ai_Notion__notion-fetch` | 페이지 내용 |
 | Figma | `figma.com` | figma 플러그인의 `get_design_context`, `get_screenshot` | 디자인 컨텍스트, 스크린샷 |
-| Jira | `*.atlassian.net`, `*.jira.com` | `mcp__claude_ai_Atlassian__getJiraIssue` | 이슈 제목, 설명, AC |
+| Jira | `*.atlassian.net`, `*.jira.com` | `mcp__claude_ai_Atlassian_MCP__getJiraIssue` | 이슈 제목, 설명, AC |
 | Slack | `*.slack.com` | `mcp__claude_ai_Slack__slack_read_thread`, `mcp__claude_ai_Slack__slack_read_channel` | 메시지/스레드 내용 |
 | 사내 API 문서 | `docs.prnd.co.kr` | `WebFetch` (view→API URL 변환 후) | 엔드포인트·필드·enum |
 
@@ -57,7 +57,7 @@ https://{workspace}.jira.com/browse/{issueKey}
 ```
 
 - 이슈 키: URL 경로 마지막 세그먼트 (예: `HDA-123`)
-- `mcp__claude_ai_Atlassian__getJiraIssue`에 이슈 키 전달
+- `mcp__claude_ai_Atlassian_MCP__getJiraIssue`에 이슈 키 전달
 
 ### Slack
 

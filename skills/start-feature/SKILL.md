@@ -3,7 +3,7 @@ name: start-feature
 effort: low
 description: 에픽의 feature-base 브랜치를 만들어 원격에 올리고 base worktree와 하위 작업용 worktree를 준비하는 스킬. 사용자가 'start-feature', '피처 시작', '피처 브랜치 만들어', 'feature-base 만들어', '에픽 브랜치 준비해줘' 등을 에픽 키와 함께 요청할 때 이 스킬을 사용해야 한다. 에픽 자체를 만드는 일은 `~/.prnd-cli/create_jira_epic.mjs`가 맡고, 이슈 하나를 착수하는 요청에는 `start-worktree`를 사용한다.
 argument-hint: "<에픽키 또는 feature-base 브랜치명> [--children <n>] [--display-name <에픽 제목>] [--with <다른 앱 저장소>...]"
-allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian__getJiraIssue
+allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian_MCP__getJiraIssue
 ---
 
 # start-feature
@@ -12,7 +12,7 @@ allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian__getJiraIssue
 
 ## 절차
 
-1. **에픽 정보를 얻는다.** 인자가 에픽 키(예: `HDA-99999`)면 `mcp__claude_ai_Atlassian__getJiraIssue`로 summary를 가져와, `create-new-branch-name` 규칙에 따라 `feature-base/<키>-<명사구 slug>`를 만든다. 인자가 이미 `feature-base/`로 시작하면 브랜치 이름은 그대로 쓰되, 이름에서 뽑은 키로 summary를 조회한다.
+1. **에픽 정보를 얻는다.** 인자가 에픽 키(예: `HDA-99999`)면 `mcp__claude_ai_Atlassian_MCP__getJiraIssue`로 summary를 가져와, `create-new-branch-name` 규칙에 따라 `feature-base/<키>-<명사구 slug>`를 만든다. 인자가 이미 `feature-base/`로 시작하면 브랜치 이름은 그대로 쓰되, 이름에서 뽑은 키로 summary를 조회한다.
 2. **실행 전에 확인받는다.** 이 스킬은 base 브랜치를 원격에 올린다. 만들어질 브랜치 이름과 에픽 제목을 보여 주고 사용자 확인을 받는다. `rules/git.md`의 push 게이트는 이 확인으로 충족된다 — 스크립트 안에서 업로드가 일어나므로 별도 지시를 다시 받지 않는다.
 3. **스크립트를 호출한다.**
 

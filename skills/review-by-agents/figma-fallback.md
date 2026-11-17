@@ -10,7 +10,7 @@
 
 ## 0. 사전 — 이슈 ID·epic_key·폴백 링크 확보 (공통 전제)
 
-이슈 ID는 PR 제목·본문 → 브랜치명(`git rev-parse --abbrev-ref HEAD`) → 최근 커밋 메시지에서 `{PROJECT}-{번호}`(예 `HDA-21304`) 패턴으로 추출한다. `mcp__claude_ai_Atlassian__getJiraIssue(issueIdOrKey, fields=["summary","description","comment","parent","issuetype"], responseContentFormat="markdown")`와 `mcp__claude_ai_Atlassian__getJiraIssueRemoteIssueLinks`를 호출해 다음을 동시에 확보한다:
+이슈 ID는 PR 제목·본문 → 브랜치명(`git rev-parse --abbrev-ref HEAD`) → 최근 커밋 메시지에서 `{PROJECT}-{번호}`(예 `HDA-21304`) 패턴으로 추출한다. `mcp__claude_ai_Atlassian_MCP__getJiraIssue(issueIdOrKey, fields=["summary","description","comment","parent","issuetype"], responseContentFormat="markdown")`와 `mcp__claude_ai_Atlassian_MCP__executeRead`(`name: "listJiraIssueRemoteIssueLinks"`)를 호출해 다음을 동시에 확보한다:
 
 - **epic_key**: `issuetype.hierarchyLevel`이 1이면 그 이슈 ID, 0이면 `parent` 이슈 ID, -1(하위 작업)이면 `parent`의 `parent` 이슈 ID (1번 feature-memory 조회 키)
 - **이슈 컨텍스트**: `summary`(제목)·description — 1번 frame 자동 매칭의 신호로 사용

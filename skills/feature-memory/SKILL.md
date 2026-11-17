@@ -29,7 +29,7 @@ model: sonnet
 
 매 갱신 STEP 2.1 시작 시 다음을 병렬 호출하여 본인 정보를 확보한다:
 
-1. **Jira 본인**: `mcp__claude_ai_Atlassian__atlassianUserInfo()` → `accountId`, `displayName`, `email`
+1. **Jira 본인**: `mcp__claude_ai_Atlassian_MCP__atlassianUserInfo()` → `accountId`, `displayName`, `email`
 2. **Slack 본인**: `mcp__claude_ai_Slack__slack_search_users(query=email_from_jira)` → `user_id`, `display_name`, real_name 매핑
 3. **GitHub 본인**: `gh api user --jq '.login'` (또는 git config `user.email` 매칭) → `login`
 
@@ -144,7 +144,7 @@ model: sonnet
 2. `epic_key` 중복 확인: Notion DB의 `epic_key` property로 검색.
    - `status = active`로 이미 있으면 → "이미 등록된 피처입니다. 갱신하려면 `/feature-memory {epic_key}`" 안내 후 중단
    - `status = archived`로 이미 있으면 → "보관된 피처입니다. 활성화하려면 `/feature-memory reactivate {epic_key}`" 안내 후 중단
-3. Jira에서 이슈 정보 조회 (`mcp__claude_ai_Atlassian__getJiraIssue`, fields: `summary,status,priority,issuetype,parent`) — 키가 여러 개면 병렬 호출:
+3. Jira에서 이슈 정보 조회 (`mcp__claude_ai_Atlassian_MCP__getJiraIssue`, fields: `summary,status,priority,issuetype,parent`) — 키가 여러 개면 병렬 호출:
    - `issuetype.name`이 Epic이 아니면 경고 후 진행 (Story/Task도 허용)
    - `summary` → 페이지 제목 후보
    - **Feature 이상 키(`hierarchyLevel ≥ 2`, 예: `HD-676`)로 등록하면**: 하위 에픽을 JQL로 해석해(위 `## 키 체계`) **해석된 플랫폼 에픽 키들을 `epic_key`에 쓴다**. 제목은 그 Feature의 `summary`로 잡는다. 부모 키는 `epic_key`에 넣지 않는다.
@@ -183,11 +183,11 @@ model: sonnet
    - `status = archived`이면 "보관된 피처입니다. 갱신하려면 `/feature-memory reactivate {epic_key}`로 먼저 활성화하세요." 안내 후 중단. (보관된 페이지를 갱신해 본문이 바뀌면 보관 의도가 흐려지므로 명시적 활성화를 강제.)
 2. **page_id가 확인되면 즉시** `mcp__claude_ai_Notion__notion-fetch(page_id)`로 **전체 본문**을 가져온다. (page property + 본문 markdown 모두 포함) — 위 강제 게이트 적용 대상.
 3. **본인 식별 fetch** — 상단 `## 본인 식별` 절차(3-call 병렬)를 수행해 `self.jira_account_id`·`self.display_name`·`self.email`·`self.slack_user_id`·`self.slack_display_name`·`self.github_login`를 확보한다 (한 세션 1회 캐싱). 호출 상세는 그 섹션 참조 — 여기 중복 기술하지 않는다.
-4. **동시에** Jira fetch — `epic_key`의 키마다 1회씩 병렬 호출: `mcp__claude_ai_Atlassian__getJiraIssue(issueIdOrKey=<key>, fields=["summary","status","priority","description","comment","subtasks","parent","labels","components","updated","assignee","issuetype"], responseContentFormat="markdown")`
-   - **`epic_key` 재해석 (필수)**: 제목이 부모 Feature 키로 시작하거나 트래킹 대상들이 공통 `parent`를 가지면, 그 부모 키로 `mcp__claude_ai_Atlassian__searchJiraIssuesUsingJql(jql="parent = {parent_key} AND project = {Jira project key} ORDER BY key ASC", fields=<위와 동일>, responseContentFormat="markdown")`를 호출해 **새로 생긴 하위 에픽을 찾는다**. `fields`를 함께 요청하면 해석과 fetch가 한 번에 끝난다. 새 키는 이번 갱신부터 트래킹 대상에 넣고 STEP 5에서 `epic_key`에 추가한다. 필터·폴백은 위 `## 키 체계` 참조.
+4. **동시에** Jira fetch — `epic_key`의 키마다 1회씩 병렬 호출: `mcp__claude_ai_Atlassian_MCP__getJiraIssue(issueIdOrKey=<key>, fields=["summary","status","priority","description","comment","subtasks","parent","labels","components","updated","assignee","issuetype"], responseContentFormat="markdown")`
+   - **`epic_key` 재해석 (필수)**: 제목이 부모 Feature 키로 시작하거나 트래킹 대상들이 공통 `parent`를 가지면, 그 부모 키로 `mcp__claude_ai_Atlassian_MCP__searchJiraIssuesUsingJql(jql="parent = {parent_key} AND project = {Jira project key} ORDER BY key ASC", fields=<위와 동일>, responseContentFormat="markdown")`를 호출해 **새로 생긴 하위 에픽을 찾는다**. `fields`를 함께 요청하면 해석과 fetch가 한 번에 끝난다. 새 키는 이번 갱신부터 트래킹 대상에 넣고 STEP 5에서 `epic_key`에 추가한다. 필터·폴백은 위 `## 키 체계` 참조.
    - **부모 Feature 이슈 자체는 fetch·수집하지 않는다** (`epic_key`에 명시적으로 들어 있는 경우만 예외).
    - markdown 포맷이면 description/comment 본문 안의 hyperlinks가 `[text](url)` 형태로 그대로 보존됨 → URL 추출이 쉬움
-5. 추가로 remote issue links 조회: `mcp__claude_ai_Atlassian__getJiraIssueRemoteIssueLinks(<key>)` — `epic_key`의 키 + 해석된 하위 에픽 키마다 병렬 호출. Jira의 "웹 링크" 필드에 등록된 URL들 (Notion 페이지 등이 종종 여기에 붙어 있음)
+5. 추가로 remote issue links 조회: `mcp__claude_ai_Atlassian_MCP__executeRead(name="listJiraIssueRemoteIssueLinks", cloudId, inputs={issueIdOrKey: <key>})` — `epic_key`의 키 + 해석된 하위 에픽 키마다 병렬 호출. Jira의 "웹 링크" 필드에 등록된 URL들 (Notion 페이지 등이 종종 여기에 붙어 있음)
 6. page property에서 `last_run_at` 추출. 없으면 `since = now - 30일`.
 
 ### 2.2 URL 자동 추출 + 도메인별 분류

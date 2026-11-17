@@ -1,7 +1,7 @@
 ---
 name: create-pr
 effort: medium
-allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), Bash(xargs -r grep:*), mcp__claude_ai_Atlassian__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian__getJiraIssue, Bash(gh pr create:*), Read, Write, Skill(capture-preview-screenshot), Skill(illustrate-concept), Skill(upload-pr-image), AskUserQuestion
+allowed-tools: Bash(git branch:*), Bash(git log:*), Bash(git diff:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git merge-base:*), Bash(git remote:*), Bash(git ls-remote:*), Bash(git status:*), Bash(git push:*), Bash(grep:*), Bash(xargs -r grep:*), mcp__claude_ai_Atlassian_MCP__getAccessibleAtlassianResources, mcp__claude_ai_Atlassian_MCP__getJiraIssue, Bash(gh pr create:*), Read, Write, Skill(capture-preview-screenshot), Skill(illustrate-concept), Skill(upload-pr-image), AskUserQuestion
 description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그램). 사용자가 'create-pr', 'PR 생성', 'PR 만들어', 'PR 만들어줘', 'PR 작성', 'PR 올려줘', 'PR 올려', 'pull request 생성', 'pull request 만들어', '풀리퀘 생성', '풀리퀘 만들어' 등 PR 생성을 요청할 때 이 스킬을 사용해야 한다. PR 리뷰/조회 요청에는 사용하지 않는다.
 ---
 
@@ -25,8 +25,8 @@ description: PR 생성 (간결한 본문 + 복잡한 경우 mermaid 다이어그
 - owner/repo는 `gh`가 현재 디렉토리의 origin remote로 자동 감지하므로 별도 추출하지 않는다
 
 ### 2. JIRA 티켓 조회
-- `mcp__claude_ai_Atlassian__getAccessibleAtlassianResources`로 cloudId 가져오기
-- `mcp__claude_ai_Atlassian__getJiraIssue`로 티켓 조회 (반드시 `fields: ["summary", "description", "parent"]` 명시)
+- `mcp__claude_ai_Atlassian_MCP__getAccessibleAtlassianResources`로 cloudId 가져오기
+- `mcp__claude_ai_Atlassian_MCP__getJiraIssue`로 티켓 조회 (반드시 `fields: ["summary", "description", "parent"]` 명시)
 - **인증 실패 시**: develop으로 임의 진행하지 말고, AskUserQuestion으로 **base 브랜치를 사용자에게 확인**한다.
   - 후보 제시: `develop` + `git branch -r | grep "origin/feature-base/"` 목록. 사용자가 고른 브랜치를 base로 3번 단계를 건너뛰고 진행한다. (PR 제목은 세션에서 확보한 summary나 사용자 입력을 사용)
   - 사용자가 재인증을 택하면 "'/mcp'로 JIRA를 재인증한 후 다시 '/create-pr'을 실행해주세요" 출력 후 종료한다.
