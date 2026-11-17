@@ -20,6 +20,8 @@ import jira_rest
 
 DESC_MAX = 600    # 설명 부록에서 이슈당 싣는 길이. 판단에 필요한 앞부분만 남긴다
 MAX_WORKERS = 8   # acli 는 호출마다 프로세스를 새로 띄운다. 순차로 돌리면 이슈 수에 비례해 느려진다
+# 개발이 끝나 QA 로 넘어간 상태. statusCategory 는 진행 중(indeterminate)이지만 개발 순서 판단에서는 완료로 본다
+DEV_DONE_STATUSES = {"Need QA", "In QA"}
 
 
 def run(cmd):
@@ -74,7 +76,7 @@ def fetch_issue(key):
         "full_summary": f["summary"],  # 그래프는 제목을 자르므로 부록에는 원본을 싣는다
         "desc": desc.strip(),
         "status": status["name"],
-        "done": status["statusCategory"]["key"] == "done",
+        "done": status["statusCategory"]["key"] == "done" or status["name"] in DEV_DONE_STATUSES,
         "active": status["statusCategory"]["key"] == "indeterminate",
         "blocks": sorted(set(blocks)),
         "blocked_by": sorted(set(blocked_by)),

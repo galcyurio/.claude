@@ -115,7 +115,7 @@ python3 ~/.claude/skills/order-jira-issues/extdep.py resolve --epic HDA-22517 --
 
 ## 흔한 실수
 
-- **상태 이름으로 완료를 판정한다.** `종료`·`Ready to Deploy`·`Deployed`가 뒤섞여 있다. `status.statusCategory.key == "done"`으로 본다.
+- **상태 이름으로 완료를 판정한다.** `종료`·`Ready to Deploy`·`Deployed`가 뒤섞여 있다. `status.statusCategory.key == "done"`으로 본다. 다만 `Need QA`·`In QA`는 카테고리가 진행 중이어도 개발이 끝난 상태라 완료로 친다(스크립트의 `DEV_DONE_STATUSES`).
 - **완료된 blocker를 blocker로 센다.** 완료 이슈가 무언가를 blocks 하는 것은 정상 이력이다. 막고 있는 것으로 치지 않는다.
 - **종료된 이슈에 남은 링크를 그래프에 넣는다.** 대기 목록이 실제보다 길어 보인다.
 - **임계 경로를 빼먹는다.** 어느 이슈가 병목인지가 "다음에 뭘 할까"의 답이다.
