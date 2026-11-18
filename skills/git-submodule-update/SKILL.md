@@ -15,8 +15,9 @@ allowed-tools: Bash
 ## 입력
 
 - **branch** (필수): `prnd-library`에서 추적할 git 브랜치. 이름에 `release` 또는 `feature`가 포함되어야 한다.
-  - `release` 포함 → 커밋 메시지 `<JiraId> feat: 라이브러리를 최신화한다`
-  - `feature` 포함 → 커밋 메시지 `<JiraId> feat: 라이브러리를 feature 브랜치로 변경한다`
+  - `release` 포함 → 커밋 메시지 `<JiraId> feat: 라이브러리를 release 브랜치로 변경한다`
+  - `feature-base` 포함 → 커밋 메시지 `<JiraId> feat: 라이브러리를 feature-base 브랜치로 변경한다`
+  - 그 외 `feature` 포함 → 커밋 메시지 `<JiraId> feat: 라이브러리를 feature 브랜치로 변경한다`
 
 branch가 주어지지 않았으면 어떤 브랜치로 전환할지 사용자에게 먼저 물어본 뒤 진행한다.
 

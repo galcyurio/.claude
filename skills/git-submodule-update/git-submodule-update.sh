@@ -16,9 +16,11 @@ if [ -z "$branch" ]; then
   exit 1
 fi
 
-# 커밋 메시지 요약 결정 (release/feature 분기)
+# 커밋 메시지 요약 결정 (feature-base/release/feature 분기)
+# feature-base 는 feature 를 포함하므로 먼저 매칭한다.
 case "$branch" in
-  *release*) summary="라이브러리를 최신화한다" ;;
+  *feature-base*) summary="라이브러리를 feature-base 브랜치로 변경한다" ;;
+  *release*) summary="라이브러리를 release 브랜치로 변경한다" ;;
   *feature*) summary="라이브러리를 feature 브랜치로 변경한다" ;;
   *)
     echo "[오류] 유효하지 않은 branch name: $branch (release 또는 feature 포함 필요)" >&2
