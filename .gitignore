@@ -40,8 +40,11 @@ mcp-needs-auth-cache.json
 stats-cache.json
 policy-limits.json
 policy-limits.json.stamp.json
+policy-limits.json.signature*.json
 gh-pr-status-cache.json
 remote-settings.json
+remote-settings.json.signature*.json
+remote-settings.json.synced-at
 state/
 skills/synced/
 skills/.trash/
@@ -51,6 +54,7 @@ settings.json.bak
 debug/
 telemetry/
 downloads/
+feedback/
 
 # .android-ai-prompts-olaf symlink (별도 repo에서 관리)
 skills/apply-pr-feedback
@@ -65,3 +69,9 @@ skills/upload-pr-image
 skills/computer-use
 skills/orca-cli
 skills/orchestration
+skills/orca-computer-use
+
+# Orca가 생성·관리하는 설정
+keybindings.json
+orca-agent-view.json
+themes/orca.json
