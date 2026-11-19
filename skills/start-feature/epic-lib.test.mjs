@@ -40,3 +40,8 @@ test('decideSummaryAction', () => {
   assert.equal(decideSummaryAction({ ...base, current: '이름', timedOut: true }), 'set')
   assert.equal(decideSummaryAction({ input: '이름', final: '[공통][이름]', current: '[고객][이름]', timedOut: false }), 'set')
 })
+
+test('buildEpicFields는 같은 버전 id를 한 번만 넣는다', () => {
+  const f = buildEpicFields({ parentKey: 'HD-1', app: '공통', versionIds: ['12459', '1', '12459'], name: 'x', links: {} })
+  assert.deepEqual(f.fixVersions, [{ id: '12459' }, { id: '1' }])
+})

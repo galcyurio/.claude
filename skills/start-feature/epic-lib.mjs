@@ -44,7 +44,7 @@ export function buildEpicFields({ parentKey, app, versionIds, name, links }) {
     issuetype: { id: '10000' },
     summary: name,
     parent: { key: parentKey },
-    fixVersions: versionIds.map((id) => ({ id })),
+    fixVersions: [...new Set(versionIds)].map((id) => ({ id })),
     [CUSTOM_FIELDS.APP]: { value: app },
     description: {
       type: 'doc',
