@@ -4,6 +4,9 @@
 # 브랜치를 끊고, 현재 claude 세션을 그 자리로 옮긴 뒤 원래 탭을 닫는다.
 # 스크립트를 부른 자리 자체가 유휴 조건을 만족하면 거기서 브랜치만 끊고, 세션 이사와
 # 탭 닫기를 건너뛴 채 탭 제목만 이슈 키로 바꾼다.
+# 에픽의 상위 base 자리(접미사 없는 feature-base/* 를 문 worktree)에서 불리면 그 세션은
+# 에픽 전체를 보는 오케스트레이터이므로 옮기지 않는다. 자리만 준비하고 그 자리에 새 세션을
+# 띄워 --handoff 내용을 넘긴 뒤, 이 탭은 그대로 둔다.
 #
 # 사용법: start-worktree.sh <JIRA-KEY> [옵션]
 #   --base <ref>      작업 브랜치를 끊을 지점 (기본: 에픽의 feature-base, 없으면 develop)
@@ -14,6 +17,8 @@
 #   --library         자리의 prnd-library 서브모듈에도 같은 이름의 작업 브랜치를 끊는다
 #   --new             유휴 worktree를 찾지 않고 새로 만든다
 #   --no-move         세션을 옮기지 않는다 (자리만 준비)
+#   --handoff <내용>  오케스트레이터 자리에서 불렸을 때 새 세션에 넘길 작업 인계 내용 (그 자리에선 필수)
+#   --move            오케스트레이터 자리에서도 이 세션째 옮긴다 (사용자가 명시했을 때만)
 #   --dry-run         파괴적 동작 없이 계획만 출력
 set -euo pipefail
 
@@ -240,6 +245,8 @@ opt_summary=""
 opt_new=0
 opt_library=0
 opt_no_move=0
+opt_move=0
+opt_handoff=""
 opt_dry_run=0
 
 while [ $# -gt 0 ]; do
@@ -252,6 +259,8 @@ while [ $# -gt 0 ]; do
     --new) opt_new=1; shift ;;
     --library) opt_library=1; shift ;;
     --no-move) opt_no_move=1; shift ;;
+    --move) opt_move=1; shift ;;
+    --handoff) opt_handoff="${2:-}"; shift 2 ;;
     --dry-run) opt_dry_run=1; shift ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) issue_key="$1"; shift ;;
@@ -279,6 +288,20 @@ work_branch="$opt_branch"
 # 탭 제목. 이슈 키만 있으면 보드와 탭 목록에서 어떤 작업인지 읽히지 않으므로 제목을
 # 함께 붙인다. 제목을 넘겨받지 못하면 키만 쓴다 — 스킬 밖에서 손으로 부르는 경우다.
 tab_title="$issue_key${opt_summary:+ $opt_summary}"
+
+# 오케스트레이터 판정. 스크립트를 부른 자리가 풀 base 그 자체(접미사 없는 feature-base/*)를
+# 물고 있으면 에픽의 상위 base 자리이고, 거기서 도는 세션은 하위 이슈들을 지휘하는
+# 오케스트레이터다. 이 세션을 하위 자리로 옮기면 에픽의 지휘 세션이 사라지므로(2026-11-19
+# HDA-23929 착수 때 실제로 옮겨져 되돌렸다) 기본 동작을 "새 세션 열기"로 바꾼다.
+# 새 세션은 대화 이력이 없으므로 인계 내용이 없으면 자리를 만들기 전에 멈춘다.
+orchestrator=0
+caller_branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+case "$pool_ref" in
+  feature-base/*) [ "$caller_branch" = "$pool_ref" ] && orchestrator=1 ;;
+esac
+if [ "$orchestrator" = 1 ] && [ "$opt_move" = 0 ] && [ "$opt_no_move" = 0 ] && [ -z "$opt_handoff" ]; then
+  die "오케스트레이터 자리($caller_branch)에서 불렸습니다. 이 세션은 옮기지 않고 새 세션을 띄우므로, 새 세션에 넘길 작업 내용을 --handoff 로 주세요. (이 세션째 옮기려면 --move)"
+fi
 
 # 재사용할 수 있는 자리인지 판정하는 조건을 여기에 모아 둔다.
 # 조건: 메인이 아니고, 브랜치가 <pool>-<접미사>, upstream이 origin/<pool>,
@@ -519,6 +542,14 @@ fi
 
 if [ "$opt_no_move" = 1 ]; then
   info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree${library_note:+ / $library_note}"
+  exit 0
+fi
+
+# 오케스트레이터 자리에서 불렸으면 이 세션은 남기고, 준비한 자리에 새 세션을 띄운다.
+if [ "$orchestrator" = 1 ] && [ "$opt_move" = 0 ]; then
+  spawn_prompt="$issue_key 작업을 시작한다. 작업 자리는 $target_worktree ($work_branch, base $base_ref)이고 $pick_reason.${library_note:+ $library_note.} 에픽 오케스트레이터 세션이 넘긴 인계 내용은 다음과 같다: $opt_handoff 착수 여부나 진행 방향을 다시 묻지 말고, 인계 내용대로 곧바로 작업에 들어간다."
+  spawn_session "$target_worktree" "$tab_title" "$spawn_prompt" "$opt_dry_run" "[2/3]" "[3/3]"
+  info "[3/3] 이 탭(오케스트레이터)은 그대로 둡니다.${library_note:+ $library_note}"
   exit 0
 fi
 

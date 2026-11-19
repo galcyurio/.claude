@@ -124,3 +124,28 @@ move_session() {
   fi
   exec "$ORCA" terminal close --terminal "$handle" --tab --json
 }
+
+# 대상 자리에 새 claude 세션을 띄운다. 현재 세션은 옮기지 않고 탭도 닫지 않는다.
+# 에픽 오케스트레이터가 하위 이슈를 넘길 때 쓴다. 새 세션은 대화 이력이 없으므로
+# 필요한 맥락은 모두 첫 프롬프트에 담아 넘긴다.
+#
+# 사용법: spawn_session <대상 자리> <탭 제목> <첫 프롬프트> [dry-run 0|1] [기동 단계 표기] [완료 단계 표기]
+spawn_session() {
+  local target="$1" title="$2" prompt="$3" dry_run="${4:-0}" step_spawn="${5:-}" step_done="${6:-}"
+  local wt_id quoted
+  info "${step_spawn:+$step_spawn }새 세션 기동: $target"
+  if [ "$dry_run" = 1 ]; then
+    info "[dry-run] 실제로는 이 자리에 새 탭을 띄워 claude를 첫 프롬프트와 함께 실행합니다."
+    return 0
+  fi
+  wt_id="$(wait_orca_worktree "$target")" \
+    || die "orca가 worktree를 인식하지 못했습니다: $target"
+  # 인계 내용에 따옴표·백틱·$가 섞여도 깨지지 않게 작은따옴표로 감싸고, 안의 작은따옴표는
+  # '\'' 로 끊어 넣는다. printf %q 는 한글을 8진 이스케이프로 바꿔 탭 명령이 읽기 어려워진다.
+  local sq="'" esc="'\\''"
+  quoted="'${prompt//$sq/$esc}'"
+  "$ORCA" terminal create --worktree "id:$wt_id" --title "$title" \
+    --command "claude $quoted" --json > /dev/null \
+    || die "새 탭을 띄우지 못했습니다. 자리는 준비돼 있으니 그 worktree에서 직접 세션을 여세요: $target"
+  info "${step_done:+$step_done }새 탭 기동 완료: $target"
+}
