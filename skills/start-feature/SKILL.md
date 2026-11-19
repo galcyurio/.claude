@@ -18,8 +18,10 @@ allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian_MCP__getJiraIssue
 ## 진입 분기
 
 - 인자가 `HD-`로 시작하면 아래 1단계부터 전부 진행한다.
-- 인자가 `HDA-` 에픽 키면 `getJiraIssue`로 summary를 가져와 8단계부터 진행한다. 여러 앱이면 `--with`는 사용자가 준 값이나 대화 맥락을 따른다.
-- 인자가 `feature-base/`로 시작하면 브랜치 이름은 그대로 쓰고, 이름에서 뽑은 키로 summary를 조회해 9단계부터 진행한다.
+- 인자가 `HDA-` 에픽 키면 `getJiraIssue`로 summary와 App 필드(`customfield_10302`)를 가져와 8단계부터 진행한다.
+- 인자가 `feature-base/`로 시작하면 브랜치 이름은 그대로 쓰고, 이름에서 뽑은 키로 summary와 App 필드를 조회해 9단계부터 진행한다.
+- 두 경로 모두 이끄는 앱은 에픽의 App 값으로 정한다. App이 `공통`·`라이브러리`처럼 저장소 하나로 정해지지 않으면 `AskUserQuestion`으로 묻는다. `--with`는 사용자가 준 값을 따른다.
+- 두 경로 모두 9단계 전에 브랜치명·에픽 제목·worktree 트리를 보여 주고 `AskUserQuestion`으로 확인받는다(dry-run이면 생략). 이 확인이 `rules/git.md`의 push 게이트를 대신한다.
 - `--dry-run`은 어느 경로든 적용된다.
 
 ## dry-run
@@ -47,7 +49,7 @@ allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian_MCP__getJiraIssue
 5. **실행 전에 확인받는다**(dry-run이면 생략). 아래를 한 번에 보여 주고 `AskUserQuestion`으로 승인받는다. 이 승인이 에픽 생성과 `rules/git.md`의 push 게이트를 함께 충족한다.
    - 에픽 최종 제목: 단일·앱별 에픽은 `[<App>][<name>]`, `[공통]` 에픽은 `[공통][<name>]`
    - App, 수정 버전, 담당자(본인)
-   - feature-base 브랜치명(8단계 규칙으로 미리 만든다)
+   - feature-base 브랜치명: 에픽 키가 아직 없으므로 `feature-base/<에픽키>-<slug>`처럼 키 자리를 비워 보여 준다. 키를 지어내지 않는다.
    - worktree 트리(아래 "스크립트가 하는 일"의 그림 형식)
 
 6. **에픽을 만든다.** 앱별 에픽이면 앱마다 한 번씩 호출한다.
@@ -61,12 +63,14 @@ allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian_MCP__getJiraIssue
 
    `links`의 값이 `null`이면 그 플래그를 뺀다. 결과의 `key`가 에픽 키다.
 
-7. **제목을 확정한다.** Jira automation이 생성 뒤 1~2분 안에 summary를 `[App][이름]`으로 감싼다. 반영을 기다리고, 최종형이 아니거나 3분이 지나면 직접 설정한다.
+7. **제목과 담당자를 확정한다.** Jira automation이 생성 뒤 1~2분 안에 summary를 `[App][이름]`으로 감싼다. 반영을 기다리고, 최종형이 아니거나 3분이 지나면 직접 설정한다. automation이 지나간 뒤 담당자가 본인이 아니면 다시 지정한다. 앱별 에픽이면 에픽마다 실행한다.
 
    ```bash
    node ~/.claude/skills/start-feature/create-epic.mjs wait-summary <에픽키> \
-     --input "<name>" --final "<최종 제목>" [--dry-run]
+     --input "<name>" --final "<최종 제목>" --assign-me [--dry-run]
    ```
+
+   최대 3분 넘게 대기하므로 Bash 도구의 `timeout`을 `240000`으로 준다. 기본값(2분)이면 직접 설정 단계에 닿기 전에 명령이 끊긴다.
 
 8. **브랜치 이름을 정한다.** `create-new-branch-name` 규칙으로 `feature-base/<에픽키>-<명사구 slug>`를 만든다. 앱별 에픽이면 이끄는 앱의 에픽 키를 쓴다.
 

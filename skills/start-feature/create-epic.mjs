@@ -4,7 +4,7 @@
 //   create-epic.mjs info <HD-키>
 //   create-epic.mjs create --parent <HD-키> --app <App> --version-id <id> [--version-id <id>...]
 //                          --name <이름> [--spec <url>] [--design <url>] [--slack <url>] [--assign-me] [--dry-run]
-//   create-epic.mjs wait-summary <에픽키> --input <이름> --final <최종 제목> [--timeout 180] [--dry-run]
+//   create-epic.mjs wait-summary <에픽키> --input <이름> --final <최종 제목> [--timeout 180] [--assign-me] [--dry-run]
 //
 // --dry-run에서는 Jira에 쓰는 요청(POST/PUT)을 보내지 않고 보낼 내용만 출력한다.
 // 인증은 팀 스크립트와 같은 ~/.prnd/config.json(email)과 ~/.prnd/jira_token을 쓴다.
@@ -72,25 +72,34 @@ export async function createEpic(opts, request) {
 }
 
 // automation이 summary를 [App][이름]으로 감쌀 때까지 기다린 뒤, 최종형이 아니면 직접 설정한다.
-export async function waitSummary({ key, input, final, timeoutSec, dryRun }, request, sleep) {
+// assignMe면 automation이 지나간 뒤 담당자가 본인인지 확인하고, 아니면 다시 지정한다.
+export async function waitSummary({ key, input, final, timeoutSec, assignMe, dryRun }, request, sleep) {
   if (dryRun) {
-    log(`(dry-run) ${key} 제목을 "${final}"(으)로 맞춥니다`)
+    log(`(dry-run) ${key} 제목을 "${final}"(으)로 맞춥니다${assignMe ? ', 담당자가 본인인지 확인합니다' : ''}`)
     return { key, summary: final, action: 'set' }
   }
   let elapsed = 0
+  let issue, action
   for (;;) {
-    const issue = await request('GET', `/rest/api/3/issue/${key}?fields=summary`)
-    const current = issue.fields.summary
-    const action = decideSummaryAction({ current, input, final, timedOut: elapsed >= timeoutSec })
-    if (action === 'done') return { key, summary: current, action }
-    if (action === 'set') {
-      await request('PUT', `/rest/api/3/issue/${key}`, { fields: { summary: final } })
-      log(`제목을 "${final}"(으)로 설정했습니다 (이전: "${current}")`)
-      return { key, summary: final, action }
-    }
+    issue = await request('GET', `/rest/api/3/issue/${key}?fields=summary,assignee`)
+    action = decideSummaryAction({ current: issue.fields.summary, input, final, timedOut: elapsed >= timeoutSec })
+    if (action !== 'wait') break
     await sleep(POLL_INTERVAL_SEC)
     elapsed += POLL_INTERVAL_SEC
   }
+  const current = issue.fields.summary
+  if (action === 'set') {
+    await request('PUT', `/rest/api/3/issue/${key}`, { fields: { summary: final } })
+    log(`제목을 "${final}"(으)로 설정했습니다 (이전: "${current}")`)
+  }
+  if (assignMe) {
+    const me = await request('GET', '/rest/api/3/myself')
+    if (issue.fields.assignee?.accountId !== me.accountId) {
+      await request('PUT', `/rest/api/3/issue/${key}/assignee`, { accountId: me.accountId })
+      log('automation 뒤 담당자가 본인이 아니어서 다시 지정했습니다')
+    }
+  }
+  return { key, summary: action === 'set' ? final : current, action }
 }
 
 async function main() {
@@ -138,6 +147,7 @@ async function main() {
       input: need(values.input, '--input'),
       final: need(values.final, '--final'),
       timeoutSec: Number(values.timeout),
+      assignMe: values['assign-me'],
       dryRun,
     }, request, (sec) => new Promise((r) => setTimeout(r, sec * 1000)))
   } else {

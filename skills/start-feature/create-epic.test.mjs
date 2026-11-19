@@ -37,7 +37,7 @@ test('createEpic assign-me는 POST 뒤 myself의 accountId로 PUT assignee', asy
 
 test('waitSummary 타임아웃이면 final로 PUT', async () => {
   const { calls, request } = fakeRequest({
-    'GET /rest/api/3/issue/HDA-1?fields=summary': { fields: { summary: '이름' } },
+    'GET /rest/api/3/issue/HDA-1?fields=summary,assignee': { fields: { summary: '이름' } },
   })
   const r = await waitSummary({ key: 'HDA-1', input: '이름', final: '[고객][이름]', timeoutSec: 0 }, request, async () => {})
   const put = calls.find((c) => c.method === 'PUT')
@@ -49,7 +49,7 @@ test('waitSummary 타임아웃이면 final로 PUT', async () => {
 test('waitSummary는 automation이 최종형으로 감싸면 PUT 없이 끝난다', async () => {
   let n = 0
   const { calls, request } = fakeRequest({
-    'GET /rest/api/3/issue/HDA-1?fields=summary': () => ({ fields: { summary: n++ === 0 ? '이름' : '[고객][이름]' } }),
+    'GET /rest/api/3/issue/HDA-1?fields=summary,assignee': () => ({ fields: { summary: n++ === 0 ? '이름' : '[고객][이름]' } }),
   })
   const r = await waitSummary({ key: 'HDA-1', input: '이름', final: '[고객][이름]', timeoutSec: 180 }, request, async () => {})
   assert.equal(r.action, 'done')
@@ -61,4 +61,24 @@ test('waitSummary dry-run은 요청 없이 action set을 출력만 한다', asyn
   const r = await waitSummary({ key: 'HDA-DRYRUN', input: '이름', final: '[고객][이름]', timeoutSec: 180, dryRun: true }, request, async () => {})
   assert.equal(calls.length, 0)
   assert.equal(r.action, 'set')
+})
+
+test('waitSummary assign-me는 automation 뒤 담당자가 본인이 아니면 다시 지정한다', async () => {
+  const { calls, request } = fakeRequest({
+    'GET /rest/api/3/issue/HDA-1?fields=summary,assignee': { fields: { summary: '[고객][이름]', assignee: { accountId: 'B' } } },
+    'GET /rest/api/3/myself': { accountId: 'A' },
+  })
+  await waitSummary({ key: 'HDA-1', input: '이름', final: '[고객][이름]', timeoutSec: 180, assignMe: true }, request, async () => {})
+  const put = calls.find((c) => c.method === 'PUT')
+  assert.equal(put.path, '/rest/api/3/issue/HDA-1/assignee')
+  assert.deepEqual(put.body, { accountId: 'A' })
+})
+
+test('waitSummary assign-me는 담당자가 이미 본인이면 PUT하지 않는다', async () => {
+  const { calls, request } = fakeRequest({
+    'GET /rest/api/3/issue/HDA-1?fields=summary,assignee': { fields: { summary: '[고객][이름]', assignee: { accountId: 'A' } } },
+    'GET /rest/api/3/myself': { accountId: 'A' },
+  })
+  await waitSummary({ key: 'HDA-1', input: '이름', final: '[고객][이름]', timeoutSec: 180, assignMe: true }, request, async () => {})
+  assert.ok(calls.every((c) => c.method === 'GET'))
 })
