@@ -162,7 +162,8 @@ done
 case "$base_branch" in feature-base/*) ;; *) die "base 브랜치는 feature-base/ 로 시작해야 합니다." ;; esac
 
 # worktree 디렉토리 이름에 쓸 에픽 키를 뽑는다 (feature-base/HDA-22644-slug -> HDA-22644).
-epic_key="$(printf '%s' "$base_branch" | sed -E 's|^feature-base/([A-Za-z]+-[0-9]+).*|\1|')"
+# HDA-DRYRUN은 create-epic.mjs --dry-run이 실제 키 대신 돌려주는 자리표시자다.
+epic_key="$(printf '%s' "$base_branch" | sed -E 's|^feature-base/([A-Za-z]+-([0-9]+\|DRYRUN)).*|\1|')"
 [ "$epic_key" != "$base_branch" ] || die "base 브랜치에서 이슈 키를 찾지 못했습니다: $base_branch"
 
 main_repo="$(main_worktree_of "$PWD")"
