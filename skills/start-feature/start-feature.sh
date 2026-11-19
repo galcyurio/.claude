@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # start-feature.sh
 # 에픽의 feature-base 브랜치를 만들어 원격에 올리고, 그 브랜치를 물 base worktree와
-# 하위 작업용 worktree를 준비한다. 에픽 자체는 ~/.prnd-cli/create_jira_epic.mjs가 만든다.
+# 하위 작업용 worktree를 준비한다. 에픽은 같은 디렉토리의 create-epic.mjs가 만든다(SKILL.md 참고).
 #
 # 사용법: start-feature.sh <base-branch> [옵션]
 #   <base-branch>   feature-base/HDA-xxxx-slug 형태의 전체 이름
