@@ -172,6 +172,48 @@ resolve_base_from_slot() {
   printf '%s' "$found"
 }
 
+# 라이브러리만 작업한 자리의 앱 base를 얻는다. start-worktree --library 로 착수해 라이브러리
+# PR만 올리고 머지하는 경우가 많은데, 이때 앱 브랜치에는 PR이 없어 머지 확인이 늘 실패한다.
+# 아래 조건을 모두 만족할 때만 성공한다.
+#   1. 라이브러리 서브모듈이 같은 이름의 브랜치를 물고 있고, 라이브러리 저장소에 그 브랜치로
+#      머지된 PR이 있다
+#   2. 이 자리의 base 사본(-<나머지>로 끝나고 upstream이 걸린 브랜치)의 upstream 중, 앱 브랜치가
+#      앞선 커밋 없이 들어 있는 것이 정해진다. 미커밋 서브모듈 포인터 변경은 커밋이 아니다.
+#      후보가 여럿이면 라이브러리 PR의 base와 같은 이름을 고르고, 그래도 못 고르면 실패한다.
+#      숫자 자리 "2"에는 develop-2 와 feature-base/...-2 가 함께 걸리므로 resolve_base_from_slot
+#      처럼 하나뿐이길 요구하면 거의 항상 실패한다.
+# 라이브러리 브랜치 자체의 정리 판정은 2-1 절이 그대로 다시 한다.
+resolve_library_only_base() {
+  [ "$is_current" = 1 ] && [ -f "$top/.gitmodules" ] || return 1
+  local sub lib_dir repo lib_base rest br up cands="" n=0 c
+  sub="$(git config --file "$top/.gitmodules" --get submodule.prnd-library.path || true)"
+  [ -n "$sub" ] || return 1
+  lib_dir="$top/$sub"
+  [ "$(git -C "$lib_dir" symbolic-ref --quiet --short HEAD 2>/dev/null || true)" = "$branch" ] || return 1
+  repo="$(git -C "$lib_dir" remote get-url origin | sed -E 's#^(git@[^:]+:|https?://[^/]+/)##; s#\.git$##')"
+  lib_base="$(gh pr list --repo "$repo" --state merged --head "$branch" --limit 1 \
+    --json baseRefName --jq '.[0].baseRefName // empty' 2>/dev/null || true)"
+  [ -n "$lib_base" ] || return 1
+
+  rest="$(worktree_rest)"
+  [ -n "$rest" ] || return 1
+  while IFS=$'\t' read -r br up; do
+    case "$up" in origin/*) ;; *) continue ;; esac
+    case "$br" in *-"$rest") ;; *) continue ;; esac
+    up="${up#origin/}"
+    case " $cands " in *" $up "*) continue ;; esac
+    [ "$(git rev-list --count "$branch" --not "origin/$up" 2>/dev/null || echo 1)" = 0 ] || continue
+    cands="$cands $up"
+    n=$((n + 1))
+  done < <(git for-each-ref --format='%(refname:short)%09%(upstream:short)' refs/heads/)
+
+  for c in $cands; do
+    [ "$c" = "$lib_base" ] && { printf '%s' "$c"; return 0; }
+  done
+  [ "$n" = 1 ] || return 1
+  printf '%s' "${cands# }"
+}
+
 ## 2. 머지 확인과 base 판별
 
 if [ "$sync_only" = 1 ]; then
@@ -203,6 +245,10 @@ else
     command -v gh > /dev/null || die "gh CLI가 필요합니다. --base <name>으로 직접 지정할 수도 있습니다."
     base_ref="$(gh pr list --state merged --head "$branch" --limit 1 \
       --json baseRefName --jq '.[0].baseRefName // empty' 2>/dev/null || true)"
+    if [ -z "$base_ref" ] && lib_only_base="$(resolve_library_only_base)"; then
+      base_ref="$lib_only_base"
+      info "[1/6] 앱 브랜치에 커밋이 없고 라이브러리 PR이 머지됐습니다: 라이브러리만 작업한 자리로 보고 진행합니다 (base: $base_ref)"
+    fi
     if [ -z "$base_ref" ]; then
       echo "[오류] $branch 로 머지된 PR을 찾지 못했습니다." >&2
       echo "  upstream이 gone인 것은 머지 근거가 아닙니다. 사람이 머지 여부를 확인하거나," >&2
