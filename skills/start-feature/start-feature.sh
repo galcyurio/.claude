@@ -5,15 +5,17 @@
 #
 # 사용법: start-feature.sh <base-branch> [옵션]
 #   <base-branch>   feature-base/HDA-xxxx-slug 형태의 전체 이름
+#   --repo <repo>   대화를 이끌 앱 저장소(오케스트레이터, 필수). base worktree를 이 저장소에 만든다.
 #   --children <n>  저장소마다 만들 하위 worktree 개수 (기본 2)
 #   --display-name <제목>  base worktree의 orca 표시 이름 (Jira 에픽 제목)
-#   --with <repo>   함께 진행할 다른 앱 저장소 (~/dev/<repo> 또는 절대 경로, 반복 가능).
+#   --with <repo>   함께 진행할 다른 앱 저장소 (반복 가능).
 #                   그 저장소에도 같은 base 브랜치를 원격에 올리되 base worktree는 만들지
-#                   않고, 하위 worktree(-2, -3 ...)만 만들어 현재 저장소의 base worktree를
-#                   orca 부모로 연결한다. 대화는 현재 저장소의 base worktree 하나가 이끈다.
+#                   않고, 하위 worktree(-2, -3 ...)만 만들어 --repo 저장소의 base worktree를
+#                   orca 부모로 연결한다. 대화는 --repo 저장소의 base worktree 하나가 이끈다.
 #   --dry-run       파괴적 동작 없이 계획만 출력
 #
-# 현재 디렉토리의 저장소가 오케스트레이터(base worktree를 갖는 저장소)가 된다.
+# <repo>는 앱 이름(고객, 딜러 ...), ~/dev 아래 저장소 이름, 절대 경로 중 하나로 준다.
+# 저장소를 인자로 받으므로 어느 디렉토리에서 실행해도 결과가 같다.
 set -euo pipefail
 
 die() { echo "[오류] $*" >&2; exit 1; }
@@ -34,6 +36,31 @@ app_label() {
     techbay-call-android) echo "테크베이-콜" ;;
     *) echo "$1" ;;
   esac
+}
+
+# app_label의 역방향. 앱 이름을 저장소 이름으로 바꾸고, 앱 이름이 아니면 그대로 둔다.
+repo_of_app() {
+  case "$1" in
+    고객) echo "heydealer-android" ;;
+    딜러) echo "heydealer-for-dealer-android" ;;
+    딜러-콜) echo "heydealer-call-android" ;;
+    평가사) echo "heydealer-inspector-android" ;;
+    평가사-콜) echo "heydealer-inspector-call-android" ;;
+    리볼트) echo "revolt-android" ;;
+    테크베이-공업사) echo "techbay-reconditioning-android" ;;
+    테크베이-어드민) echo "techbay-admin-android" ;;
+    테크베이-콜) echo "techbay-call-android" ;;
+    *) echo "$1" ;;
+  esac
+}
+
+# 앱 이름·저장소 이름·절대 경로를 받아 그 저장소의 메인 worktree 경로를 낸다.
+resolve_repo() {
+  local r="$1" opt="$2"
+  [ -n "$r" ] || die "$opt 에 저장소가 필요합니다."
+  case "$r" in /*) ;; *) r="$HOME/dev/$(repo_of_app "$r")" ;; esac
+  git -C "$r" rev-parse --git-dir > /dev/null 2>&1 || die "git 저장소가 아닙니다: $r"
+  main_worktree_of "$r"
 }
 
 # 저장소의 메인 worktree 경로
@@ -143,21 +170,20 @@ base_branch=""
 children=2
 opt_display_name=""
 opt_dry_run=0
+main_repo=""
 with_repos=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --children) children="${2:-2}"; shift 2 ;;
     --display-name) opt_display_name="${2:-}"; shift 2 ;;
-    --with)
-      r="${2:-}"; [ -n "$r" ] || die "--with 에 저장소가 필요합니다."
-      case "$r" in /*) ;; *) r="$HOME/dev/$r" ;; esac
-      git -C "$r" rev-parse --git-dir > /dev/null 2>&1 || die "git 저장소가 아닙니다: $r"
-      with_repos+=("$(main_worktree_of "$r")"); shift 2 ;;
+    --repo) main_repo="$(resolve_repo "${2:-}" --repo)"; shift 2 ;;
+    --with) with_repos+=("$(resolve_repo "${2:-}" --with)"); shift 2 ;;
     --dry-run) opt_dry_run=1; shift ;;
     -*) die "알 수 없는 옵션: $1" ;;
     *) base_branch="$1"; shift ;;
   esac
 done
+[ -n "$main_repo" ] || die "--repo 로 대화를 이끌 앱 저장소를 지정해야 합니다 (예: --repo 고객)."
 [ -n "$base_branch" ] || die "base 브랜치 이름이 필요합니다 (예: feature-base/HDA-12345-car-list)."
 case "$base_branch" in feature-base/*) ;; *) die "base 브랜치는 feature-base/ 로 시작해야 합니다." ;; esac
 
@@ -166,7 +192,6 @@ case "$base_branch" in feature-base/*) ;; *) die "base 브랜치는 feature-base
 epic_key="$(printf '%s' "$base_branch" | sed -E 's|^feature-base/([A-Za-z]+-([0-9]+\|DRYRUN)).*|\1|')"
 [ "$epic_key" != "$base_branch" ] || die "base 브랜치에서 이슈 키를 찾지 못했습니다: $base_branch"
 
-main_repo="$(main_worktree_of "$PWD")"
 
 info "[1/3] develop 최신화 후 base 브랜치 생성: $base_branch"
 create_base_branch "$main_repo"
