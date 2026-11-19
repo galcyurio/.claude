@@ -422,6 +422,29 @@ link_parent_worktree() {
   fi
 }
 
+# orca 카드에 Jira 이슈를 붙인다. orca는 브랜치 이름으로 Jira를 찾아 주지 않고, 공식
+# 흐름은 worktree create 때 이슈를 넘기는 것인데 이 스크립트는 git worktree add로 자리를
+# 만들므로 여기서 따로 붙인다.
+# 전체 URL로 넣으면 Jira 조회 없이 linkedItems에만 저장돼 카드에 표시되지 않는다. 키를
+# 넘겨야 연결된 Jira 사이트에서 조회해 제목까지 채운다(실측).
+# 재사용한 자리에는 앞선 이슈의 링크가 남아 있으므로, 다른 Jira 링크는 먼저 떼어 낸다.
+link_jira_issue() {
+  local wt="$1" key="$2" wt_id url
+  if ! wt_id="$(wait_orca_worktree "$wt")"; then
+    warn "orca가 아직 인식하지 못해 Jira 연결을 건너뜁니다: $wt"
+    return 0
+  fi
+  "$ORCA" reference list --worktree "id:$wt_id" 2>/dev/null \
+    | awk -F '\t' -v key="$key" '$2 ~ /^\["jira"/ && $1 !~ ("/browse/" key "$") {print $1}' \
+    | while IFS= read -r url; do
+        "$ORCA" reference remove "$url" --worktree "id:$wt_id" > /dev/null \
+          || warn "앞선 Jira 링크를 떼지 못했습니다: $url"
+      done
+  info "  Jira 연결: $key"
+  "$ORCA" reference add "$key" --worktree "id:$wt_id" > /dev/null \
+    || warn "orca에 Jira 링크를 붙이지 못했습니다. 직접 실행해 주세요: orca reference add $key --worktree path:$wt"
+}
+
 # 작업 브랜치를 물고 있는 worktree 경로. 없으면 비어 있다.
 worktree_with_branch() {
   git worktree list --porcelain | awk -v ref="refs/heads/$1" '
@@ -539,6 +562,8 @@ else
 
   link_parent_worktree "$target_worktree" "$parent_path"
 fi
+
+[ "$opt_dry_run" = 1 ] || link_jira_issue "$target_worktree" "$issue_key"
 
 if [ "$opt_no_move" = 1 ]; then
   info "--no-move 이므로 세션을 옮기지 않습니다. 자리: $target_worktree${library_note:+ / $library_note}"
