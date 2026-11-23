@@ -1,7 +1,8 @@
 #!/bin/sh
 # Orca 워크스페이스 카드 상태를 전이시킨다. 규칙 본문은 ~/.claude/rules/orca.md 를 따른다.
-# usage: orca-workspace-status.sh <in-progress|my-turn|resume|in-review|completed> [--dry-run]
+# usage: orca-workspace-status.sh <in-progress|my-turn|resume|in-review|completed|start> [--dry-run]
 #   my-turn  사용자가 볼 차례(턴 종료, 권한 승인·질문 대기)로 넘긴다
+#   start    세션이 열린 순간 Idle로 넘기되, My turn 카드는 그대로 둔다. Orca가 앱을 다시 열며 세션을 복원해도 볼 차례를 잃지 않게 한다
 #   resume   My turn 카드만 In progress로 되돌린다. 도구 호출마다 불리므로 Orca를 조회하기 전에 캐시로 거른다
 #   In review와 Standby 카드는 사용자가 프롬프트를 보낼 때만 옮긴다. 그 밖에 Standby 카드에 볼 차례가 오면 읽지 않음 표시만 붙인다
 
@@ -16,6 +17,7 @@ dry_run="${2:-}"
 
 case "$target" in
   in-progress | in-review | completed) status="$target" ;;
+  start) status="completed" ;;
   my-turn) status="$MY_TURN_STATUS" ;;
   resume) status="in-progress" ;;
   *) exit 0 ;;
@@ -67,6 +69,12 @@ fi
 
 # 사용자가 카드를 직접 옮겼으면 resume은 건드리지 않는다.
 if [ "$target" = "resume" ] && [ "$current" != "$MY_TURN_STATUS" ]; then
+  remember "$current"
+  exit 0
+fi
+
+# 세션이 새로 열려도 사용자가 아직 확인하지 않은 My turn 카드는 Idle로 묻지 않는다.
+if [ "$target" = "start" ] && [ "$current" = "$MY_TURN_STATUS" ]; then
   remember "$current"
   exit 0
 fi
