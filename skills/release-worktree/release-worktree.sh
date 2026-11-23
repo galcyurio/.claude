@@ -197,9 +197,15 @@ resolve_library_only_base() {
 
   rest="$(worktree_rest)"
   [ -n "$rest" ] || return 1
+  # 에픽 자리(-HDA-23926-5)의 사본은 feature-base/...-5 처럼 끝 번호로만 끝나므로 그것도 받는다.
+  local num=""
+  case "$rest" in *-[0-9]|*-[0-9][0-9]) num="${rest##*-}" ;; esac
   while IFS=$'\t' read -r br up; do
     case "$up" in origin/*) ;; *) continue ;; esac
-    case "$br" in *-"$rest") ;; *) continue ;; esac
+    case "$br" in
+      *-"$rest") ;;
+      *) { [ -n "$num" ] && case "$br" in *-"$num") true ;; *) false ;; esac; } || continue ;;
+    esac
     up="${up#origin/}"
     case " $cands " in *" $up "*) continue ;; esac
     [ "$(git rev-list --count "$branch" --not "origin/$up" 2>/dev/null || echo 1)" = 0 ] || continue
