@@ -26,6 +26,22 @@ die() { echo "[오류] $*" >&2; exit 1; }
 warn() { echo "[경고] $*" >&2; }
 info() { echo "$*"; }
 
+# orca 카드 이름에 쓰는 앱 이름. start-feature.sh의 같은 함수와 값을 맞춘다.
+app_label() {
+  case "$1" in
+    heydealer-android) echo "고객" ;;
+    heydealer-for-dealer-android) echo "딜러" ;;
+    heydealer-call-android) echo "딜러-콜" ;;
+    heydealer-inspector-android) echo "평가사" ;;
+    heydealer-inspector-call-android) echo "평가사-콜" ;;
+    revolt-android) echo "리볼트" ;;
+    techbay-reconditioning-android) echo "테크베이-공업사" ;;
+    techbay-admin-android) echo "테크베이-어드민" ;;
+    techbay-call-android) echo "테크베이-콜" ;;
+    *) echo "$1" ;;
+  esac
+}
+
 # 세션 이사 함수는 move-worktree와 함께 쓴다.
 source "$(dirname "$0")/session-move.sh"
 
@@ -406,16 +422,19 @@ find_idle_worktree() {
 # 자리가 하나도 없는 경우) 연결하지 않고 넘어간다.
 # 부모 selector는 path:<경로>를 쓴다. worktree set 은 worktree:<id> 형식을 받지 않아
 # selector_not_found로 실패한다(worktree create 의 selector 목록과 다르다).
+# 카드 이름도 start-feature가 만든 하위 자리와 같은 `<앱> <번호>`로 고정한다. 이름을
+# 두지 않으면 카드가 연결된 Jira 제목을 대신 보여 주고, 그 제목은 착수 시점 값에 머문다.
 link_parent_worktree() {
-  local wt="$1" parent="$2" wt_id
+  local wt="$1" parent="$2" wt_id label
   if [ -z "$parent" ] || [ "$parent" = "$wt" ]; then
     info "  상위 worktree가 없어 부모 연결을 건너뜁니다 (풀 base: $pool_ref${slot_name:+-$slot_name})"
     return 0
   fi
+  label="$(app_label "$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")") ${wt##*-}"
   if wt_id="$(wait_orca_worktree "$wt")"; then
-    info "  상위 worktree 연결: $parent"
+    info "  상위 worktree 연결: $parent (카드 이름: $label)"
     "$ORCA" worktree set --worktree "id:$wt_id" \
-      --parent-worktree "path:$parent" --json > /dev/null \
+      --parent-worktree "path:$parent" --display-name "$label" --json > /dev/null \
       || warn "orca 부모 연결에 실패했습니다. 앱에서 직접 연결해 주세요: $parent"
   else
     warn "orca가 아직 인식하지 못해 부모 연결을 건너뜁니다: $wt"
