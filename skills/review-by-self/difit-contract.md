@@ -28,7 +28,7 @@
 그래서 difit를 띄운 직후 **이 세션을 감시하는 지킴이(`~/.claude/skills/review-by-self/difit-watchdog.sh`)를 함께 detach로 띄운다.** 세션이 사라지면 지킴이가 difit를 대신 종료한다.
 
 - Bash 도구가 실행하는 셸의 `$PPID`가 **이 세션의 `claude` 프로세스**다(실측: `ps -o pid,ppid,command -p $PPID` → `claude`, 그 위가 로그인 셸과 터미널 앱). 터미널 탭을 닫으면 이 프로세스가 사라진다.
-- **Orca 봇 Chat은 탭을 닫아도 `claude` 프로세스가 남는다**(2026-11-24 실측: 닫은 Chat의 difit가 계속 떠 있었다). 대신 `orca agent list --json`에는 열린 Chat 탭만 나오므로, 지킴이는 `ORCA_STRUCTURED_SESSION=1`이면 `ORCA_AGENT_SESSION_ID`가 이 목록에서 연속 2회 빠졌을 때 Chat이 닫힌 것으로 본다(2.5초 간격이라 닫은 뒤 5초 안에 정리된다). 조회가 실패하면 판단을 보류한다.
+- **Orca 봇 Chat은 탭을 닫아도 `claude` 프로세스가 남는다**(2026-11-24 실측: 닫은 Chat의 difit가 계속 떠 있었다). `orca agent list`도 실행 중인 Chat을 계속 보여 주므로 신호가 되지 못한다. 열린 Chat 탭은 Orca DB(`$ORCA_USER_DATA_PATH/agent-session-domain.db`)의 `agent_session_tabs` 테이블에만 남으므로, 지킴이는 `ORCA_STRUCTURED_SESSION=1`이면 `ORCA_AGENT_SESSION_ID`가 이 테이블에서 연속 2회 빠졌을 때 Chat이 닫힌 것으로 본다(2.5초 간격이라 닫은 뒤 5초 안에 정리된다). 조회가 실패하면 판단을 보류한다.
 - 런치 배너로 포트를 확정하고 `lsof`로 difit pid를 얻은 **직후**, 같은 Bash 호출 안에서 띄운다. 환경 변수는 지킴이에 그대로 상속된다.
 
 ```bash
