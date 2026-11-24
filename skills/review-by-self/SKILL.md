@@ -40,13 +40,11 @@ difit를 nohup으로 detach해 띄워 사용자가 리뷰하는 동안 세션이
 
 - `nohup <difit-command> <target> --no-open --keep-alive --clean --port <N> > <스크래치패드>/difit-<N>.log 2>&1 &` 형태로 띄운다. **`--comment` 프리로드는 넣지 않는다**(시작 코멘트를 쓰지 않음 — 아래 참고).
 - **`--no-open`이라 difit가 브라우저를 자동으로 열지 않는다.** 런치 1~3초 후 로그에서 `🚀 difit server started on http://localhost:<port>` 배너를 읽어 실제 바인딩 포트로 URL을 확정하고, pid는 `lsof -ti tcp:<port> -sTCP:LISTEN`으로 얻어 기록한다.
-- **포트·pid를 확정한 직후 같은 Bash 호출에서 지킴이를 띄운다** (계약의 "세션 종료 자동 정리 — 지킴이"). 이 세션의 `claude` 프로세스(`$PPID`)가 사라지면 지킴이가 difit를 대신 종료한다.
+- **포트·pid를 확정한 직후 같은 Bash 호출에서 지킴이를 띄운다** (계약의 "세션 종료 자동 정리 — 지킴이"). 이 세션의 `claude` 프로세스(`$PPID`)가 사라지거나 Orca 봇 Chat 탭이 닫히면 지킴이가 difit를 대신 종료한다.
 
   ```bash
   DIFIT_PID=$(lsof -ti tcp:<N> -sTCP:LISTEN)
-  nohup bash -c "while kill -0 $PPID 2>/dev/null && kill -0 $DIFIT_PID 2>/dev/null; do sleep 5; done
-    P=\$(lsof -ti tcp:<N> -sTCP:LISTEN 2>/dev/null)
-    [ \"\$P\" = \"$DIFIT_PID\" ] && kill \"\$P\"" >/dev/null 2>&1 &
+  nohup bash ~/.claude/skills/review-by-self/difit-watchdog.sh <N> "$DIFIT_PID" "$PPID" >/dev/null 2>&1 &
   ```
 
 - 사용자에게 **URL을 안내**하고, **직접 브라우저를 열어 리뷰한 뒤 남긴 코멘트가 있으면 알려달라**고 안내한 뒤 턴을 종료한다. **종료를 위한 신고는 요구하지 않는다** — 남길 코멘트가 없으면 그대로 닫아도 지킴이가 difit를 정리한다는 점을 함께 안내한다. `--keep-alive`라 브라우저를 닫아도 서버는 유지되므로, 브라우저 닫힘을 폴링하지 않는다(detach 실행이라 기다릴 하니스 잡도 없다).

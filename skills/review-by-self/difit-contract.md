@@ -25,21 +25,20 @@
 
 `nohup … &`로 detach했으므로 difit는 **클로드 세션이 끝나도 혼자 계속 켜져 있다.** 하니스가 정리해 주지 않으므로, 리뷰 결과에 반영할 것이 없어 사용자가 곧바로 세션을 닫으려는 상황에서 **오직 서버를 끄게 하려고 "리뷰 완료"를 알려야 하는 불필요한 왕복**이 생긴다.
 
-그래서 difit를 띄운 직후 **이 세션의 `claude` 프로세스를 감시하는 지킴이를 함께 detach로 띄운다.** 세션이 사라지면 지킴이가 difit를 대신 종료한다.
+그래서 difit를 띄운 직후 **이 세션을 감시하는 지킴이(`~/.claude/skills/review-by-self/difit-watchdog.sh`)를 함께 detach로 띄운다.** 세션이 사라지면 지킴이가 difit를 대신 종료한다.
 
-- Bash 도구가 실행하는 셸의 `$PPID`가 **이 세션의 `claude` 프로세스**다(실측: `ps -o pid,ppid,command -p $PPID` → `claude`, 그 위가 로그인 셸과 터미널 앱). 이 값을 감시 대상으로 쓴다.
-- 런치 배너로 포트를 확정하고 `lsof`로 difit pid를 얻은 **직후**, 같은 Bash 호출 안에서 띄운다.
+- Bash 도구가 실행하는 셸의 `$PPID`가 **이 세션의 `claude` 프로세스**다(실측: `ps -o pid,ppid,command -p $PPID` → `claude`, 그 위가 로그인 셸과 터미널 앱). 터미널 탭을 닫으면 이 프로세스가 사라진다.
+- **Orca 봇 Chat은 탭을 닫아도 `claude` 프로세스가 남는다**(2026-11-24 실측: 닫은 Chat의 difit가 계속 떠 있었다). 대신 `orca agent list --json`에는 열린 Chat 탭만 나오므로, 지킴이는 `ORCA_STRUCTURED_SESSION=1`이면 `ORCA_AGENT_SESSION_ID`가 이 목록에서 연속 2회 빠졌을 때 Chat이 닫힌 것으로 본다(2.5초 간격이라 닫은 뒤 5초 안에 정리된다). 조회가 실패하면 판단을 보류한다.
+- 런치 배너로 포트를 확정하고 `lsof`로 difit pid를 얻은 **직후**, 같은 Bash 호출 안에서 띄운다. 환경 변수는 지킴이에 그대로 상속된다.
 
 ```bash
 DIFIT_PID=$(lsof -ti tcp:<N> -sTCP:LISTEN)
-nohup bash -c "while kill -0 $PPID 2>/dev/null && kill -0 $DIFIT_PID 2>/dev/null; do sleep 5; done
-  P=\$(lsof -ti tcp:<N> -sTCP:LISTEN 2>/dev/null)
-  [ \"\$P\" = \"$DIFIT_PID\" ] && kill \"\$P\"" >/dev/null 2>&1 &
+nohup bash ~/.claude/skills/review-by-self/difit-watchdog.sh <N> "$DIFIT_PID" "$PPID" >/dev/null 2>&1 &
 ```
 
-- `$PPID`와 `$DIFIT_PID`는 **바깥 셸에서 전개**되어 감시 대상이 값으로 박히고, `\$P`는 지킴이 내부에서 전개된다. 이스케이프를 바꾸면 감시 대상이 엉뚱한 프로세스가 된다.
+- `$PPID`와 `$DIFIT_PID`는 **바깥 셸에서 전개**되어 감시 대상이 값으로 넘어간다.
 - **pid와 포트를 함께 확인한 뒤 죽인다.** difit가 이미 정상 종료되어 pid가 재사용되고 그 포트를 다른 프로세스가 점유한 상황에서 무관한 프로세스를 죽이지 않기 위한 조건이다.
-- **감시 조건에 difit pid도 넣는다**(`kill -0 $PPID && kill -0 $DIFIT_PID`). 이것이 없으면 6-D 회수 경로로 difit를 먼저 끈 뒤에도 지킴이가 세션이 끝날 때까지 빈 루프를 돌고, 한 세션에서 리뷰를 여러 번 하면 그만큼 쌓인다. 두 조건을 함께 보면 **difit가 먼저 사라진 경우 지킴이도 곧바로 물러난다**(실측: difit를 먼저 kill하면 5초 내 지킴이 자가 종료, 잔존 프로세스 0개).
+- **감시 조건에 difit pid도 넣는다**(지킴이 루프는 `kill -0 $DIFIT_PID`가 성공하는 동안만 돈다). 이것이 없으면 6-D 회수 경로로 difit를 먼저 끈 뒤에도 지킴이가 세션이 끝날 때까지 빈 루프를 돌고, 한 세션에서 리뷰를 여러 번 하면 그만큼 쌓인다. 두 조건을 함께 보면 **difit가 먼저 사라진 경우 지킴이도 곧바로 물러난다**(실측: difit를 먼저 kill하면 5초 내 지킴이 자가 종료, 잔존 프로세스 0개).
 - 루프를 빠져나온 뒤 포트를 다시 확인하므로, difit가 먼저 죽은 경우에는 pid가 일치하지 않아 아무것도 죽이지 않는다.
 - 세션이 **강제 종료되거나 다운되어도 동작한다.** `kill -0` 폴링이라 종료 신호를 받을 필요가 없다.
 - 정리 지연은 최대 5초다. 즉시 정리가 필요하면 회수 경로("회수 후 종료")를 쓴다.
