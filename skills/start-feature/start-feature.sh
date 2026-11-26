@@ -213,6 +213,12 @@ if [ "$opt_dry_run" = 0 ]; then
       --display-name "$opt_display_name" --json > /dev/null \
       || info "  표시 이름을 바꾸지 못했습니다: $opt_display_name"
   fi
+
+  # 카드에 에픽 Jira 이슈를 붙인다. git worktree add로 만든 자리는 orca가 이슈를 모르므로
+  # 따로 붙여야 한다. 전체 URL이 아니라 키를 넘겨야 Jira에서 조회해 카드에 표시된다.
+  info "  Jira 연결: $epic_key"
+  "$ORCA" reference add "$epic_key" --worktree "id:$base_wt_id" > /dev/null \
+    || info "  orca에 Jira 링크를 붙이지 못했습니다. 직접 실행해 주세요: orca reference add $epic_key --worktree path:$base_path"
 fi
 
 info "[3/3] 하위 worktree 생성 (저장소마다 ${children}개, 부모: $base_path)"
