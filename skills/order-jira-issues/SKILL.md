@@ -1,7 +1,6 @@
 ---
 name: order-jira-issues
 description: Jira 이슈들의 blocks·blocked by 관계를 정리하고 지금 착수할 이슈를 고를 때 사용한다. 사용자가 'order-jira-issues', '이슈 관계 보여줘', '차단 관계', 'blocked by 정리', '뭐부터 해야 해', '작업 순서', '지금 뭐 진행할까', '같이 진행할 수 있는 거 있어', '병렬로 할 수 있는 거', '막혀 있는 이슈', '남은 작업 순서' 등을 물을 때 이 스킬을 사용해야 한다. 이슈를 새로 만들거나 쪼개거나 링크를 거는 요청에는 `plan-feature-issues`를 사용한다.
-effort: medium
 ---
 
 # Jira 이슈 순서 파악

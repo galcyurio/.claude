@@ -1,6 +1,5 @@
 ---
 name: orca-open-in-split
-effort: low
 description: 웹 페이지(PR, Jira, 문서 등) 여러 개를 Orca 탭의 분할 창에 띄워야 할 때 사용한다. 사용자가 'orca-open-in-split', 'orca 탭에서 열어줘', '우측에 띄워줘', 'split해서 열어줘', 'PR 옆에 띄워줘', '분할 창으로 열어줘' 등을 요청하면 이 스킬을 사용한다. 기본 브라우저(Chrome·Safari)로 여는 요청에는 `open` 명령을, 페이지를 조작·캡처하는 요청에는 `orca-cli`를 사용한다.
 argument-hint: "[--direction right|left|down|up] <url> [<url> ...]"
 allowed-tools: Bash

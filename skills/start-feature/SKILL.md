@@ -1,6 +1,5 @@
 ---
 name: start-feature
-effort: low
 description: 피처를 할당받았을 때 기획 Jira(HD-) 하위에 HDA 에픽을 만들고, 에픽의 feature-base 브랜치를 원격에 올려 base worktree와 하위 작업용 worktree까지 준비하는 스킬. 이미 있는 에픽 키나 feature-base 브랜치를 주면 에픽 생성은 건너뛴다. `--dry-run`이면 에픽 생성부터 worktree까지 아무것도 쓰지 않고 계획만 보여 준다. 사용자가 'start-feature', '피처 시작', '에픽 만들어', '에픽 생성', '피처 브랜치 만들어', 'feature-base 만들어', '에픽 브랜치 준비해줘' 등을 기획 Jira 키나 에픽 키와 함께 요청할 때 이 스킬을 사용해야 한다. 이슈 하나를 착수하는 요청에는 `start-worktree`를 사용한다.
 argument-hint: "<HD-기획키 | HDA-에픽키 | feature-base/...> [--dry-run] [--children <n>] [--with <앱>...]"
 allowed-tools: Bash, AskUserQuestion, mcp__claude_ai_Atlassian_MCP__getJiraIssue

@@ -1,6 +1,5 @@
 ---
 name: approve-pr
-effort: low
 description: PR을 `LGTM 👍🙆‍♀️🙏💻` 메시지와 함께 Approve하는 스킬. 사용자가 'approve-pr', 'PR 승인해', 'PR approve해', '어프루브해줘', 'LGTM 남겨줘' 등을 PR 링크·번호와 함께 요청할 때 이 스킬을 사용한다. PR 리뷰 요청에는 `review-by-agents`를 사용한다.
 argument-hint: "[PR URL | PR 번호]"
 allowed-tools: Bash

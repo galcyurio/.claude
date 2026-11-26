@@ -1,6 +1,5 @@
 ---
 name: start-worktree
-effort: low
 description: Jira 이슈 하나를 worktree에서 착수하는 스킬. 유휴 worktree를 재사용하거나 새로 만들고 브랜치를 끊은 뒤, 현재 claude 세션을 대화 이력째 그 자리로 옮기고 원래 탭을 닫는다. 사용자가 'start-worktree', '이 이슈 작업 시작해', 'worktree에서 시작해', '작업 시작해줘', '착수해줘' 등을 Jira 키와 함께 요청할 때 이 스킬을 사용해야 한다. 피처 자체를 여는 요청에는 `start-feature`, 작업을 끝내고 자리를 반납하는 요청에는 `release-worktree`를 사용한다.
 argument-hint: "<JIRA-KEY> [--base <ref>] [--pool <ref>] [--slot <계열>] [--library] [--new] [--no-move]"
 allowed-tools: Bash, AskUserQuestion

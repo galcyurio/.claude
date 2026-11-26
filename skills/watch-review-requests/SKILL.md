@@ -1,6 +1,5 @@
 ---
 name: watch-review-requests
-effort: low
 description: 나에게 온 PR 리뷰 요청을 주기적으로 확인하는 모니터를 Orca 탭에 띄우거나 끄는 스킬. 모니터는 새 요청이 오면 같은 Jira 키의 PR 을 레포와 상관없이 묶어 Orca 탭 하나를 열고 `/review-by-agents` 를 보낸다. 사용자가 'watch-review-requests', '리뷰 모니터', '리뷰 요청 감시', '리뷰 요청 모니터링 켜줘', '리뷰 모니터 꺼줘' 등을 요청할 때 이 스킬을 사용해야 한다. PR 하나를 지금 리뷰하는 요청에는 `review-by-agents` 를 사용한다.
 argument-hint: "[--interval <초>] | stop"
 allowed-tools: Bash

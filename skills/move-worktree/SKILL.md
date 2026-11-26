@@ -1,6 +1,5 @@
 ---
 name: move-worktree
-effort: low
 description: 진행 중인 작업 브랜치와 현재 claude 세션을 같은 저장소의 다른 worktree 자리로 옮겨야 할 때 사용한다. 사용자가 'move-worktree', 'N번 worktree로 옮겨', '작업 자리 옮겨', '이 작업 N번 자리로', '다른 worktree에서 이어서 해' 등을 요청하면 이 스킬을 사용한다. 이슈를 새로 착수하는 요청에는 `start-worktree`, 작업을 끝내고 자리를 반납하는 요청에는 `release-worktree`를 사용한다.
 argument-hint: "<N | 대상 자리 경로> [--discard-target]"
 allowed-tools: Bash, AskUserQuestion

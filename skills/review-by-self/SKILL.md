@@ -2,7 +2,6 @@
 name: review-by-self
 description: "변경사항을 difit(diff 뷰어)로 띄워 사용자가 직접 리뷰하게 하는 스킬. 사용자가 'review-by-self', 'difit', 'difit으로 띄워', 'difit으로 리뷰', '뷰어로 보여줘' 등을 지칭할 때만 사용한다. 일반 '리뷰해줘'·'코드 리뷰'·다관점 병렬 리뷰는 review-by-agents를 사용한다."
 model: sonnet
-effort: low
 ---
 
 # review-by-self — difit 뷰어로 변경사항 직접 리뷰
